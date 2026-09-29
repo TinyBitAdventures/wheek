@@ -1,5 +1,15 @@
 # Changelog
 
+## Unreleased
+
+### The Warren
+- The burrows now open into a warren you can explore: winding tunnels under the whole wood, laid out to match the map above, so every burrow's den sits right under its entrance. Crawl in from any burrow you've found (E, then "Crawl down into the warren").
+- Five hidden chambers to discover: the Glowworm Grotto, Root Cellar, Mushroom Hall, Old Seed Store and Crystal Hollow, each with its own look and treats to eat.
+- A curio stash: nine lost trinkets tucked into the chambers and dead-end nooks, with the Golden Acorn waiting in the deepest one. They get their own page in the journal.
+- Your map fills in as you explore. Press M for a big map; sniff (R) underground to find curios and mark unexplored chambers.
+- Walk to a burrow's den from below to discover it, and climb out there. Passages you've walked end to end become quick routes: from a burrow, you can scurry straight to any burrow you've linked up.
+- Your herd comes underground with you. Daylight (or moonlight) falls down each burrow's shaft, and the hawk and foxes can't reach you down there.
+
 ## v0.1.0 (2026-09-28)
 
 The first release. Wheek! moves out of the playground into its own repo.

@@ -7,7 +7,7 @@ const [out = 'shots', ...want] = process.argv.slice(2);
 const W = +(process.env.W || 1280), H = +(process.env.H || 800);
 
 // Runs in the page with the game's debug handle (window.__game) in scope as g.
-const setup = (page, body) => page.evaluate(`(()=>{const g=window.__game,{G,pig}=g;${body};pig.pos.y=g.heightAt(pig.pos.x,pig.pos.z);})()`);
+const setup = (page, body) => page.evaluate(`(()=>{const g=window.__game,{G,pig}=g;${body};pig.pos.y=G.under?0:g.heightAt(pig.pos.x,pig.pos.z);})()`);
 // Hold the camera where a scene puts it (the game eases it back behind the pig 1.5 s after a drag).
 // Headless WebGL runs at a few frames a second, so after a teleport wait until the eased camera has caught up.
 const camera = async (page, yaw, dist, pitch) => {
@@ -52,6 +52,27 @@ const scenes = {
     await page.click('#tmList .btn.alt >> nth=0', { timeout: 5000 });
     await page.waitForTimeout(1600);
   },
+  // Down in the warren: crawl along the first passage from the Meadow Burrow's den.
+  async warren(page) {
+    await page.waitForFunction(() => !window.__game.G.inTunnel, null, { timeout: 20000, polling: 250 });
+    await setup(page, `G.time=12;g.enterWarren(g.tunnels[0],true)`);
+    await page.keyboard.down('KeyW'); await page.waitForTimeout(2500); await page.keyboard.up('KeyW');
+    await page.waitForTimeout(1500);
+  },
+  // A den under a burrow: daylight falls down the shaft.
+  async den(page) {
+    await setup(page, `const n=g.tunnels[0].node;if(!g.G.under)g.enterWarren(g.tunnels[0],true);pig.pos.set(n.x-.35,0,n.z+.2);pig.heading=Math.PI/2;G.camYaw=pig.heading+Math.PI;G.camPitch=.25`);
+    await page.waitForTimeout(3500);
+  },
+  // A hidden chamber with the full map open.
+  async chamber(page) {
+    await setup(page, `const n=g.W.nodes.find(n=>n.theme==='${process.env.HALL || 'shrooms'}');if(!g.G.under)g.enterWarren(g.tunnels[0],true);pig.pos.set(n.x+n.r*.7,0,n.z);pig.heading=-Math.PI/2;G.camYaw=pig.heading+Math.PI;G.camPitch=.35`);
+    await page.waitForTimeout(3500);
+  },
+  async map(page) {
+    await setup(page, `g.W.edges.forEach(e=>e.pts.forEach(p=>p.seen=true));g.W.nodes.forEach(n=>n.seen=true);document.getElementById('mapwrap').classList.add('big')`);
+    await page.waitForTimeout(1200);
+  },
 };
 
 (async () => {
@@ -85,7 +106,7 @@ const scenes = {
     await shot(name);
   }
   if (pick('journal')) { await page.keyboard.press('KeyJ'); await page.waitForTimeout(600); await shot('journal'); }
-  const info = await page.evaluate(() => { const g = window.__game, r = g.renderer.info.render; return { calls: r.calls, triangles: r.triangles, friends: g.friends.length, tunnels: g.tunnels.length, spots: g.spots.length }; });
+  const info = await page.evaluate(() => { const g = window.__game, r = g.renderer.info.render; return { calls: r.calls, triangles: r.triangles, caveTris: g.W.tris, nodes: g.W.nodes.length, edges: g.W.edges.length, friends: g.friends.length, tunnels: g.tunnels.length, spots: g.spots.length }; });
   console.log(JSON.stringify({ url: URL, version, ...info }));
   console.log(errors.length ? 'ERRORS\n' + errors.join('\n') : 'no console errors');
   await browser.close();

@@ -233,7 +233,7 @@ const RANKS=[[0,'Nibbler'],[4,'Sniffer'],[12,'Rummager'],[25,'Master Forager'],[
 const G={started:false,paused:false,over:false,modal:false,inTunnel:false,
   hp:100,full:80,vitc:75,energy:100,happy:50,score:0,best:lsGet('wheek-best',0),
   day:1,time:7.0,combo:0,comboT:0,forages:0,pets:0,petStreak:0,lastPetHuman:null,petStreakT:0,
-  found:{},tunnels:0,luckT:0,giftT:40,huddle:false,wheekT:0,sniffCD:0,popcornCD:0,cause:'',nightsSurvived:0,eaten:0};
+  found:{},curios:{},tunnels:0,luckT:0,giftT:40,huddle:false,wheekT:0,sniffCD:0,popcornCD:0,cause:'',nightsSurvived:0,eaten:0};
 const pig={pos:new THREE.Vector3(2.5,0,-1.5),vel:new THREE.Vector3(),heading:Math.PI,vy:0,air:false,phase:0,obj:null,parts:{},eating:0,foraging:0,knock:0,popSpin:0,fur:[]};
 (()=>{const s=lsGet('wheek-pig',null);const b=s&&BREEDS[s.breed]?s.breed:'american';G.breed=b;G.coat=s&&BREEDS[b].coats.includes(s.coat)?s.coat:BREEDS[b].coats[0];G.name=(s&&s.name)||PIG_NAMES[Math.floor(Math.random()*PIG_NAMES.length)];G.perk=perksFor(b)})();
 const keys={};
@@ -533,8 +533,8 @@ function heart(x,y,z){const s=new THREE.Sprite(heartMat.clone());s.scale.setScal
 function updateHearts(dt){for(let i=hearts.length-1;i>=0;i--){const h=hearts[i];h.life-=dt;h.s.position.y+=h.vy*dt;h.s.position.x+=Math.sin(h.life*6)*.03*dt;h.s.material.opacity=Math.min(1,h.life*1.5);if(h.life<=0){scene.remove(h.s);h.s.material.dispose();hearts.splice(i,1)}}}
 // sniff markers
 const markers=[];
-function marker(x,y,z,color){const s=new THREE.Sprite(new THREE.SpriteMaterial({map:glowTex,color,transparent:true,depthWrite:false,blending:THREE.AdditiveBlending,fog:false}));s.position.set(x,y,z);s.scale.setScalar(.5);scene.add(s);markers.push({s,life:7,y})}
-function updateMarkers(dt,t){for(let i=markers.length-1;i>=0;i--){const m=markers[i];m.life-=dt;m.s.position.y=m.y+.25+Math.sin(t*3+i)*.08;m.s.scale.setScalar(.45+Math.sin(t*5+i)*.1);m.s.material.opacity=Math.min(1,m.life);if(m.life<=0){scene.remove(m.s);markers.splice(i,1)}}}
+function marker(x,y,z,color,to=scene){const s=new THREE.Sprite(new THREE.SpriteMaterial({map:glowTex,color,transparent:true,depthWrite:false,blending:THREE.AdditiveBlending,fog:false}));s.position.set(x,y,z);s.scale.setScalar(.5);to.add(s);markers.push({s,life:7,y})}
+function updateMarkers(dt,t){for(let i=markers.length-1;i>=0;i--){const m=markers[i];m.life-=dt;m.s.position.y=m.y+.25+Math.sin(t*3+i)*.08;m.s.scale.setScalar(.45+Math.sin(t*5+i)*.1);m.s.material.opacity=Math.min(1,m.life);if(m.life<=0){m.s.removeFromParent();m.s.material.dispose();markers.splice(i,1)}}}
 // fireflies
 const ffN=90;const ffGeo=new THREE.BufferGeometry();const ffPos=new Float32Array(ffN*3);ffGeo.setAttribute('position',new THREE.BufferAttribute(ffPos,3));
 const ffMat=new THREE.PointsMaterial({map:glowTex,color:0xd8ff70,size:.12,transparent:true,opacity:0,depthWrite:false,blending:THREE.AdditiveBlending});
@@ -658,6 +658,7 @@ function updateReveals(dt){for(let i=revealAnims.length-1;i>=0;i--){const a=reve
 
 // wheek & tossing
 function wheek(){if(G.wheekCD>0)return;G.wheekCD=1.2;SFX.wheek();G.wheekT=3;floaty('Wheek!','#fff');
+  if(G.under){setTimeout(()=>SFX.wheek(),420);if(herd.length)setTimeout(()=>SFX.chut(),700);return}
   const h=humans.find(h=>h.visible&&Math.hypot(h.obj.position.x-pig.pos.x,h.obj.position.z-pig.pos.z)<6);
   if(h){if(h.tossCD>0){toast(`${h.name}: “You already had a snack, silly!” (${Math.ceil(h.tossCD)}s)`);return}
     h.tossCD=45;const type=pick({carrot:40,strawberry:30,pepper:25,goldCarrot:2});setTimeout(()=>tossVeg(h,type),600);toast(`🥰 ${h.name} heard you! Here comes a snack…`,'good')}
@@ -669,7 +670,7 @@ function updateDrops(dt){for(let i=drops.length-1;i>=0;i--){const d=drops[i];if(
   else{d.life-=dt;d.obj.position.y=d.to.y+Math.abs(Math.sin(performance.now()/300))*.01;if(d.life<=0){scene.remove(d.obj);drops.splice(i,1)}}}}
 
 // sniff
-function sniff(){if(G.sniffCD>0){toast(`Your nose needs a moment (${Math.ceil(G.sniffCD)}s)`);return}G.sniffCD=10;SFX.sniff();let n=0,t=0;
+function sniff(){if(G.sniffCD>0){toast(`Your nose needs a moment (${Math.ceil(G.sniffCD)}s)`);return}G.sniffCD=10;SFX.sniff();if(G.under){sniffWarren();return}let n=0,t=0;
   for(const s of spots){if(!s.ready)continue;const d=Math.hypot(s.x-pig.pos.x,s.z-pig.pos.z);if(d<22){marker(s.x,heightAt(s.x,s.z)+.2,s.z,0xffd060);n++}}
   for(const tu of tunnels){const d=Math.hypot(tu.x-pig.pos.x,tu.z-pig.pos.z);if(d<32){marker(tu.ex,heightAt(tu.ex,tu.ez)+.35,tu.ez,tu.found?0x7fd0ff:0x9a7bff);if(!tu.found)t++}}
   let w=0;for(const f of friends){if(f.state!=='wild')continue;const d=Math.hypot(f.pos.x-pig.pos.x,f.pos.z-pig.pos.z);if(d<30){marker(f.pos.x,f.pos.y+.3,f.pos.z,0xff9fd0);f.known=true;w++}}
@@ -698,12 +699,16 @@ function openTunnel(t){
   G.modal=true;$('tunnelMenu').classList.remove('hidden');$('tmTitle').textContent='🕳 '+t.name;
   const list=$('tmList');list.innerHTML='';
   const rest=document.createElement('button');rest.className='btn';rest.innerHTML='💤 Nap here — restore energy &amp; health, 2 hours pass';rest.onclick=()=>{closeTunnel();restInTunnel()};list.appendChild(rest);
-  tunnels.filter(x=>x.found&&x!==t).forEach(x=>{const b=document.createElement('button');b.className='btn alt';const d=Math.round(Math.hypot(x.x-t.x,x.z-t.z));b.innerHTML=`➜ Scurry to <b>${x.name}</b> <span style="opacity:.6">(${d} m)</span>`;b.onclick=()=>{closeTunnel();startTravel(t,x)};list.appendChild(b)});
-  if(tunnels.filter(x=>x.found).length<2){const p=document.createElement('p');p.textContent='Find more tunnels (sniff with R!) to travel between them.';list.appendChild(p)}
+  const dig=document.createElement('button');dig.className='btn';dig.innerHTML='🕳 Crawl down into the warren — explore the tunnels';dig.onclick=()=>{closeTunnel();enterWarren(t)};list.appendChild(dig);
+  const linked=linkedTo(t);linked.forEach(x=>{const b=document.createElement('button');b.className='btn alt';const d=Math.round(Math.hypot(x.x-t.x,x.z-t.z));b.innerHTML=`➜ Scurry to <b>${x.name}</b> <span style="opacity:.6">(${d} m)</span>`;b.onclick=()=>{closeTunnel();startTravel(t,x)};list.appendChild(b)});
+  if(!linked.length){const p=document.createElement('p');p.textContent=tunnels.filter(x=>x.found).length<2?'Find more tunnels (sniff with R!) to travel between them.':'Explore the warren below. Once you have walked the passages between two burrows, you can scurry straight there.';list.appendChild(p)}
   const back=document.createElement('button');back.className='btn alt';back.textContent='↩ Back outside';back.onclick=closeTunnel;list.appendChild(back);
   G.hidden=true;
 }
 function closeTunnel(){G.modal=false;G.hidden=false;$('tunnelMenu').classList.add('hidden')}
+function findTunnel(tu,below){tu.found=true;G.tunnels++;SFX.find('rare');callout('rare','🕳 '+tu.name,100);
+  toast(below?`🕳 <b>You found ${tu.name} from below!</b> Climb out here any time.`:`🕳 <b>Tunnel discovered: ${tu.name}!</b> Press E at the entrance to nap, hide or crawl into the warren.`,'gold',5);addScore(100,'tunnel!','#7fd0ff');
+  if(G.tunnels===tunnels.length){toast('🏆 <b>You found every tunnel!</b> +1000','gold',6);addScore(1000,'all tunnels!','#ffd23f')}}
 function restInTunnel(){flash('rgba(0,0,0,1)',1);G.time+=2;G.energy=100;G.hp=Math.min(100,G.hp+20);G.full=Math.max(0,G.full-8);G.vitc=Math.max(0,G.vitc-5);if(herd.length){G.happy=Math.min(100,G.happy+herd.length*6);toast(`💤 You and your herd of ${herd.length+1} snuggled up in a warm pile. Energy restored!`,'good')}else toast('💤 You curled up in the cozy burrow. Energy restored!','good');addScore(10+herd.length*10)}
 function startTravel(a,b){
   G.inTunnel=true;travel={a,b,t:0};$('prompt').innerHTML='';$('danger').style.display='none';SFX.whoosh();scene.remove(pig.obj);tScene.add(pig.obj);pig.blob.visible=false;G.energy=Math.max(0,G.energy-3);
@@ -715,6 +720,265 @@ function updateTravel(dt){
   const pc=tCurve.getPointAt(clamp(k-.035,0,1));tCam.position.set(pc.x,pc.y-.16,pc.z);tCam.lookAt(p.x,p.y-.25,p.z);tScene.userData.pl.position.set(pc.x,pc.y-.08,pc.z);
   if(travel.t>=1){const b=travel.b;tScene.remove(pig.obj);scene.add(pig.obj);pig.obj.rotation.set(0,0,0);pig.pos.set(b.ex,heightAt(b.ex,b.ez),b.ez);pig.heading=b.rot;G.camYaw=b.rot+Math.PI;pig.blob.visible=true;G.inTunnel=false;travel=null;regroupHerd();flash('rgba(0,0,0,1)',1);toast(`🕳 Popped out at <b>${b.name}</b>`);addScore(15)}
 }
+
+// ============================================================ the warren (explorable underground)
+// The burrows open into one cave network. Its layout is the surface map shrunk by WS, so each burrow's den lies right
+// under its entrance and every passage heads the way its burrow lies above. The walls are one surface-nets mesh over a
+// signed distance field (open space < 0): capsules for passages, domes for chambers, a flat floor at y=0.
+const WS=.34,W_RT=.38,W_CY=.3,W_VS=.1,W_TOP=1.55;
+const wScene=new THREE.Scene();wScene.background=new THREE.Color(0x0a0604);wScene.fog=new THREE.Fog(0x0a0604,.9,7);
+const W={nodes:[],edges:[],prims:[],cells:new Map(),foods:[],curios:[],glows:[],pool:[],trail:[],pts:0,seenPts:0,revealT:0,lightT:0,from:null};
+const CURIOS={
+  button:{name:'Lost Button',icon:'🔘',rarity:'common',pts:60},
+  acorn:{name:'Acorn Cap',icon:'🌰',rarity:'common',pts:60},
+  marble:{name:'Blue Marble',icon:'🔵',rarity:'uncommon',pts:100},
+  shell:{name:'Snail Shell',icon:'🐚',rarity:'uncommon',pts:100},
+  coin:{name:'Old Penny',icon:'🪙',rarity:'uncommon',pts:100},
+  feather:{name:'Jay Feather',icon:'🪶',rarity:'rare',pts:180},
+  key:{name:'Tiny Brass Key',icon:'🗝️',rarity:'rare',pts:180},
+  crystal:{name:'Glow Crystal',icon:'💎',rarity:'epic',pts:300},
+  goldAcorn:{name:'Golden Acorn',icon:'✨🌰',rarity:'legendary',pts:600},
+};
+const HALLS=[['Glowworm Grotto','glow'],['Root Cellar','roots'],['Mushroom Hall','shrooms'],['Old Seed Store','larder'],['Crystal Hollow','crystal']];
+const HALL_BLURB={glow:'Glowworms twinkle on the ceiling.',roots:'Tree roots dangle everywhere, and someone left carrots.',shrooms:'Mushrooms glow in the dark.',larder:'An old guinea pig larder, still stocked!',crystal:'The walls sparkle.'};
+const smin=(a,b,k)=>{const h=clamp(.5+.5*(b-a)/k,0,1);return lerp(b,a,h)-k*h*(1-h)};
+function primSd(p,x,y,z){
+  if(p.c){const dx=(x-p.x)/p.r,dy=y/p.h,dz=(z-p.z)/p.r;return (Math.sqrt(dx*dx+dy*dy+dz*dz)-1)*Math.min(p.r,p.h)}
+  if(p.v){const qy=y-clamp(y,p.y0,p.y1);return Math.sqrt((x-p.x)**2+qy*qy+(z-p.z)**2)-p.r}
+  const bx=p.bx-p.ax,bz=p.bz-p.az,t=clamp(((x-p.ax)*bx+(z-p.az)*bz)/(bx*bx+bz*bz),0,1),qx=x-p.ax-bx*t,qz=z-p.az-bz*t,qy=y-W_CY;
+  return Math.sqrt(qx*qx+qy*qy+qz*qz)-W_RT}
+function primBox(p){return p.c||p.v?[p.x-p.r,p.x+p.r,p.z-p.r,p.z+p.r]:[Math.min(p.ax,p.bx)-W_RT,Math.max(p.ax,p.bx)+W_RT,Math.min(p.az,p.bz)-W_RT,Math.max(p.az,p.bz)+W_RT]}
+const wKey=(cx,cz)=>(cx+500)*1000+cz+500;
+// distance to the cave wall without its noise (collision and the camera keep a margin for that)
+function wSdf(x,y,z,floor=true){const l=W.cells.get(wKey(Math.floor(x/2),Math.floor(z/2)));if(!l)return 1;let d=1;for(const p of l)d=Math.min(d,primSd(p,x,y,z));return floor?Math.max(d,-y):d}
+function warrenCollide(P,pr){const y=.12,e=.02;
+  for(let k=0;k<3;k++){const d=wSdf(P.x,y,P.z);if(d<-pr)return;const gx=wSdf(P.x+e,y,P.z)-wSdf(P.x-e,y,P.z),gz=wSdf(P.x,y,P.z+e)-wSdf(P.x,y,P.z-e),gl=Math.hypot(gx,gz);if(gl<1e-6)return;P.x-=gx/gl*(d+pr);P.z-=gz/gl*(d+pr)}}
+
+// naive surface nets: one vertex per cell the surface crosses, one quad per crossing grid edge; normals face open space
+function surfaceNets(F,nx,ny,nz,ox,oy,oz,vs){
+  const I=(x,y,z)=>x+nx*(y+ny*z);const V=new Int32Array(nx*ny*nz).fill(-1);const pos=[],nor=[],idx=[];const cv=new Float32Array(8);
+  const EG=[[0,1],[2,3],[4,5],[6,7],[0,2],[1,3],[4,6],[5,7],[0,4],[1,5],[2,6],[3,7]];
+  for(let z=0;z<nz-1;z++)for(let y=0;y<ny-1;y++)for(let x=0;x<nx-1;x++){
+    let m=0;for(let k=0;k<8;k++){const v=F[I(x+(k&1),y+(k>>1&1),z+(k>>2&1))];cv[k]=v;if(v<0)m|=1<<k}
+    if(m===0||m===255)continue;
+    let sx=0,sy=0,sz=0,c=0;
+    for(const [a,b] of EG){if((cv[a]<0)===(cv[b]<0))continue;const t=cv[a]/(cv[a]-cv[b]);sx+=(a&1)+((b&1)-(a&1))*t;sy+=(a>>1&1)+((b>>1&1)-(a>>1&1))*t;sz+=(a>>2&1)+((b>>2&1)-(a>>2&1))*t;c++}
+    V[I(x,y,z)]=pos.length/3;pos.push(ox+(x+sx/c)*vs,oy+(y+sy/c)*vs,oz+(z+sz/c)*vs);
+    const gx=cv[1]+cv[3]+cv[5]+cv[7]-cv[0]-cv[2]-cv[4]-cv[6],gy=cv[2]+cv[3]+cv[6]+cv[7]-cv[0]-cv[1]-cv[4]-cv[5],gz=cv[4]+cv[5]+cv[6]+cv[7]-cv[0]-cv[1]-cv[2]-cv[3],gl=Math.hypot(gx,gy,gz)||1;
+    nor.push(-gx/gl,-gy/gl,-gz/gl)}
+  const quad=(a,b,c,d,flip)=>{if(a<0||b<0||c<0||d<0)return;if(flip)idx.push(a,b,c,a,c,d);else idx.push(a,c,b,a,d,c)};
+  for(let z=0;z<nz;z++)for(let y=0;y<ny;y++)for(let x=0;x<nx;x++){const s0=F[I(x,y,z)]<0;
+    if(x<nx-1&&y>0&&z>0&&(F[I(x+1,y,z)]<0)!==s0)quad(V[I(x,y-1,z-1)],V[I(x,y,z-1)],V[I(x,y,z)],V[I(x,y-1,z)],s0);
+    if(y<ny-1&&x>0&&z>0&&(F[I(x,y+1,z)]<0)!==s0)quad(V[I(x-1,y,z-1)],V[I(x-1,y,z)],V[I(x,y,z)],V[I(x,y,z-1)],s0);
+    if(z<nz-1&&x>0&&y>0&&(F[I(x,y,z+1)]<0)!==s0)quad(V[I(x-1,y-1,z)],V[I(x,y-1,z)],V[I(x,y,z)],V[I(x-1,y,z)],s0)}
+  // make the winding agree with the normals (which way round is easy to get backwards)
+  let agree=0;for(let i=0;i<Math.min(idx.length,30000);i+=3){const a=idx[i]*3,b=idx[i+1]*3,c=idx[i+2]*3;
+    const ux=pos[b]-pos[a],uy=pos[b+1]-pos[a+1],uz=pos[b+2]-pos[a+2],wx=pos[c]-pos[a],wy=pos[c+1]-pos[a+1],wz=pos[c+2]-pos[a+2];
+    agree+=(uy*wz-uz*wy)*nor[a]+(uz*wx-ux*wz)*nor[a+1]+(ux*wy-uy*wx)*nor[a+2]}
+  if(agree<0)for(let i=0;i<idx.length;i+=3){const t=idx[i+1];idx[i+1]=idx[i+2];idx[i+2]=t}
+  return {pos,nor,idx}}
+
+function wSet(name,mats,tweak){const parts=bake(name);return parts.map(p=>{const mat=tweak?tweak(p.mat.clone()):p.mat;const im=new THREE.InstancedMesh(p.geo,mat,mats.length);mats.forEach((m,j)=>im.setMatrixAt(j,m));im.computeBoundingSphere();wScene.add(im);return im})}
+function itemModel(type){const it=ITEMS[type];const o=M[it.model].clone(true);
+  if(it.gold||it.tint)o.traverse(m=>{if(m.isMesh){m.material=m.material.clone();if(it.gold){m.material.color.set(0xffd54a);m.material.emissive=new THREE.Color(0xffa800);m.material.emissiveIntensity=.5}else if(m.material.name==='Veg')m.material.color.set(it.tint)}});
+  o.scale.setScalar({Hay:.8,Carrot:1,Pepper:1.1}[it.model]||1.3);return o}
+function curioModel(k){const g=new THREE.Group();
+  const add=(geo,col,o={})=>{const p={color:col,roughness:o.r??.45,metalness:o.m??0};if(o.e)Object.assign(p,{emissive:new THREE.Color(o.e),emissiveIntensity:o.ei??1});const m=new THREE.Mesh(geo,new THREE.MeshStandardMaterial(p));g.add(m);return m};
+  const acorn=(gold)=>{const c=gold?{m:.6,r:.3,e:0xffa800,ei:.6}:{};add(new THREE.SphereGeometry(.026,14,10),gold?0xffd54a:0xb57a3a,c).scale.set(1,1.3,1);const cap=add(new THREE.SphereGeometry(.029,14,8,0,Math.PI*2,0,Math.PI/2),gold?0xffc02a:0x6b4a2a,c);cap.position.y=.012};
+  if(k==='marble')add(new THREE.SphereGeometry(.028,18,12),0x3a7bff,{r:.08,e:0x0a2050});
+  else if(k==='button'){const b=add(new THREE.CylinderGeometry(.034,.034,.01,20),0xd94a6a);b.rotation.x=1.2}
+  else if(k==='acorn')acorn(false);
+  else if(k==='shell'){add(new THREE.TorusGeometry(.024,.012,10,20),0xe8c9a0).rotation.y=.4;add(new THREE.SphereGeometry(.013,10,8),0xd8b080).position.set(0,0,.004)}
+  else if(k==='coin'){const c=add(new THREE.CylinderGeometry(.026,.026,.006,22),0xc07a3a,{m:.8,r:.3});c.rotation.x=1.3}
+  else if(k==='feather'){const f=add(new THREE.ConeGeometry(.014,.11,8),0x3a8adf,{r:.6});f.scale.z=.3;f.rotation.z=1.1}
+  else if(k==='key'){add(new THREE.TorusGeometry(.016,.005,8,16),0xd8a830,{m:.8,r:.3}).position.x=-.025;add(new THREE.BoxGeometry(.05,.008,.008),0xd8a830,{m:.8,r:.3}).position.x=.01}
+  else if(k==='crystal')add(new THREE.OctahedronGeometry(.032),0x9af0ff,{r:.15,e:0x2a90b0,ei:1.4}).scale.y=1.7;
+  else acorn(true);
+  return g}
+
+function buildWarren(){
+  const wr=mulberry32(20260929),WR=(a,b)=>a+(b-a)*wr();const N=W.nodes,E=W.edges;
+  tunnels.forEach(t=>{const n={x:t.x*WS,z:t.z*WS,r:1.05,h:.85,kind:'den',name:t.name,den:t};t.node=n;N.push(n)});
+  for(const [name,theme] of HALLS)for(let k=0;k<500;k++){const a=wr()*Math.PI*2,rr=Math.sqrt(wr())*(EDGE-6)*WS,x=Math.cos(a)*rr,z=Math.sin(a)*rr;
+    if(N.some(n=>Math.hypot(n.x-x,n.z-z)<n.r+4))continue;N.push({x,z,r:WR(1.35,1.7),h:WR(1,1.15),kind:'hall',theme,name});break}
+  const link=(a,b)=>E.push({a,b});
+  const segX=(a,b,c,d)=>{const o=(p,q,r)=>Math.sign((q.x-p.x)*(r.z-p.z)-(q.z-p.z)*(r.x-p.x));return o(a,b,c)!==o(a,b,d)&&o(c,d,a)!==o(c,d,b)};
+  const segD=(p,a,b)=>{const bx=b.x-a.x,bz=b.z-a.z,t=clamp(((p.x-a.x)*bx+(p.z-a.z)*bz)/(bx*bx+bz*bz),0,1);return Math.hypot(p.x-a.x-bx*t,p.z-a.z-bz*t)};
+  const ok=(a,b)=>!E.some(e=>e.a!==a&&e.b!==a&&e.a!==b&&e.b!==b&&segX(a,b,e.a,e.b))&&N.every(n=>n===a||n===b||segD(n,a,b)>n.r+.9);
+  // a spanning tree (never crosses itself), then a few short loops, then dead-end nooks
+  {const inT=[N[0]],out=N.slice(1);while(out.length){let best=null,bd=1e9;for(const a of inT)for(const b of out){const d=Math.hypot(a.x-b.x,a.z-b.z);if(d<bd){bd=d;best=[a,b]}}link(...best);inT.push(best[1]);out.splice(out.indexOf(best[1]),1)}}
+  {const pairs=[];for(let i=0;i<N.length;i++)for(let j=i+1;j<N.length;j++)pairs.push([N[i],N[j],Math.hypot(N[i].x-N[j].x,N[i].z-N[j].z)]);pairs.sort((p,q)=>p[2]-q[2]);
+   let extra=0;for(const [a,b,d] of pairs){if(extra>=4||d>13)break;if(E.some(e=>e.a===a&&e.b===b||e.a===b&&e.b===a))continue;if(ok(a,b)){link(a,b);extra++}}}
+  {const bases=N.slice();for(let k=0,tries=0;k<4&&tries<400;tries++){const a=bases[Math.floor(wr()*bases.length)],ang=wr()*Math.PI*2,L=WR(2.6,4.2);
+    const nk={x:a.x+Math.cos(ang)*L,z:a.z+Math.sin(ang)*L,r:.62,h:.62,kind:'nook',name:'a snug nook'};
+    if(Math.hypot(nk.x,nk.z)>EDGE*WS||!N.every(n=>Math.hypot(n.x-nk.x,n.z-nk.z)>n.r+2.2)||!E.every(e=>segD(nk,e.a,e.b)>1.6)||!ok(a,nk))continue;N.push(nk);link(a,nk);k++}}
+  // passages wander a little on the way
+  for(const e of E){const {a,b}=e,dx=b.x-a.x,dz=b.z-a.z,L=Math.hypot(dx,dz),px=-dz/L,pz=dx/L,w1=WR(-.08,.08)*L,w2=WR(-.04,.04)*L,n=Math.max(4,Math.ceil(L/.45));
+    e.len=L;e.pts=[];for(let k=0;k<=n;k++){const t=k/n,o=Math.sin(Math.PI*t)*w1+Math.sin(Math.PI*2*t)*w2;e.pts.push({x:a.x+dx*t+px*o,z:a.z+dz*t+pz*o,seen:false})}
+    for(let k=0;k<n;k++)W.prims.push({ax:e.pts[k].x,az:e.pts[k].z,bx:e.pts[k+1].x,bz:e.pts[k+1].z});W.pts+=e.pts.length}
+  for(const n of N){W.prims.push({c:1,x:n.x,z:n.z,r:n.r,h:n.h});n.edges=E.filter(e=>e.a===n||e.b===n);if(n.kind==='den')W.prims.push({v:1,x:n.x,z:n.z,r:.3,y0:.4,y1:3})}
+  for(const p of W.prims){const [x0,x1,z0,z1]=primBox(p);for(let cx=Math.floor((x0-1)/2);cx<=Math.floor((x1+1)/2);cx++)for(let cz=Math.floor((z0-1)/2);cz<=Math.floor((z1+1)/2);cz++){const k=wKey(cx,cz);if(!W.cells.has(k))W.cells.set(k,[]);W.cells.get(k).push(p)}}
+
+  // --- the distance field and the cave mesh
+  let x0=1e9,x1=-1e9,z0=1e9,z1=-1e9;for(const p of W.prims){const b=primBox(p);x0=Math.min(x0,b[0]);x1=Math.max(x1,b[1]);z0=Math.min(z0,b[2]);z1=Math.max(z1,b[3])}
+  const vs=W_VS,ox=x0-.6,oy=-.25,oz=z0-.6,nx=Math.ceil((x1-x0+1.2)/vs)+1,ny=Math.ceil((W_TOP-oy)/vs)+1,nz=Math.ceil((z1-z0+1.2)/vs)+1;
+  const F=new Float32Array(nx*ny*nz).fill(1);
+  for(const p of W.prims){const [a0,a1,b0,b1]=primBox(p),pad=.3,top=p.v?ny-1:Math.min(ny-1,Math.ceil(((p.c?p.h:W_CY+W_RT)+pad-oy)/vs));
+    const i0=Math.max(0,Math.floor((a0-pad-ox)/vs)),i1=Math.min(nx-1,Math.ceil((a1+pad-ox)/vs)),k0=Math.max(0,Math.floor((b0-pad-oz)/vs)),k1=Math.min(nz-1,Math.ceil((b1+pad-oz)/vs));
+    for(let k=k0;k<=k1;k++)for(let j=0;j<=top;j++)for(let i=i0;i<=i1;i++){const q=i+nx*(j+ny*k);F[q]=smin(F[q],primSd(p,ox+i*vs,oy+j*vs,oz+k*vs),.12)}}
+  for(let k=0;k<nz;k++)for(let j=0;j<ny;j++)for(let i=0;i<nx;i++){const q=i+nx*(j+ny*k);if(F[q]>.4)continue;const x=ox+i*vs,y=oy+j*vs,z=oz+k*vs;
+    const wall=vnoise(x*2.4+y*1.7,z*2.4-y*1.3)*.05+vnoise(x*.8-y*.6,z*.8+y*.5)*.07;F[q]=Math.max(F[q]+wall*smooth(0,.25,y),-y)}
+  const {pos,nor,idx}=surfaceNets(F,nx,ny,nz,ox,oy,oz,vs);
+  const col=new Float32Array(pos.length),uv=new Float32Array(pos.length/3*2);
+  for(let i=0;i<pos.length/3;i++){const x=pos[i*3],y=pos[i*3+1],z=pos[i*3+2],ny_=nor[i*3+1];
+    const n=vnoise(x*1.6+y*2,z*1.6)*.5+.5,strata=Math.sin(y*24+vnoise(x*.6,z*.6)*4)*.5+.5,floor=smooth(.6,.9,ny_);
+    let r=lerp(.2,.34,n)*lerp(.8,1.1,strata),g=lerp(.13,.22,n)*lerp(.8,1.06,strata),b=lerp(.08,.13,n);
+    r=lerp(r,.34+n*.08,floor);g=lerp(g,.25+n*.06,floor);b=lerp(b,.16+n*.04,floor);const up=smooth(.2,1.2,y);col[i*3]=r*(1-up*.25);col[i*3+1]=g*(1-up*.22);col[i*3+2]=b*(1-up*.2);
+    if(Math.abs(ny_)>.6){uv[i*2]=x*1.3;uv[i*2+1]=z*1.3}else{uv[i*2]=(x+z)*1.3;uv[i*2+1]=y*1.3}}
+  const geo=new THREE.BufferGeometry();geo.setAttribute('position',new THREE.Float32BufferAttribute(pos,3));geo.setAttribute('normal',new THREE.Float32BufferAttribute(nor,3));
+  geo.setAttribute('color',new THREE.BufferAttribute(col,3));geo.setAttribute('uv',new THREE.BufferAttribute(uv,2));geo.setIndex(idx);geo.computeBoundingSphere();
+  wScene.add(new THREE.Mesh(geo,new THREE.MeshStandardMaterial({vertexColors:true,roughness:.97,map:detailTex})));
+  W.tris=idx.length/3;
+
+  // --- light
+  wScene.add(new THREE.HemisphereLight(0x7a6a58,0x1a1008,.28));
+  W.lantern=new THREE.PointLight(0xffd0a0,1.1,3.2,1.6);wScene.add(W.lantern);
+  for(let i=0;i<3;i++){const l=new THREE.PointLight(0xffffff,0,5,1.5);wScene.add(l);W.pool.push(l)}
+  // --- dens: daylight falls down a shaft from the burrow above
+  const ceil=(n,x,z)=>n.h*Math.sqrt(Math.max(0,1-((x-n.x)**2+(z-n.z)**2)/(n.r*n.r)));
+  const inHall=(n,a,b)=>{const ang=wr()*Math.PI*2,r=n.r*WR(a,b);return {x:n.x+Math.cos(ang)*r,z:n.z+Math.sin(ang)*r,ang}};
+  for(const n of N.filter(n=>n.kind==='den')){
+    const sky=new THREE.Mesh(new THREE.CircleGeometry(.45,20),new THREE.MeshBasicMaterial({color:0xffffff,fog:false}));sky.rotation.x=Math.PI/2;sky.position.set(n.x,W_TOP-.07,n.z);wScene.add(sky);
+    const beam=new THREE.Mesh(new THREE.CylinderGeometry(.24,.55,W_TOP,18,1,true),new THREE.MeshBasicMaterial({color:0xffffff,transparent:true,opacity:.2,blending:THREE.AdditiveBlending,depthWrite:false,side:THREE.DoubleSide,fog:false}));
+    beam.position.set(n.x,W_TOP/2,n.z);wScene.add(beam);
+    const pool=new THREE.Mesh(new THREE.CircleGeometry(.6,24),new THREE.MeshBasicMaterial({map:glowTex,color:0xffffff,transparent:true,opacity:.5,blending:THREE.AdditiveBlending,depthWrite:false,fog:false}));pool.rotation.x=-Math.PI/2;pool.position.set(n.x,.004,n.z);wScene.add(pool);
+    n.sky=sky;n.beam=beam;n.pool=pool;W.glows.push({x:n.x,y:1.1,z:n.z,col:new THREE.Color(),i:1,d:4.5,den:n})}
+  // --- decor: glowworms, roots, pebbles, mushrooms, crystals
+  const glowP=[],rootM=[],pebM=[],shroomM=[],redM=[],crysM=[],hayM=[];
+  const tubeTop=lat=>W_CY+Math.sqrt(Math.max(0,W_RT*W_RT-lat*lat))-.03;
+  for(const e of E){const nearDen=[e.a,e.b].some(n=>n.kind==='den');
+    e.pts.forEach((p,k)=>{if(k===0||k===e.pts.length-1)return;const nx_=e.pts[k+1].x-e.pts[k-1].x,nz_=e.pts[k+1].z-e.pts[k-1].z,l=Math.hypot(nx_,nz_),px=-nz_/l,pz=nx_/l;
+      if(wr()<.3){const c=3+Math.floor(wr()*6);for(let i=0;i<c;i++){const lat=WR(-.22,.22);glowP.push(p.x+px*lat+WR(-.2,.2)*nx_/l,tubeTop(lat),p.z+pz*lat+WR(-.2,.2)*nz_/l)}}
+      const rootChance=nearDen&&(k<5||k>e.pts.length-6)?.8:.12;
+      if(wr()<rootChance){const lat=WR(-.18,.18);rootM.push(mat4(p.x+px*lat,tubeTop(lat)+.02,p.z+pz*lat,wr()*6,1,WR(-.3,.3),WR(-.3,.3),WR(.12,.32)))}
+      if(wr()<.35){const lat=(wr()<.5?-1:1)*WR(.18,.26);pebM.push(mat4(p.x+px*lat,-.01,p.z+pz*lat,wr()*6,WR(.025,.06)))}
+      if(wr()<.05){const lat=(wr()<.5?-1:1)*WR(.17,.24);(wr()<.25?redM:shroomM).push(mat4(p.x+px*lat,0,p.z+pz*lat,wr()*6,WR(.4,.7)))}})}
+  const food=(type,x,z,ry=0)=>{const o=itemModel(type);o.position.set(x,0,z);o.rotation.y=ry;wScene.add(o);W.foods.push({type,x,z,obj:o,alive:true,respawn:0})};
+  for(const n of N.filter(n=>n.kind==='hall')){
+    const g={x:n.x,y:n.h*.7,z:n.z,col:new THREE.Color(0xffc890),i:.9,d:4};
+    if(n.theme==='glow'){for(let i=0;i<260;i++){const a=wr()*Math.PI*2,r=Math.sqrt(wr())*n.r*.92,x=n.x+Math.cos(a)*r,z=n.z+Math.sin(a)*r;glowP.push(x,ceil(n,x,z)-.03,z)}g.col.set(0x5affd0);g.i=1.4;
+      for(let i=0;i<3;i++){const p=inHall(n,.4,.75);food(i?'clover':'dandelion',p.x,p.z,p.ang)}}
+    if(n.theme==='roots'){for(let i=0;i<70;i++){const p=inHall(n,0,.8);rootM.push(mat4(p.x,ceil(n,p.x,p.z)+.02,p.z,wr()*6,1.3,WR(-.3,.3),WR(-.3,.3),WR(.2,.6)))}
+      for(let i=0;i<4;i++){const p=inHall(n,.45,.75);food('carrot',p.x,p.z,p.ang)}}
+    if(n.theme==='shrooms'){for(let i=0;i<34;i++){const p=inHall(n,.25,.85);(i%5?shroomM:redM).push(mat4(p.x,0,p.z,wr()*6,WR(.9,1.8)))}g.col.set(0x9affb0);g.i=1.2;
+      for(let i=0;i<4;i++){const p=inHall(n,.3,.7);food('chanterelle',p.x,p.z,p.ang)}}
+    if(n.theme==='larder'){for(let i=0;i<3;i++){const p=inHall(n,.5,.75);hayM.push(mat4(p.x,0,p.z,wr()*6,WR(1.4,2)))}
+      ['berries','berries','strawberry','strawberry','hay','pepper'].forEach(t=>{const p=inHall(n,.25,.7);food(t,p.x,p.z,p.ang)})}
+    if(n.theme==='crystal'){for(let i=0;i<40;i++){const p=inHall(n,.55,.92),x=p.x,z=p.z;crysM.push(mat4(x,WR(0,ceil(n,x,z)*.6),z,wr()*6,WR(.6,1.6),WR(-.6,.6),WR(-.6,.6)))}g.col.set(0x8ad8ff);g.i=1.5}
+    W.glows.push(g)}
+  const pts_=new THREE.BufferGeometry();pts_.setAttribute('position',new THREE.Float32BufferAttribute(glowP,3));
+  wScene.add(new THREE.Points(pts_,new THREE.PointsMaterial({map:glowTex,color:0x6affd4,size:.045,transparent:true,depthWrite:false,blending:THREE.AdditiveBlending})));
+  {const cone=new THREE.ConeGeometry(.014,1,5);cone.rotateX(Math.PI);cone.translate(0,-.5,0);const im=new THREE.InstancedMesh(cone,new THREE.MeshStandardMaterial({color:0x6a4a2c,roughness:1}),rootM.length);rootM.forEach((m,i)=>im.setMatrixAt(i,m));wScene.add(im)}
+  {const im=new THREE.InstancedMesh(new THREE.OctahedronGeometry(.06),new THREE.MeshStandardMaterial({color:0x9ae8ff,emissive:0x2a7090,emissiveIntensity:1.3,roughness:.2,transparent:true,opacity:.9}),crysM.length);crysM.forEach((m,i)=>{m.multiply(new THREE.Matrix4().makeScale(1,2.2,1));im.setMatrixAt(i,m)});wScene.add(im)}
+  wSet('Rock',pebM);if(hayM.length)wSet('Hay',hayM);
+  const glowShroom=m=>{m.emissive=new THREE.Color(0x2a5a38);m.emissiveIntensity=.8;return m};
+  if(shroomM.length)wSet('MushroomBrown',shroomM,glowShroom);if(redM.length)wSet('MushroomRed',redM);
+  // --- curios: one in each hall and nook; the golden acorn waits in the farthest one from the meadow
+  const dist=new Map([[N[0],0]]);{const todo=[N[0]];while(todo.length){const a=todo.shift();for(const e of a.edges){const b=e.a===a?e.b:e.a,d=dist.get(a)+e.len;if(!dist.has(b)||d<dist.get(b)){dist.set(b,d);todo.push(b)}}}}
+  const slots=N.filter(n=>n.kind!=='den');const keys_=Object.keys(CURIOS).filter(k=>k!=='goldAcorn'&&k!=='crystal');
+  const far=slots.slice().sort((a,b)=>dist.get(b)-dist.get(a))[0];
+  for(const n of slots){const k=n===far?'goldAcorn':n.theme==='crystal'?'crystal':keys_.splice(Math.floor(wr()*keys_.length),1)[0]||'crystal';
+    const p=n.kind==='nook'?{x:n.x,z:n.z}:inHall(n,.15,.4);const g=new THREE.Group();const mesh=curioModel(k);g.add(mesh);
+    const glow=new THREE.Sprite(new THREE.SpriteMaterial({map:glowTex,color:RARITY[CURIOS[k].rarity][0],transparent:true,opacity:.55,depthWrite:false,blending:THREE.AdditiveBlending}));glow.scale.setScalar(.22);g.add(glow);
+    g.position.set(p.x,.07,p.z);wScene.add(g);n.curio=k;W.curios.push({k,x:p.x,z:p.z,y:.07,obj:g,mesh,got:false,node:n})}
+}
+
+// ---- enter / leave
+function snapCamera(){camTgt.set(pig.pos.x,pig.pos.y+.09,pig.pos.z);camPos.set(camTgt.x+Math.sin(G.camYaw)*.5,camTgt.y+.15,camTgt.z+Math.cos(G.camYaw)*.5)}
+function swapScene(o,to){o.removeFromParent();to.add(o)}
+function enterWarren(t,quiet){const n=t.node;G.under=true;G.hidden=true;W.from=t;
+  if(!quiet){SFX.whoosh();flash('rgba(0,0,0,1)',1)}
+  swapScene(pig.obj,wScene);swapScene(pts,wScene);pig.blob.visible=false;pig.light.intensity=0;pig.air=false;pig.vy=0;
+  const e=n.edges[0],nx=e.a===n?e.pts[2]:e.pts[e.pts.length-3],h=Math.atan2(nx.x-n.x,nx.z-n.z);
+  pig.pos.set(n.x+Math.sin(h)*.62,0,n.z+Math.cos(h)*.62);pig.vel.set(0,0,0);pig.heading=h;G.camYaw=h+Math.PI;
+  W.trail.length=0;W.trail.push({x:pig.pos.x,z:pig.pos.z});
+  herd.forEach(f=>{swapScene(f.obj,wScene);f.blob.visible=false;f.tag.style.display='none';f.pos.set(n.x,0,n.z);f.vel.set(0,0,0);f.air=false;f.vy=0});
+  snapCamera();W.revealT=0;W.lightT=0;
+  if(quiet)return;
+  if(!G.warrenTip){G.warrenTip=true;toast('🕳 <b>The Warren.</b> Explore to fill in your map (<kbd>M</kbd>). Walk a passage end to end and it becomes a quick route between burrows.','gold',9)}
+  else toast(`🕳 Down into the warren under <b>${t.name}</b>`)}
+function exitWarren(n){const t=n.den;G.under=false;G.hidden=false;SFX.whoosh();flash('rgba(0,0,0,1)',1);
+  swapScene(pig.obj,scene);swapScene(pts,scene);pig.blob.visible=true;
+  herd.forEach(f=>{swapScene(f.obj,scene);f.blob.visible=true});
+  pig.pos.set(t.ex,heightAt(t.ex,t.ez),t.ez);pig.vel.set(0,0,0);pig.heading=t.rot;G.camYaw=t.rot+Math.PI;regroupHerd();snapCamera();
+  if(t!==W.from){toast(`🕳 Popped out at <b>${t.name}</b>`);addScore(15)}}
+
+// ---- exploring
+function chamberFound(n){n.seen=true;
+  if(n.kind==='den'){if(!n.den.found)findTunnel(n.den,true)}
+  else if(n.kind==='hall'){SFX.find('epic');callout('epic','🕳 '+n.name,150);toast(`🕳 <b>You found the ${n.name}!</b> ${HALL_BLURB[n.theme]}`,'gold',5);addScore(150,'','#c98bff');
+    const halls=W.nodes.filter(x=>x.kind==='hall');if(halls.every(x=>x.seen)){toast('🏆 <b>Every hidden chamber found!</b> +800','gold',6);addScore(800,'chambers!','#ffd23f')}}
+  else if(W.curios.some(c=>c.node===n&&!c.got))toast('🕳 A snug little nook. Something glints in here…')}
+function revealWarren(){const px=pig.pos.x,pz=pig.pos.z;
+  for(const e of W.edges){if(e.done||Math.min(Math.hypot(e.a.x-px,e.a.z-pz),Math.hypot(e.b.x-px,e.b.z-pz))>e.len+3)continue;
+    let n=0;for(const p of e.pts){if(!p.seen&&Math.hypot(p.x-px,p.z-pz)<2.2){p.seen=true;W.seenPts++}if(p.seen)n++}
+    if(n>=e.pts.length*.9){e.done=true;toastRoute()}}
+  for(const n of W.nodes)if(!n.seen&&Math.hypot(n.x-px,n.z-pz)<n.r+1)chamberFound(n);
+  if(!W.allSeen&&W.edges.every(e=>e.done)){W.allSeen=true;toast('🗺 <b>You mapped the whole warren!</b> +1500','gold',6);addScore(1500,'mapped!','#ffd23f');flash('rgba(255,215,80,.4)',.6)}}
+// burrows joined by passages you have walked
+function linkedTo(t){const start=t.node,seen=new Set([start]),todo=[start];while(todo.length){const a=todo.pop();for(const e of a.edges){if(!e.done)continue;const b=e.a===a?e.b:e.a;if(!seen.has(b)){seen.add(b);todo.push(b)}}}
+  return tunnels.filter(x=>x!==t&&x.found&&seen.has(x.node))}
+function routeCount(){let n=0;for(const t of tunnels)if(t.found)n+=linkedTo(t).length;return n/2}
+function toastRoute(){const n=routeCount();if(n>(W.routes||0)){W.routes=n;toast(`🗺 <b>New quick route!</b> ${n} burrow-to-burrow route${n>1?'s':''} open.`,'good',4);addScore(40,'route!','#7fd0ff')}}
+function warrenActions(){const acts=[];if(pig.air)return acts;const m=mouthPos();
+  const c=W.curios.find(c=>!c.got&&Math.hypot(c.x-m.x,c.z-m.z)<.3);if(c)acts.push({k:'E',label:`Pick up ${CURIOS[c.k].icon} ${CURIOS[c.k].name}`,do:()=>takeCurio(c)});
+  const f=W.foods.find(f=>f.alive&&Math.hypot(f.x-m.x,f.z-m.z)<.26);if(f)acts.push({k:'E',label:`Eat ${ITEMS[f.type].name}`,do:()=>{f.alive=false;f.obj.visible=false;f.respawn=R(150,240);discover(f.type);applyFood(f.type)}});
+  const d=W.nodes.find(n=>n.kind==='den'&&Math.hypot(n.x-pig.pos.x,n.z-pig.pos.z)<.5);if(d)acts.push({k:'E',label:`Climb out · ${d.name}`,do:()=>exitWarren(d)});
+  return acts}
+function takeCurio(c){c.got=true;c.obj.removeFromParent();const it=CURIOS[c.k];G.curios[c.k]=true;SFX.pop();SFX.find(it.rarity);callout(it.rarity,`${it.icon} ${it.name}`,Math.round(it.pts*mult()));
+  toast(`${it.icon} <b style="color:${RARITY[it.rarity][0]}">${it.name}</b> added to your curio stash (J)`,it.rarity==='legendary'||it.rarity==='epic'?'gold':'good',4);addScore(it.pts);emit(c.x,.1,c.z,24,{col:[1,.85,.5],spread:.7,up:1.2,size:.02,life:1,grav:1.5});
+  if(it.rarity==='legendary')flash('rgba(255,215,80,.55)',.8);
+  if(W.curios.every(x=>x.got)){toast('🏆 <b>Curio stash complete!</b> +1000','gold',6);addScore(1000,'stash!','#ffd23f')}}
+function sniffWarren(){let c=0,h=0;
+  for(const x of W.curios)if(!x.got&&Math.hypot(x.x-pig.pos.x,x.z-pig.pos.z)<12){marker(x.x,.25,x.z,0xffd060,wScene);c++}
+  for(const f of W.foods)if(f.alive&&Math.hypot(f.x-pig.pos.x,f.z-pig.pos.z)<8)marker(f.x,.2,f.z,0x9fe88a,wScene);
+  for(const n of W.nodes)if(!n.seen&&!n.heard&&Math.hypot(n.x-pig.pos.x,n.z-pig.pos.z)<14){n.heard=true;h++}
+  toast(`👃 Sniff sniff… ${c?`<b>${c} curio${c>1?'s':''}</b> nearby`:'earthy smells'}${h?`, and fresh air from <b>${h} unexplored chamber${h>1?'s':''}</b> (marked ? on your map)`:''}.`)}
+function updateWarren(dt,t){
+  updatePig(dt,t);
+  W.revealT-=dt;if(W.revealT<=0){W.revealT=.2;revealWarren()}
+  // the herd follows along the trail
+  const last=W.trail[0];if(Math.hypot(pig.pos.x-last.x,pig.pos.z-last.z)>.06){W.trail.unshift({x:pig.pos.x,z:pig.pos.z});if(W.trail.length>(HERD_MAX+1)*6+4)W.trail.pop()}
+  herd.forEach((f,i)=>{const tp=W.trail[Math.min(W.trail.length-1,(i+1)*6)],hx=tp.x-f.pos.x,hz=tp.z-f.pos.z,hl=Math.hypot(hx,hz);
+    if(hl>.07){f.heading+=angDiff(f.heading,Math.atan2(hx,hz))*Math.min(1,dt*8);const s=Math.min(Math.min(3.8,hl*4+.4),hl/Math.max(dt,1e-3));f.vel.set(Math.sin(f.heading)*s,0,Math.cos(f.heading)*s)}else f.vel.multiplyScalar(Math.max(0,1-dt*10));
+    f.pos.x+=f.vel.x*dt;f.pos.z+=f.vel.z*dt;const dx=f.pos.x-pig.pos.x,dz=f.pos.z-pig.pos.z,d=Math.hypot(dx,dz);if(d<.2&&d>1e-4){f.pos.x+=dx/d*(.2-d);f.pos.z+=dz/d*(.2-d)}
+    for(const o of herd){if(o===f)continue;const ox=f.pos.x-o.pos.x,oz=f.pos.z-o.pos.z,od=Math.hypot(ox,oz);if(od<.18&&od>1e-4){f.pos.x+=ox/od*(.18-od)*.5;f.pos.z+=oz/od*(.18-od)*.5}}
+    warrenCollide(f.pos,.09);f.pos.y=0;const moving=Math.hypot(f.vel.x,f.vel.z)>.1;
+    f.obj.position.set(f.pos.x,moving?Math.abs(Math.sin(f.phase))*.008:0,f.pos.z);f.obj.rotation.set(0,f.heading,0,'YXZ');for(const s of f.fur)s.visible=true;animatePigLegs(dt,Math.hypot(f.vel.x,f.vel.z),moving,f)});
+  for(const f of W.foods)if(!f.alive){f.respawn-=dt;if(f.respawn<=0&&Math.hypot(f.x-pig.pos.x,f.z-pig.pos.z)>3){f.alive=true;f.obj.visible=true}}
+  for(const c of W.curios)if(!c.got){c.obj.position.y=c.y+Math.sin(t*2+c.x)*.012;c.mesh.rotation.y+=dt*1.2}
+  // daylight (or moonlight) down the shafts follows the sky above
+  const day=clamp(sun.intensity/2.9,0,1);
+  for(const n of W.nodes)if(n.sky){n.sky.material.color.copy(skyMat.uniforms.hor.value).multiplyScalar(.5+day*.9);n.beam.material.color.copy(sun.color).multiplyScalar(.25+day*.9);n.pool.material.color.copy(n.beam.material.color)}
+  for(const g of W.glows)if(g.den){g.col.copy(sun.color);g.i=.35+day*1.6}
+  W.lightT-=dt;if(W.lightT<=0){W.lightT=.25;const near=W.glows.map(g=>[g,Math.hypot(g.x-pig.pos.x,g.z-pig.pos.z)]).sort((a,b)=>a[1]-b[1]);
+    W.pool.forEach((l,i)=>{const n=near[i];if(!n||n[1]>9){l.intensity=0;return}l.position.set(n[0].x,n[0].y,n[0].z);l.color.copy(n[0].col);l.intensity=n[0].i;l.distance=n[0].d})}
+  W.lantern.position.set(pig.pos.x-Math.sin(pig.heading)*.15,pig.pos.y+.4,pig.pos.z-Math.cos(pig.heading)*.15);
+}
+function drawWarrenMap(g,s){const w=v=>s(v/WS),big=$('mapwrap').classList.contains('big');
+  g.fillStyle='#120b06';g.fillRect(0,0,340,340);g.globalAlpha=.16;g.drawImage(mapBg,0,0);g.globalAlpha=1;
+  g.lineCap=g.lineJoin='round';
+  for(const [lw,c] of [[10,'#5a3e22'],[5,'#d2a86e']]){g.strokeStyle=c;g.lineWidth=lw;g.beginPath();
+    for(const e of W.edges)for(let k=0;k<e.pts.length-1;k++){const a=e.pts[k],b=e.pts[k+1];if(a.seen&&b.seen){g.moveTo(w(a.x),w(a.z));g.lineTo(w(b.x),w(b.z))}}g.stroke()}
+  g.textAlign='center';g.font='600 13px Fredoka, sans-serif';
+  for(const n of W.nodes){const x=w(n.x),z=w(n.z),r=n.r/WS/144*340;
+    if(!n.seen){if(n.heard){g.fillStyle='rgba(255,220,160,.55)';g.fillText('?',x,z+6)}continue}
+    g.fillStyle=n.kind==='hall'?'#e0b880':'#d2a86e';g.beginPath();g.arc(x,z,r,0,7);g.fill();
+    if(n.kind==='den'){g.strokeStyle='#ffe08a';g.lineWidth=2.5;g.beginPath();g.arc(x,z,r*.55,0,7);g.stroke()}
+    if(big&&n.kind!=='nook'){g.fillStyle='#fff3d8';g.strokeStyle='rgba(0,0,0,.6)';g.lineWidth=3;g.strokeText(n.name,x,z-r-4);g.fillText(n.name,x,z-r-4)}}
+  for(const c of W.curios)if(!c.got&&c.node.seen){g.fillStyle=RARITY[CURIOS[c.k].rarity][0];g.beginPath();g.arc(w(c.x),w(c.z),3.5,0,7);g.fill()}
+  herd.forEach(f=>{g.fillStyle='#ff9fd0';g.beginPath();g.arc(w(f.pos.x),w(f.pos.z),3,0,7);g.fill()});
+  return w}
 
 // ============================================================ humans / petting
 function updateHumans(dt){
@@ -757,7 +1021,7 @@ function inLog(l,x,z){const dx=x-l.x,dz=z-l.z;const c=Math.cos(l.rot),s=Math.sin
 const _hv=new THREE.Vector3();
 function updateHawk(dt,t){
   const h=hawk;const o=h.obj;
-  if(h.state==='away'){o.visible=false;if(!isNight()&&G.time>7)h.t-=dt;if(h.t<=0){h.state='circle';h.t=R(14,20);h.detect=0;h.a=rand()*6;o.visible=true;SFX.screech();toast('🦅 <b>A hawk is circling!</b> Hide under a bush, in a log — or freeze.','bad',4);if(herd.length){const f=herd[0];setTimeout(()=>{SFX.wheek();toast(`🐹 ${esc(f.name)} wheeks an alarm! More eyes in your herd means the hawk spots you slower.`,'',4)},900)}}return}
+  if(h.state==='away'){o.visible=false;if(!isNight()&&G.time>7&&!G.under)h.t-=dt;if(h.t<=0){h.state='circle';h.t=R(14,20);h.detect=0;h.a=rand()*6;o.visible=true;SFX.screech();toast('🦅 <b>A hawk is circling!</b> Hide under a bush, in a log — or freeze.','bad',4);if(herd.length){const f=herd[0];setTimeout(()=>{SFX.wheek();toast(`🐹 ${esc(f.name)} wheeks an alarm! More eyes in your herd means the hawk spots you slower.`,'',4)},900)}}return}
   if(h.state==='circle'){
     h.a+=dt*.45;const cx=pig.pos.x+Math.cos(h.a)*13,cz=pig.pos.z+Math.sin(h.a)*13,cy=heightAt(pig.pos.x,pig.pos.z)+20;
     _hv.set(cx,cy,cz);h.vel.subVectors(_hv,o.position);o.position.lerp(_hv,Math.min(1,dt*1.5));
@@ -960,13 +1224,14 @@ function updatePig(dt,t){
   if(sprint)G.energy=Math.max(0,G.energy-dt*5.5*G.perk.sprintCost);
   pig.pos.x+=pig.vel.x*dt;pig.pos.z+=pig.vel.z*dt;
   // collisions
-  collide(pig.pos,.1);
+  const gh=G.under?()=>0:heightAt;
+  if(G.under)warrenCollide(pig.pos,.1);else collide(pig.pos,.1);
   // vertical
-  const gy=heightAt(pig.pos.x,pig.pos.z);
+  const gy=gh(pig.pos.x,pig.pos.z);
   if(pig.air||pig.vy>0){pig.vy-=9.8*dt;pig.pos.y+=pig.vy*dt;if(pig.pos.y<=gy){pig.pos.y=gy;pig.vy=0;pig.air=false;pig.popSpin=0}else pig.air=true}else pig.pos.y=gy;
   // pose
   const o=pig.obj;const moving=Math.hypot(pig.vel.x,pig.vel.z)>.12;
-  const hf=heightAt(pig.pos.x+Math.sin(pig.heading)*.12,pig.pos.z+Math.cos(pig.heading)*.12),hb=heightAt(pig.pos.x-Math.sin(pig.heading)*.12,pig.pos.z-Math.cos(pig.heading)*.12);
+  const hf=gh(pig.pos.x+Math.sin(pig.heading)*.12,pig.pos.z+Math.cos(pig.heading)*.12),hb=gh(pig.pos.x-Math.sin(pig.heading)*.12,pig.pos.z-Math.cos(pig.heading)*.12);
   const pitch=Math.atan2(hb-hf,.24);
   const bob=moving&&!pig.air?Math.abs(Math.sin(pig.phase))*.008:Math.sin(t*2.2)*.0015;
   o.position.set(pig.pos.x,pig.pos.y+bob,pig.pos.z);
@@ -988,10 +1253,14 @@ G.camYaw=Math.PI*0;G.camPitch=.2;G.camDist=.95;G.drag=false;G.lastDrag=0;
 const camPos=new THREE.Vector3(),camTgt=new THREE.Vector3();
 function updateCamera(dt){
   const tgt=_v.set(pig.pos.x,pig.pos.y+.09,pig.pos.z);camTgt.lerp(tgt,Math.min(1,dt*10));
-  const d=G.camDist,p=G.camPitch;
-  const want=new THREE.Vector3(camTgt.x+Math.sin(G.camYaw)*Math.cos(p)*d,camTgt.y+Math.sin(p)*d,camTgt.z+Math.cos(G.camYaw)*Math.cos(p)*d);
-  const gy=heightAt(want.x,want.z)+.07;if(want.y<gy)want.y=gy;
-  camPos.lerp(want,Math.min(1,dt*8));camera.position.copy(camPos);camera.lookAt(camTgt);
+  const d=G.under?Math.min(G.camDist,.8):G.camDist;let p=G.under?Math.min(G.camPitch,.5):G.camPitch;
+  const want=new THREE.Vector3();const aim=(p,d)=>want.set(camTgt.x+Math.sin(G.camYaw)*Math.cos(p)*d,camTgt.y+Math.sin(p)*d,camTgt.z+Math.cos(G.camYaw)*Math.cos(p)*d);
+  if(G.under){// pull in until the line from the pig stays inside the cave; against a wall, look down from higher up instead
+    const reach=p=>{aim(p,d);for(let s=1;s<=12;s++){const q=s/12;if(wSdf(lerp(camTgt.x,want.x,q),lerp(camTgt.y,want.y,q),lerp(camTgt.z,want.z,q),false)>-.1)return (s-1)/12}return 1};
+    let best=p,bk=reach(p);for(const q of [.7,.95,1.2]){if(bk>=.6||q<=p)continue;const k=reach(q);if(k>bk+.1){bk=k;best=q}}
+    aim(best,d*Math.max(.15,bk))}
+  else{aim(p,d);const gy=heightAt(want.x,want.z)+.07;if(want.y<gy)want.y=gy}
+  camPos.lerp(want,Math.min(1,dt*8));if(G.under&&wSdf(camPos.x,camPos.y,camPos.z,false)>-.05)camPos.copy(want);camera.position.copy(camPos);camera.lookAt(camTgt);
 }
 
 // ============================================================ day/night
@@ -1043,8 +1312,7 @@ function updateSurvival(dt){
   for(const p of patches){if(p.amount<1){const before=p.amount;p.amount=Math.min(1,p.amount+dt*.012);if(Math.floor(before*20)!==Math.floor(p.amount*20))updatePatch(p)}}
   for(const ps of pickSets)for(const it of ps.items){if(!it.alive){it.respawn-=dt;if(it.respawn<=0&&Math.hypot(it.x-pig.pos.x,it.z-pig.pos.z)>4){it.alive=true;ps.set.setMatrix(it.i,mat4(it.x,it.y,it.z,it.ry,it.s))}}}
   // tunnel discovery
-  for(const tu of tunnels){if(!tu.found&&Math.hypot(tu.ex-pig.pos.x,tu.ez-pig.pos.z)<3.2){tu.found=true;G.tunnels++;SFX.find('rare');callout('rare','🕳 '+tu.name,100);toast(`🕳 <b>Tunnel discovered: ${tu.name}!</b> Press E at the entrance to hide, nap or travel.`,'gold',5);addScore(100,'tunnel!','#7fd0ff');
-    if(G.tunnels===tunnels.length){toast('🏆 <b>You found every tunnel!</b> +1000','gold',6);addScore(1000,'all tunnels!','#ffd23f')}}}
+  if(!G.under)for(const tu of tunnels){if(!tu.found&&Math.hypot(tu.ex-pig.pos.x,tu.ez-pig.pos.z)<3.2)findTunnel(tu)}
   if(G.hp<=0&&!G.over)gameOver();
 }
 
@@ -1067,7 +1335,7 @@ function updateHUD(dt){
   else if(foxes.some(f=>f.active&&f.state==='chase')){dg.style.display='block';dg.querySelector('.l').textContent='🦊 A fox is chasing you!';dg.querySelector('i').style.width='100%'}
   else dg.style.display='none';
   // prompts
-  const acts=G.inTunnel?[]:currentActions();G.acts=acts;
+  const acts=G.inTunnel?[]:G.under?warrenActions():currentActions();G.acts=acts;
   $('prompt').innerHTML=acts.map(a=>`<div class="pill" style="${a.disabled?'opacity:.6':''}"><kbd>${a.k}</kbd>${a.hold?'hold · ':''}${a.label}</div>`).join('')+(G.happy>70&&G.popcornCD<=0?'<div class="pill"><kbd>␣</kbd>Popcorn!</div>':'')+(G.huddle?`<div class="pill">🐹 Huddling with your herd · happy &amp; rested</div>`:'');
   if(calloutT>0){calloutT-=.1;if(calloutT<=0)$('callout').style.opacity=0}
   drawMap();
@@ -1077,22 +1345,32 @@ function drawMapBg(){const c=document.createElement('canvas');c.width=c.height=3
   for(let y=0;y<340;y++)for(let x=0;x<340;x++){const wx=(x/340*2-1)*72,wz=(y/340*2-1)*72;const f=forestness(wx,wz);const p=distToPath(wx,wz)<1.2;const i=(y*340+x)*4;const out=Math.hypot(wx,wz)>EDGE;
     let r=lerp(120,40,f),gg=lerp(170,85,f),b=lerp(70,40,f);if(p){r=170;gg=140;b=95}if(out){r*=.5;gg*=.5;b*=.5}img.data[i]=r;img.data[i+1]=gg;img.data[i+2]=b;img.data[i+3]=255}
   g.putImageData(img,0,0);const s=v=>(v/72*.5+.5)*340;g.fillStyle='#b5523b';g.fillRect(s(HOME.x-3),s(HOME.z-2.3),6/144*340,4.6/144*340);mapBg=c}
-function drawMap(){if(!mapBg)drawMapBg();const g=mctx;const s=v=>(v/72*.5+.5)*340;g.drawImage(mapBg,0,0);
+function drawMap(){if(!mapBg)drawMapBg();const g=mctx;const s=v=>(v/72*.5+.5)*340;
+  if(G.under){const w=drawWarrenMap(g,s);drawArrow(g,w(pig.pos.x),w(pig.pos.z));return}
+  g.drawImage(mapBg,0,0);
+  // passages you have explored, faint under the woods
+  g.setLineDash([5,6]);g.strokeStyle='rgba(50,30,12,.5)';g.lineWidth=3;g.beginPath();
+  for(const e of W.edges)for(let k=0;k<e.pts.length-1;k++){const a=e.pts[k],b=e.pts[k+1];if(a.seen&&b.seen){g.moveTo(s(a.x/WS),s(a.z/WS));g.lineTo(s(b.x/WS),s(b.z/WS))}}g.stroke();g.setLineDash([]);
   tunnels.forEach(t=>{if(!t.found)return;g.fillStyle='#2a1a0a';g.strokeStyle='#ffd9a0';g.lineWidth=2;g.beginPath();g.arc(s(t.x),s(t.z),6,0,7);g.fill();g.stroke()});
   if(!isNight())humans.forEach(h=>{g.fillStyle='#ffb0d0';g.beginPath();g.arc(s(h.obj.position.x),s(h.obj.position.z),5,0,7);g.fill()});
   friends.forEach(f=>{if(f.state==='herd'){g.fillStyle='#ff9fd0';g.beginPath();g.arc(s(f.pos.x),s(f.pos.z),3.5,0,7);g.fill()}else if(f.known){g.fillStyle='#f2d6a8';g.strokeStyle='#6a4a2a';g.lineWidth=1.5;g.beginPath();g.arc(s(f.pos.x),s(f.pos.z),4.5,0,7);g.fill();g.stroke()}});
   foxes.forEach(f=>{if(f.active&&f.pos.distanceTo(pig.pos)<18){g.fillStyle='#ff5a2a';g.beginPath();g.arc(s(f.pos.x),s(f.pos.z),5,0,7);g.fill()}});
-  const px=s(pig.pos.x),pz=s(pig.pos.z);g.save();g.translate(px,pz);g.rotate(-pig.heading+Math.PI);g.fillStyle='#fff';g.strokeStyle='#000';g.lineWidth=2;g.beginPath();g.moveTo(0,-10);g.lineTo(7,8);g.lineTo(-7,8);g.closePath();g.fill();g.stroke();g.restore()}
+  drawArrow(g,s(pig.pos.x),s(pig.pos.z))}
+function drawArrow(g,px,pz){g.save();g.translate(px,pz);g.rotate(-pig.heading+Math.PI);g.fillStyle='#fff';g.strokeStyle='#000';g.lineWidth=2;g.beginPath();g.moveTo(0,-10);g.lineTo(7,8);g.lineTo(-7,8);g.closePath();g.fill();g.stroke();g.restore()}
 
 // ============================================================ journal / game over
 function openJournal(){G.modal=true;$('journal').classList.remove('hidden');const all=Object.keys(ITEMS);const found=all.filter(k=>G.found[k]).length;
   $('jsub').textContent=`${found}/${all.length} treats discovered · ${G.forages} forages · rank: ${RANKS[rankIdx()][1]}${rankIdx()<RANKS.length-1?` (next at ${RANKS[rankIdx()+1][0]})`:''}`;
   $('jgrid').innerHTML=all.map(k=>{const it=ITEMS[k];const n=G.found[k];return `<div class="jcell ${n?'':'unk'}"><div class="e">${n?it.icon:'❔'}</div><div class="nm" style="color:${RARITY[it.rarity][0]}">${n?it.name:'???'}</div><div class="ct">${n?'×'+n:it.rarity}</div></div>`}).join('');
-  $('jherd').innerHTML=`<h2 style="margin:18px 0 8px;font-size:20px">🐹 Your herd · ${herd.length}/${HERD_MAX}</h2>`+[`<span class="hcell"><b>${esc(G.name)}</b> · ${BREEDS[G.breed].name} ${COATS[G.coat].name} (you)</span>`,...herd.map(f=>`<span class="hcell"><b>${esc(f.name)}</b> · ${BREEDS[f.look.breed].name} ${COATS[f.look.coat].name}</span>`)].join('')+(herd.length<HERD_MAX?`<p style="font-size:13px;margin:6px 0 0">${friends.filter(f=>f.state!=='herd').length} more piggies are out there. Sniff (R) to find them.</p>`:'')}
+  $('jherd').innerHTML=`<h2 style="margin:18px 0 8px;font-size:20px">🐹 Your herd · ${herd.length}/${HERD_MAX}</h2>`+[`<span class="hcell"><b>${esc(G.name)}</b> · ${BREEDS[G.breed].name} ${COATS[G.coat].name} (you)</span>`,...herd.map(f=>`<span class="hcell"><b>${esc(f.name)}</b> · ${BREEDS[f.look.breed].name} ${COATS[f.look.coat].name}</span>`)].join('')+(herd.length<HERD_MAX?`<p style="font-size:13px;margin:6px 0 0">${friends.filter(f=>f.state!=='herd').length} more piggies are out there. Sniff (R) to find them.</p>`:'');
+  const halls=W.nodes.filter(n=>n.kind==='hall');
+  $('jwarren').innerHTML=`<h2 style="margin:18px 0 4px;font-size:20px">🕳 The Warren · ${warrenPct()}% mapped</h2><p style="font-size:13px;margin:0 0 8px">${halls.filter(n=>n.seen).length}/${halls.length} hidden chambers · ${G.tunnels}/${tunnels.length} burrows · ${routeCount()} quick routes · curio stash ${W.curios.filter(c=>c.got).length}/${W.curios.length}</p><div class="jgrid">`+
+    W.curios.map(c=>{const it=CURIOS[c.k];return `<div class="jcell ${c.got?'':'unk'}"><div class="e">${c.got?it.icon:'❔'}</div><div class="nm" style="color:${RARITY[it.rarity][0]}">${c.got?it.name:'???'}</div><div class="ct">${c.got?'curio':it.rarity}</div></div>`}).join('')+'</div>'}
+function warrenPct(){return Math.round(W.seenPts/W.pts*100)}
 function closeJournal(){G.modal=false;$('journal').classList.add('hidden')}
 function gameOver(){G.over=true;const best=Math.max(G.best,G.score);lsSet('wheek-best',best);
   $('overWhy').textContent=`${G.name} the ${BREEDS[G.breed].name} ${G.cause||'had a very long day'}.`;
-  $('overStats').innerHTML=`Score: <b style="color:#ffd23f;font-size:24px">${G.score.toLocaleString()}</b>${G.score>=G.best&&G.score>0?' 🏆 new best!':''}<br>Best: ${best.toLocaleString()}<br>Days survived: ${G.day} · Nights: ${G.nightsSurvived}<br>Forages: ${G.forages} · Treats eaten: ${G.eaten} · Pets: ${G.pets}<br>Tunnels found: ${G.tunnels}/${tunnels.length} · Herd: ${herd.length}/${HERD_MAX}<br>Journal: ${Object.keys(G.found).length}/${Object.keys(ITEMS).length}`;
+  $('overStats').innerHTML=`Score: <b style="color:#ffd23f;font-size:24px">${G.score.toLocaleString()}</b>${G.score>=G.best&&G.score>0?' 🏆 new best!':''}<br>Best: ${best.toLocaleString()}<br>Days survived: ${G.day} · Nights: ${G.nightsSurvived}<br>Forages: ${G.forages} · Treats eaten: ${G.eaten} · Pets: ${G.pets}<br>Tunnels found: ${G.tunnels}/${tunnels.length} · Herd: ${herd.length}/${HERD_MAX}<br>Warren: ${warrenPct()}% mapped · Curios: ${W.curios.filter(c=>c.got).length}/${W.curios.length}<br>Journal: ${Object.keys(G.found).length}/${Object.keys(ITEMS).length}`;
   $('over').classList.remove('hidden')}
 
 // ============================================================ input
@@ -1104,7 +1382,8 @@ addEventListener('keydown',e=>{
   if(G.modal||G.paused||G.over||G.inTunnel||e.repeat)return;
   if(e.code==='Space'){e.preventDefault();if(!pig.air){pig.vy=1.55;pig.air=true;SFX.jump();if(G.happy>70&&G.popcornCD<=0){G.popcornCD=3;addScore(15,'popcorn!','#ffb0e0');herdPopcorn();emit(pig.pos.x,pig.pos.y+.1,pig.pos.z,10,{col:[1,.8,.9],spread:.5,up:.8,size:.015,life:.6})}}}
   if(e.code==='KeyE'){const a=(G.acts||currentActions()).find(a=>a.k==='E'&&!a.hold);if(a)a.do()}
-  if(e.code==='KeyF'){const a=currentActions().find(a=>a.k==='F'&&a.spot);if(a&&!forageState)startForage(a.spot)}
+  if(e.code==='KeyM')$('mapwrap').classList.toggle('big');
+  if(e.code==='KeyF'&&!G.under){const a=currentActions().find(a=>a.k==='F'&&a.spot);if(a&&!forageState)startForage(a.spot)}
   if(e.code==='KeyR')sniff();
   if(e.code==='KeyQ')wheek();
 });
@@ -1138,9 +1417,10 @@ function loop(){
   const dt=Math.min(clock.getDelta(),.05);const t=clock.elapsedTime;U.time.value=t;
   if(G.started&&!G.paused&&!G.over&&!G.modal){
     if(G.inTunnel&&travel){updateTravel(dt);updateParticles(dt);renderer.render(tScene,tCam);return}
+    if(G.under){updateWarren(dt,t);updateSurvival(dt);updateHawk(dt,t);updateFoxes(dt,t);updateDay(dt)}else{
     updatePig(dt,t);
     const hold=(keys.KeyE)&&!G.inTunnel?(G.acts||[]).find(a=>a.k==='E'&&a.hold):null;if(hold)holdEat(dt,hold);
-    updateForage(dt);updateSurvival(dt);updateHumans(dt);updateFriends(dt,t);updateHawk(dt,t);updateFoxes(dt,t);updateDay(dt);updateReveals(dt);updateDrops(dt);
+    updateForage(dt);updateSurvival(dt);updateHumans(dt);updateFriends(dt,t);updateHawk(dt,t);updateFoxes(dt,t);updateDay(dt);updateReveals(dt);updateDrops(dt)}
   }else if(!G.started){ // title orbit / breed preview
     if(G.selecting)G.camYaw+=angDiff(G.camYaw,pig.heading+.5+Math.sin(t*.3)*.9)*Math.min(1,dt*2);else G.camYaw+=dt*.08;updateDay(0);updatePig(dt,t);updateFriends(dt,t);
   }
@@ -1150,7 +1430,7 @@ function loop(){
   // chunk culling
   if((frame++&7)===0){const cx=camera.position.x,cz=camera.position.z;for(const b of CHUNKS){const v=Math.hypot(b.cx-cx,b.cz-cz)<b.view;for(const m of b.meshes)m.visible=v}}
   if(G.started)updateHUD(dt);
-  renderer.render(scene,camera);
+  renderer.render(G.under?wScene:scene,camera);
 }
 
 // ============================================================ boot
@@ -1160,6 +1440,7 @@ function loop(){
   await loadAssets(p=>{$('loading').textContent=`Growing the forest… ${Math.round(p*100)}%`});
   $('loading').textContent='Planting trees…';await new Promise(r=>setTimeout(r,20));
   buildWorld();buildPig();buildPredators();buildTunnelScene();buildFriends();
+  $('loading').textContent='Digging tunnels…';await new Promise(r=>setTimeout(r,20));buildWarren();
   pig.pos.y=heightAt(pig.pos.x,pig.pos.z);pig.heading=0.4;G.camYaw=pig.heading+Math.PI;camTgt.copy(pig.pos);camPos.set(pig.pos.x+2,pig.pos.y+1,pig.pos.z+2);
   updatePig(0.016,0);updateDay(0);
   $('loading').textContent=G.best?`Best score: ${G.best.toLocaleString()}`:'';
@@ -1173,5 +1454,5 @@ function loop(){
     toast(`🐹 Welcome, ${esc(G.name)}! Munch grass (hold <kbd>E</kbd>) and forage (hold <kbd>F</kbd>).`,'good',6);setTimeout(()=>toast('💡 Humans kneeling in the meadow give pets — walk up to their hand and stay still.','',7),2500);setTimeout(()=>toast('💡 Sniff with <kbd>R</kbd> to find forage spots and hidden tunnels.','',7),6000);setTimeout(()=>toast('🐹 Other guinea pigs live in the meadow and woods. Walk up gently and hold <kbd>C</kbd> to befriend them — piggies are happier in a herd!','',8),10000)};
   $('dice').onclick=()=>{let n;do{n=PIG_NAMES[Math.floor(Math.random()*PIG_NAMES.length)]}while(n===$('pigName').value);$('pigName').value=n};
   $('resumeBtn').onclick=()=>togglePause(false);$('jclose').onclick=closeJournal;$('againBtn').onclick=()=>location.reload();
-  window.__game={G,pig,friends,herd,joinHerd,keys,applyLook,humans,tunnels,spots,hawk,foxes,heightAt,renderer,scene,camera};
+  window.__game={G,W,WS,enterWarren,exitWarren,pig,friends,herd,joinHerd,keys,applyLook,humans,tunnels,spots,hawk,foxes,heightAt,renderer,scene,camera};
 })().catch(e=>{console.error(e);$('loading').textContent='Failed to load: '+e.message});
