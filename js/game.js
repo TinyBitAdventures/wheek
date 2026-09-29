@@ -849,7 +849,7 @@ function buildWarren(){
   const inHall=(n,a,b)=>{const ang=wr()*Math.PI*2,r=n.r*WR(a,b);return {x:n.x+Math.cos(ang)*r,z:n.z+Math.sin(ang)*r,ang}};
   for(const n of N.filter(n=>n.kind==='den')){
     const sky=new THREE.Mesh(new THREE.CircleGeometry(.45,20),new THREE.MeshBasicMaterial({color:0xffffff,fog:false}));sky.rotation.x=Math.PI/2;sky.position.set(n.x,W_TOP-.07,n.z);wScene.add(sky);
-    const beam=new THREE.Mesh(new THREE.CylinderGeometry(.24,.55,W_TOP,18,1,true),new THREE.MeshBasicMaterial({color:0xffffff,transparent:true,opacity:.2,blending:THREE.AdditiveBlending,depthWrite:false,side:THREE.DoubleSide,fog:false}));
+    const beam=new THREE.Mesh(new THREE.CylinderGeometry(.24,.42,W_TOP,18,1,true),new THREE.MeshBasicMaterial({color:0xffffff,transparent:true,opacity:.12,blending:THREE.AdditiveBlending,depthWrite:false,side:THREE.DoubleSide,fog:false}));
     beam.position.set(n.x,W_TOP/2,n.z);wScene.add(beam);
     const pool=new THREE.Mesh(new THREE.CircleGeometry(.6,24),new THREE.MeshBasicMaterial({map:glowTex,color:0xffffff,transparent:true,opacity:.5,blending:THREE.AdditiveBlending,depthWrite:false,fog:false}));pool.rotation.x=-Math.PI/2;pool.position.set(n.x,.004,n.z);wScene.add(pool);
     n.sky=sky;n.beam=beam;n.pool=pool;W.glows.push({x:n.x,y:1.1,z:n.z,col:new THREE.Color(),i:1,d:4.5,den:n})}
@@ -1269,7 +1269,7 @@ const cA=new THREE.Color(),cB=new THREE.Color();
 function lerpHex(a,b,k,out){cA.set(a);cB.set(b);return out.copy(cA).lerp(cB,k)}
 function updateDay(dt){
   const prev=G.time;G.time+=dt/15;if(G.time>=24)G.time-=24;
-  if(prev<6&&G.time>=6){G.day++;G.nightsSurvived++;toast(`🌅 <b>You survived night ${G.nightsSurvived}!</b> +250`,'gold',5);addScore(250,'survived!','#ffd23f');flash('rgba(255,200,120,.35)',.5)}
+  if(prev<6&&G.time>=6){G.day++;G.nightsSurvived++;toast(`🌅 <b>You survived night ${G.nightsSurvived}!</b> +250`,'gold',5);addScore(250,'survived!','#ffd23f');flash('rgba(255,200,120,.35)',.5);if(G.slot){saveGame(true);toast('💾 Autosaved')}}
   if(prev<19.5&&G.time>=19.5)toast('🌇 Dusk is coming. Foxes hunt at night — know where your tunnels are!','',5);
   const T=G.time;let i=0;while(i<SKY.length-2&&SKY[i+1][0]<=T)i++;const a=SKY[i],b=SKY[i+1];const k=(T-a[0])/(b[0]-a[0]);
   lerpHex(a[1],b[1],k,skyMat.uniforms.top.value);lerpHex(a[2],b[2],k,skyMat.uniforms.hor.value);lerpHex(a[3],b[3],k,sun.color);
@@ -1371,11 +1371,55 @@ function closeJournal(){G.modal=false;$('journal').classList.add('hidden')}
 function gameOver(){G.over=true;const best=Math.max(G.best,G.score);lsSet('wheek-best',best);
   $('overWhy').textContent=`${G.name} the ${BREEDS[G.breed].name} ${G.cause||'had a very long day'}.`;
   $('overStats').innerHTML=`Score: <b style="color:#ffd23f;font-size:24px">${G.score.toLocaleString()}</b>${G.score>=G.best&&G.score>0?' 🏆 new best!':''}<br>Best: ${best.toLocaleString()}<br>Days survived: ${G.day} · Nights: ${G.nightsSurvived}<br>Forages: ${G.forages} · Treats eaten: ${G.eaten} · Pets: ${G.pets}<br>Tunnels found: ${G.tunnels}/${tunnels.length} · Herd: ${herd.length}/${HERD_MAX}<br>Warren: ${warrenPct()}% mapped · Curios: ${W.curios.filter(c=>c.got).length}/${W.curios.length}<br>Journal: ${Object.keys(G.found).length}/${Object.keys(ITEMS).length}`;
+  $('retryBtn').classList.toggle('hidden',!lsGet(slotKey(G.slot),null));
   $('over').classList.remove('hidden')}
+
+// ============================================================ saves
+// Three slots in localStorage. The world is seeded (the same every game), so a save only keeps what changed:
+// the stats, what's been found, the herd (by friend index) and the warren's explored passages.
+const SLOTS=3,slotKey=i=>'wheek-slot-'+i;
+const SAVE_G=['hp','full','vitc','energy','happy','score','day','time','forages','pets','found','curios','nightsSurvived','eaten','luckT','warrenTip'];
+function snapshot(){const g={};for(const k of SAVE_G)g[k]=G[k];const ix=(a,f)=>a.flatMap((x,i)=>f(x)?[i]:[]);
+  return {v:1,saved:Date.now(),name:G.name,breed:G.breed,coat:G.coat,G:g,
+    pig:{x:+pig.pos.x.toFixed(2),z:+pig.pos.z.toFixed(2),h:+pig.heading.toFixed(2)},under:G.under?tunnels.indexOf(W.from):-1,
+    tunnels:ix(tunnels,t=>t.found),herd:herd.map(f=>friends.indexOf(f)),names:friends.map(f=>f.name),known:ix(friends,f=>f.known),
+    warren:{edges:W.edges.map(e=>e.pts.map(p=>p.seen?1:0).join('')),seen:ix(W.nodes,n=>n.seen),heard:ix(W.nodes,n=>n.heard),got:ix(W.curios,c=>c.got),routes:W.routes||0}}}
+function saveGame(quiet){if(!G.slot||!G.started||G.over)return;lsSet(slotKey(G.slot),snapshot());if(!quiet)toast(`💾 Saved to slot ${G.slot}`,'good')}
+function restore(s){
+  for(const k of SAVE_G)if(k in s.G)G[k]=s.G[k];
+  G.name=s.name;G.breed=BREEDS[s.breed]?s.breed:'american';G.coat=BREEDS[G.breed].coats.includes(s.coat)?s.coat:BREEDS[G.breed].coats[0];G.perk=perksFor(G.breed);buildPig();
+  tunnels.forEach((t,i)=>t.found=s.tunnels.includes(i));G.tunnels=s.tunnels.length;
+  // wild piggies' names depend on your own name at load, so keep the ones this game used
+  (s.names||[]).forEach((n,i)=>{if(friends[i])friends[i].name=n});
+  s.known.forEach(i=>{if(friends[i])friends[i].known=true});
+  s.herd.forEach(i=>{const f=friends[i];if(!f||herd.includes(f))return;f.state='herd';f.friend=1;f.tag.style.display='none';herd.push(f)});
+  const w=s.warren;
+  W.edges.forEach((e,i)=>{const b=w.edges[i]||'';e.pts.forEach((p,k)=>{if(b[k]==='1'&&!p.seen){p.seen=true;W.seenPts++}});e.done=e.pts.filter(p=>p.seen).length>=e.pts.length*.9});
+  w.seen.forEach(i=>{if(W.nodes[i])W.nodes[i].seen=true});w.heard.forEach(i=>{if(W.nodes[i])W.nodes[i].heard=true});
+  w.got.forEach(i=>{const c=W.curios[i];if(c){c.got=true;c.obj.removeFromParent()}});W.routes=w.routes;W.allSeen=W.edges.every(e=>e.done);
+  pig.pos.set(s.pig.x,heightAt(s.pig.x,s.pig.z),s.pig.z);pig.heading=s.pig.h;
+  if(tunnels[s.under]){enterWarren(tunnels[s.under],true);pig.pos.set(s.pig.x,0,s.pig.z);pig.heading=s.pig.h;W.trail=[{x:pig.pos.x,z:pig.pos.z}];herd.forEach(f=>f.pos.copy(pig.pos))}
+  else regroupHerd();
+  G.camYaw=pig.heading+Math.PI;snapCamera();updateDay(0)}
+function ago(t){const m=Math.round((Date.now()-t)/60000);return m<1?'just now':m<60?`${m} min ago`:m<1440?`${Math.round(m/60)} h ago`:`${Math.round(m/1440)} days ago`}
+function renderSlots(){const el=$('slots');el.innerHTML='';
+  for(let i=1;i<=SLOTS;i++){const s=lsGet(slotKey(i),null);const row=document.createElement('div');row.className='slot';
+    if(s&&s.G){row.innerHTML=`<button class="btn cont">▶ ${esc(s.name)} the ${BREEDS[s.breed]?.name||'guinea pig'}<span>Slot ${i} · Day ${s.G.day} · ${s.G.score.toLocaleString()} pts · saved ${ago(s.saved)}</span></button><button class="btn alt del" title="Delete this save">🗑</button>`;
+      row.querySelector('.cont').onclick=()=>continueGame(i);row.querySelector('.del').onclick=()=>{if(confirm(`Delete ${s.name}'s save in slot ${i}?`)){try{localStorage.removeItem(slotKey(i))}catch(e){}renderSlots()}}}
+    else{row.innerHTML=`<button class="btn alt new">＋ New guinea pig<span>Slot ${i} · empty</span></button>`;row.querySelector('.new').onclick=()=>newGame(i)}
+    el.appendChild(row)}}
+function newGame(i){G.slot=i;audioInit();$('title').classList.add('hidden');openSelect()}
+function continueGame(i){const s=lsGet(slotKey(i),null);if(!s)return renderSlots();G.slot=i;audioInit();restore(s);
+  startPlaying(()=>toast(`🐹 Welcome back, ${esc(G.name)}! Day ${G.day}${G.under?', down in the warren':''}.`,'good',5))}
+function startPlaying(welcome){
+  friends.forEach(f=>{if(f.name===G.name)f.name=PIG_NAMES.find(n=>n!==G.name&&!friends.some(o=>o.name===n))});
+  G.selecting=false;camera.clearViewOffset();$('select').classList.add('hidden');G.started=true;G.camDist=.95;G.camPitch=.2;G.camYaw=pig.heading+Math.PI;$('title').classList.add('hidden');['stats','top','mapwrap','help'].forEach(i=>$(i).classList.remove('hidden'));SFX.wheek();
+  welcome();saveGame(true)}
+addEventListener('pagehide',()=>saveGame(true));
 
 // ============================================================ input
 addEventListener('keydown',e=>{
-  if(!G.started)return;keys[e.code]=true;
+  if(!G.started)return;keys[e.code]=true;if(AC&&AC.state==='suspended')AC.resume();
   if(e.code==='Escape'){if(!$('journal').classList.contains('hidden'))closeJournal();else if(!$('tunnelMenu').classList.contains('hidden'))closeTunnel();else togglePause();return}
   if(e.code==='KeyP'){togglePause();return}
   if(e.code==='KeyJ'){if($('journal').classList.contains('hidden'))openJournal();else closeJournal();return}
@@ -1445,14 +1489,14 @@ function loop(){
   updatePig(0.016,0);updateDay(0);
   $('loading').textContent=G.best?`Best score: ${G.best.toLocaleString()}`:'';
   G.camDist=2.4;G.camPitch=.32;
-  bar.disabled=false;bar.textContent='Choose your guinea pig';
+  bar.classList.add('hidden');renderSlots();$('slots').classList.remove('hidden');
   loop();
-  bar.onclick=()=>{audioInit();$('title').classList.add('hidden');openSelect()};
   $('goBtn').onclick=()=>{const nm=$('pigName').value.trim().slice(0,14);G.name=nm||PIG_NAMES[0];lsSet('wheek-pig',{breed:G.breed,coat:G.coat,name:G.name});
-    friends.forEach(f=>{if(f.name===G.name)f.name=PIG_NAMES.find(n=>n!==G.name&&!friends.some(o=>o.name===n))});
-    G.selecting=false;camera.clearViewOffset();$('select').classList.add('hidden');G.started=true;G.camDist=.95;G.camPitch=.2;G.camYaw=pig.heading+Math.PI;$('title').classList.add('hidden');['stats','top','mapwrap','help'].forEach(i=>$(i).classList.remove('hidden'));SFX.wheek();
-    toast(`🐹 Welcome, ${esc(G.name)}! Munch grass (hold <kbd>E</kbd>) and forage (hold <kbd>F</kbd>).`,'good',6);setTimeout(()=>toast('💡 Humans kneeling in the meadow give pets — walk up to their hand and stay still.','',7),2500);setTimeout(()=>toast('💡 Sniff with <kbd>R</kbd> to find forage spots and hidden tunnels.','',7),6000);setTimeout(()=>toast('🐹 Other guinea pigs live in the meadow and woods. Walk up gently and hold <kbd>C</kbd> to befriend them — piggies are happier in a herd!','',8),10000)};
+    startPlaying(()=>{toast(`🐹 Welcome, ${esc(G.name)}! Munch grass (hold <kbd>E</kbd>) and forage (hold <kbd>F</kbd>).`,'good',6);setTimeout(()=>toast('💡 Humans kneeling in the meadow give pets — walk up to their hand and stay still.','',7),2500);setTimeout(()=>toast('💡 Sniff with <kbd>R</kbd> to find forage spots and hidden tunnels.','',7),6000);setTimeout(()=>toast('🐹 Other guinea pigs live in the meadow and woods. Walk up gently and hold <kbd>C</kbd> to befriend them — piggies are happier in a herd!','',8),10000)})};
+  // "Back to your last save" after a game over reloads the page and lands here
+  {let r=null;try{r=sessionStorage.getItem('wheek-continue');sessionStorage.removeItem('wheek-continue')}catch(e){}if(r&&lsGet(slotKey(+r),null))continueGame(+r)}
   $('dice').onclick=()=>{let n;do{n=PIG_NAMES[Math.floor(Math.random()*PIG_NAMES.length)]}while(n===$('pigName').value);$('pigName').value=n};
-  $('resumeBtn').onclick=()=>togglePause(false);$('jclose').onclick=closeJournal;$('againBtn').onclick=()=>location.reload();
+  $('resumeBtn').onclick=()=>togglePause(false);$('saveBtn').onclick=()=>saveGame();$('quitBtn').onclick=()=>{saveGame(true);location.reload()};$('jclose').onclick=closeJournal;$('againBtn').onclick=()=>location.reload();
+  $('retryBtn').onclick=()=>{try{sessionStorage.setItem('wheek-continue',G.slot)}catch(e){}location.reload()};
   window.__game={G,W,WS,enterWarren,exitWarren,pig,friends,herd,joinHerd,keys,applyLook,humans,tunnels,spots,hawk,foxes,heightAt,renderer,scene,camera};
 })().catch(e=>{console.error(e);$('loading').textContent='Failed to load: '+e.message});

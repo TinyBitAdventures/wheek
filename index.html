@@ -109,6 +109,10 @@ kbd{display:inline-block;min-width:20px;text-align:center;padding:0 5px;margin-r
 .perk b{color:var(--ink)}
 .perk .pk{display:block;margin-top:5px;color:var(--gold)}
 .hcell{display:inline-block;background:rgba(0,0,0,.25);border:1px solid var(--edge);border-radius:10px;padding:5px 10px;margin:3px;font-size:13px}
+.slot{display:flex;gap:8px}
+.slot .btn{flex:1;margin:0;font-size:17px;padding:10px 16px;text-align:left}
+.slot .btn span{display:block;font-size:12px;font-weight:500;opacity:.7}
+.slot .del{flex:0 0 auto;padding:10px 14px;text-align:center}
 .hidden{display:none!important}
 @media (max-width:700px){.overlay.sel{align-items:flex-end;background:linear-gradient(0deg,rgba(15,10,5,.75),rgba(15,10,5,.1) 60%,transparent)}.selcard{max-height:62%;padding:16px}.breed span{display:none}#mapwrap{display:none}#toasts{top:auto;bottom:110px}#stats{min-width:170px}}
 </style>
@@ -160,6 +164,7 @@ kbd{display:inline-block;min-width:20px;text-align:center;padding:0 5px;margin-r
       <div>Stand still next to a human for pets</div>
     </div>
     <button class="btn" id="startBtn" disabled>Loading…</button>
+    <div id="slots" class="tlist hidden"></div>
     <div id="loading"></div>
     <div id="ver"></div>
   </div>
@@ -174,10 +179,10 @@ kbd{display:inline-block;min-width:20px;text-align:center;padding:0 5px;margin-r
   <div class="perk" id="perk"></div>
   <button class="btn" id="goBtn">Start scurrying</button>
 </div></div>
-<div id="pause" class="overlay hidden"><div class="card" style="text-align:center"><h2>Paused</h2><p>Your guinea pig is having a little think.</p><button class="btn" id="resumeBtn">Resume</button></div></div>
+<div id="pause" class="overlay hidden"><div class="card" style="text-align:center"><h2>Paused</h2><p>Your guinea pig is having a little think.</p><div class="tlist" style="max-width:320px;margin:14px auto 0"><button class="btn" id="resumeBtn">Resume</button><button class="btn alt" id="saveBtn">💾 Save</button><button class="btn alt" id="quitBtn">🏠 Save &amp; quit to menu</button></div></div></div>
 <div id="journal" class="overlay hidden"><div class="card"><h2>🌿 Forager's Journal</h2><p id="jsub"></p><div class="jgrid" id="jgrid"></div><div id="jherd"></div><div id="jwarren"></div><div style="text-align:center;margin-top:16px"><button class="btn" id="jclose">Close</button></div></div></div>
 <div id="tunnelMenu" class="overlay hidden"><div class="card"><h2 id="tmTitle">🕳 Tunnel</h2><p>The burrow is warm and smells of earth. Where to?</p><div class="tlist" id="tmList"></div></div></div>
-<div id="over" class="overlay hidden"><div class="card" style="text-align:center"><h2 id="overTitle">Your adventure is over</h2><p id="overWhy"></p><div id="overStats" style="font-size:16px;line-height:1.8;margin:10px 0"></div><button class="btn" id="againBtn">Play again</button></div></div>
+<div id="over" class="overlay hidden"><div class="card" style="text-align:center"><h2 id="overTitle">Your adventure is over</h2><p id="overWhy"></p><div id="overStats" style="font-size:16px;line-height:1.8;margin:10px 0"></div><div class="tlist" style="max-width:320px;margin:14px auto 0"><button class="btn hidden" id="retryBtn">↺ Back to your last save</button><button class="btn alt" id="againBtn">🏠 Main menu</button></div></div></div>
 
 <script type="importmap">
 {"imports":{"three":"https://cdn.jsdelivr.net/npm/three@0.170.0/build/three.module.js","three/addons/":"https://cdn.jsdelivr.net/npm/three@0.170.0/examples/jsm/"}}

@@ -42,19 +42,19 @@ const scenes = {
     await setup(page, `G.time=12;pig.pos.set(0,0,-6);pig.heading=Math.PI`);
     await camera(page, .2, 3.5, .35);
   },
-  // Inside the burrow, scurrying between two found tunnels.
+  // Scurrying along a quick route between two found burrows (routes open once their passages are explored).
   async tunnel(page) {
     await page.keyboard.up('KeyF');
-    await setup(page, `G.time=18;const [a,b]=g.tunnels;a.found=b.found=true;pig.pos.set(a.ex,0,a.ez);pig.heading=a.rot+Math.PI`);
+    await setup(page, `G.time=18;const [a,b]=g.tunnels;a.found=b.found=true;g.W.edges.forEach(e=>e.done=true);pig.pos.set(a.ex,0,a.ez);pig.heading=a.rot+Math.PI`);
     // keep the pig on the entrance (the herd can nudge it) until the prompt list, refreshed about once a second, offers the tunnel
     await page.waitForFunction(() => { const g = window.__game, [a] = g.tunnels; g.pig.pos.set(a.ex, g.heightAt(a.ex, a.ez), a.ez); return (g.G.acts || []).some(x => x.label.startsWith('Enter tunnel')); }, null, { timeout: 10000, polling: 200 });
     await page.keyboard.press('KeyE');
-    await page.click('#tmList .btn.alt >> nth=0', { timeout: 5000 });
+    await page.click('#tmList .btn.alt >> nth=0', { timeout: 30000 });
     await page.waitForTimeout(1600);
   },
   // Down in the warren: crawl along the first passage from the Meadow Burrow's den.
   async warren(page) {
-    await page.waitForFunction(() => !window.__game.G.inTunnel, null, { timeout: 20000, polling: 250 });
+    await page.waitForFunction(() => !window.__game.G.inTunnel, null, { timeout: 120000, polling: 250 });
     await setup(page, `G.time=12;g.enterWarren(g.tunnels[0],true)`);
     await page.keyboard.down('KeyW'); await page.waitForTimeout(2500); await page.keyboard.up('KeyW');
     await page.waitForTimeout(1500);
@@ -89,10 +89,10 @@ const scenes = {
   };
 
   await page.goto(URL);
-  await page.waitForFunction(() => !document.getElementById('startBtn').disabled, null, { timeout: 180000 });
+  await page.waitForFunction(() => !document.getElementById('slots').classList.contains('hidden'), null, { timeout: 180000 });
   const version = await page.evaluate(() => document.getElementById('ver')?.textContent || '');
   if (pick('title')) await shot('title');
-  await page.click('#startBtn');
+  await page.click('#slots .new >> nth=0');
   await page.click('.breed[data-b=abyssinian]');
   await page.waitForTimeout(1200);
   if (pick('select')) await shot('select');

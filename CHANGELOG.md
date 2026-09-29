@@ -10,6 +10,12 @@
 - Walk to a burrow's den from below to discover it, and climb out there. Passages you've walked end to end become quick routes: from a burrow, you can scurry straight to any burrow you've linked up.
 - Your herd comes underground with you. Daylight (or moonlight) falls down each burrow's shaft, and the hawk and foxes can't reach you down there.
 
+### Saves
+- Three save slots on the title screen, each showing your guinea pig, day, score and when it was saved. Delete one with 🗑.
+- Pause (P) to save, or save and quit back to the title.
+- Autosaves at sunrise and when you close the tab. A save keeps your stats, journal, herd, found burrows and the warren you've mapped, even if you're underground.
+- After a game over, go back to your last save or return to the title.
+
 ## v0.1.0 (2026-09-28)
 
 The first release. Wheek! moves out of the playground into its own repo.
