@@ -106,16 +106,18 @@ function bake(name){
 // chunked instanced sets with distance culling
 let CHUNKS=[];
 function makeSet(name,mats,{chunk=20,view=500,shadow=true,receive=true,parts=null,tint=null}={}){
-  parts=parts||bake(name);if(tint)parts=parts.map(p=>tint[p.mat.name]?{geo:p.geo,mat:tint[p.mat.name](p.mat.clone())}:p);const buckets=new Map();const index=[];
+  parts=parts||bake(name);if(tint)parts=parts.map(p=>tint[p.mat.name]?{geo:p.geo,mat:tint[p.mat.name](p.mat.clone())}:p);
+  // which chunk each instance went to, and its slot there (typed arrays: a zone has ~100k instances)
+  const buckets=new Map(),list=[],bi=new Uint16Array(mats.length),bj=new Uint32Array(mats.length);
   mats.forEach((m,i)=>{const x=m.elements[12],z=m.elements[14];const kx=Math.floor(x/chunk),kz=Math.floor(z/chunk),key=kx+','+kz;
-    let b=buckets.get(key);if(!b){b={list:[],cx:(kx+.5)*chunk,cz:(kz+.5)*chunk,view:view+chunk*.75};buckets.set(key,b)}
-    index[i]={b,j:b.list.length};b.list.push(m)});
-  for(const b of buckets.values()){
+    let b=buckets.get(key);if(!b){b={list:[],cx:(kx+.5)*chunk,cz:(kz+.5)*chunk,view:view+chunk*.75};buckets.set(key,b);b.id=list.length;list.push(b)}
+    bi[i]=b.id;bj[i]=b.list.length;b.list.push(m)});
+  for(const b of list){
     b.meshes=parts.map(p=>{const im=new THREE.InstancedMesh(p.geo,p.mat,b.list.length);b.list.forEach((m,j)=>im.setMatrixAt(j,m));im.castShadow=shadow;im.receiveShadow=receive;im.instanceMatrix.needsUpdate=true;im.computeBoundingSphere();ZG.add(im);return im});
-    CHUNKS.push(b);
+    b.list=null;CHUNKS.push(b);   // the matrices now live in the instance buffers
   }
   return {parts,
-    setMatrix(i,m,filter){const {b,j}=index[i];b.meshes.forEach((im,k)=>{if(filter&&!filter(parts[k].mat.name))return;im.setMatrixAt(j,m);im.instanceMatrix.needsUpdate=true})}};
+    setMatrix(i,m,filter){const b=list[bi[i]],j=bj[i];b.meshes.forEach((im,k)=>{if(filter&&!filter(parts[k].mat.name))return;im.setMatrixAt(j,m);im.instanceMatrix.needsUpdate=true})}};
 }
 const ZERO=new THREE.Matrix4().makeScale(0,0,0);
 const tmpM=new THREE.Matrix4(),tmpQ=new THREE.Quaternion(),tmpS=new THREE.Vector3(),tmpP=new THREE.Vector3(),tmpE=new THREE.Euler();
@@ -206,6 +208,8 @@ function buildZone(z){
   const prev=rand;if(z.seed)rand=mulberry32(z.seed);   // the park keeps the world's own sequence: its layout predates zones
   z.build(z);rand=prev;if(z!==PARK)addSignposts(z);
   for(const i of G.zfound[z.id]||[])if(z.tunnels[i])z.tunnels[i].found=true;
+  // a plant that ended up inside a rock or trunk can never be eaten: leave it out (without touching the seeded layout)
+  for(const ps of z.pickSets)for(const it of ps.items)if(z.colliders.some(c=>Math.hypot(c.x-it.x,c.z-it.z)<c.r)){it.alive=false;it.respawn=Infinity;ps.set.setMatrix(it.i,ZERO)}
   Object.assign(z,{leafpiles:G.leafpiles,lpSet:G.lpSet,bushSet:G.bushSet,lushSet:G.lushSet,glass:G.glass});z.built=true}
 function showZone(z){const old=Z&&Z.built?Z:null;if(!z.built)buildZone(z);useZone(z);if(old&&old!==z)scene.remove(old.group);scene.add(z.group)}
 
@@ -451,18 +455,20 @@ function lampPosts(pts){if(!pts.length)return;const lm=pts.map(([x,z])=>{addColl
   const g=new THREE.BufferGeometry();g.setAttribute('position',new THREE.Float32BufferAttribute(pts.flatMap(([x,z])=>[x,heightAt(x,z)+2.74,z]),3));
   const pm=new THREE.PointsMaterial({map:glowTex,color:0xffc070,size:1.6,transparent:true,opacity:0,depthWrite:false,blending:THREE.AdditiveBlending});ZG.add(new THREE.Points(g,pm));Z.lamps.push({glow:pm})}
 // animals that wander inside an area (a pen, a paddock) or paddle about on a pond
-const CRITTER={Goat:{r:.3,speed:.55,sfx:'baa',say:'🐐 A goat! It gives you a friendly sniff.'},Sheep:{r:.33,speed:.4,sfx:'baa',say:'🐑 A fluffy sheep! Baa!'},Duck:{r:.14,speed:.35,sfx:'quack',say:'🦆 Quack! A duck paddles over to say hello.',swim:true}};
+const CRITTER={Goat:{r:.3,speed:.55,sfx:'baa',say:'🐐 A goat! It gives you a friendly sniff.'},Sheep:{r:.33,speed:.4,sfx:'baa',say:'🐑 A fluffy sheep! Baa!'},Duck:{r:.14,speed:.35,sfx:'quack',say:'🦆 Quack! A duck paddles over to say hello.',swim:true,meet:2.4}};
 function inArea(a){if(a.r){for(let k=0;k<60;k++){const ang=rand()*Math.PI*2,rr=Math.sqrt(rand())*a.r,x=a.x+Math.cos(ang)*rr,z=a.z+Math.sin(ang)*rr;if(!a.water||wet(x,z,-.1))return {x,z}}return {x:a.x,z:a.z}}return {x:R(a.x0,a.x1),z:R(a.z0,a.z1)}}
 function addCritters(kind,n,area){for(let i=0;i<n;i++){const o=M[kind].clone(true);ZG.add(o);const p=inArea(area);
   Z.critters.push({kind,obj:o,legs:['LegFL','LegFR','LegBL','LegBR'].map(k=>o.getObjectByName(k)).filter(Boolean),area,x:p.x,z:p.z,tx:p.x,tz:p.z,heading:rand()*Math.PI*2,t:R(0,4),phase:rand()*6,moving:false,sayT:R(4,12)})}}
 function updateCritters(dt,t){
   for(const c of Z.critters){const C=CRITTER[c.kind];c.t-=dt;
-    if(c.t<=0){if(c.moving){c.moving=false;c.t=R(2,6)}else{const p=inArea(c.area);c.tx=p.x;c.tz=p.z;c.moving=true;c.t=R(4,9)}}
+    const px=pig.pos.x-c.x,pz=pig.pos.z-c.z,pd=Math.hypot(px,pz);
+    if(c.t<=0){if(c.moving){c.moving=false;c.t=R(2,6)}else{const p=inArea(c.area);c.tx=p.x;c.tz=p.z;c.moving=true;c.t=R(4,9);
+      // ducks paddle over to a guinea pig on the bank: the deep water in their patch nearest to it
+      if(C.swim&&pd<7){const a=c.area,ax=pig.pos.x-a.x,az=pig.pos.z-a.z,al=Math.hypot(ax,az)||1;for(let k=1;k>=0;k-=.1){const x=a.x+ax/al*a.r*k,z=a.z+az/al*a.r*k;if(wet(x,z,-.1)){c.tx=x;c.tz=z;c.t=R(3,5);break}}}}}
     const dx=c.tx-c.x,dz=c.tz-c.z,d=Math.hypot(dx,dz);let sp=0;
     if(c.moving&&d>.12){c.heading+=angDiff(c.heading,Math.atan2(dx,dz))*Math.min(1,dt*3);sp=C.speed;c.x+=Math.sin(c.heading)*sp*dt;c.z+=Math.cos(c.heading)*sp*dt}else if(c.moving){c.moving=false;c.t=R(2,6)}
-    const px=pig.pos.x-c.x,pz=pig.pos.z-c.z,pd=Math.hypot(px,pz);
     if(!C.swim&&pd<C.r+.1&&pd>1e-4){const k=(C.r+.1-pd)/pd;pig.pos.x+=px*k;pig.pos.z+=pz*k}
-    if(pd<1.4){if(!G.met[c.kind]){G.met[c.kind]=1;toast(C.say,'good',4);G.happy=Math.min(100,G.happy+10);addScore(40,'new friend!','#ff9fd0');SFX[C.sfx]()}else if((c.sayT-=dt)<=0){c.sayT=R(6,14);SFX[C.sfx]()}}
+    if(pd<(C.meet||1.4)){if(!G.met[c.kind]){G.met[c.kind]=1;toast(C.say,'good',4);G.happy=Math.min(100,G.happy+10);addScore(40,'new friend!','#ff9fd0');SFX[C.sfx]()}else if((c.sayT-=dt)<=0){c.sayT=R(6,14);SFX[C.sfx]()}}
     c.obj.position.set(c.x,C.swim?Z.waterY-.03+Math.sin(t*2+c.phase)*.008:heightAt(c.x,c.z),c.z);c.obj.rotation.y=c.heading;
     if(c.legs.length){c.phase+=dt*sp*14;const sw=sp?Math.sin(c.phase)*.45:0;c.legs[0].rotation.x=sw;c.legs[3].rotation.x=sw;c.legs[1].rotation.x=-sw;c.legs[2].rotation.x=-sw}}}
 // traffic: cars drive each lane and loop round, keep their distance and take turns at the crossroads. Look both ways!
@@ -1950,5 +1956,5 @@ function loop(){
   $('dice').onclick=()=>{let n;do{n=PIG_NAMES[Math.floor(Math.random()*PIG_NAMES.length)]}while(n===$('pigName').value);$('pigName').value=n};
   $('resumeBtn').onclick=()=>togglePause(false);$('saveBtn').onclick=()=>saveGame();$('quitBtn').onclick=()=>{saveGame(true);location.reload()};$('jclose').onclick=closeJournal;$('againBtn').onclick=()=>location.reload();
   $('retryBtn').onclick=()=>{try{sessionStorage.setItem('wheek-continue',G.slot)}catch(e){}location.reload()};
-  window.__game={G,W,WS,ZONE,Z:()=>Z,visit:(id,x=0,z=0,h=0)=>arriveZone(ZONE[id],0,{x,z,h}),enterWarren,exitWarren,pig,friends,herd,joinHerd,keys,applyLook,humans,tunnels,spots,hawk,foxes,heightAt,renderer,scene,camera};
+  window.__game={G,W,WS,ZONE,PARK,EDGE,wSdf,neighbour,freeAt,Z:()=>Z,visit:(id,x=0,z=0,h=0)=>arriveZone(ZONE[id],0,{x,z,h}),enterWarren,exitWarren,pig,friends,herd,joinHerd,keys,applyLook,humans,tunnels,spots,hawk,foxes,heightAt,renderer,scene,camera};
 })().catch(e=>{console.error(e);$('loading').textContent='Failed to load: '+e.message});

@@ -30,6 +30,9 @@
 
 ### Fixes
 - The little mushrooms on hollow logs now grow along the top of the log instead of floating in the air beside it.
+- Ducks paddle over to a guinea pig on the bank, so you can always say hello.
+- A dandelion hidden inside a rock in the park no longer counts as a plant you could never reach.
+- The world uses about half the memory it did, which matters once you've visited every zone.
 
 ## v0.1.0 (2026-09-28)
 
