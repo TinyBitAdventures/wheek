@@ -610,7 +610,6 @@ defineZone({id:'deepwood',blurb:'Ancient trees and deep shade. Rare mushrooms an
 
 // ---- Downtown: a small town, Main Street and Elm Street, houses, lawns and a town square
 const MAIN_Z=0,ELM_X=14;
-const onRoad=(x,z)=>Math.abs(z-MAIN_Z)<3||Math.abs(x-ELM_X)<3;
 const townPath=(x,z)=>Math.max(0,Math.min(Math.abs(z-MAIN_Z),Math.abs(x-ELM_X))-5.2)+(Math.hypot(x,z)>EDGE+4?9:0);
 defineZone({id:'town',blurb:'Shops, a fountain square and lots of friendly humans. Wheek for veggies, and look both ways before you cross!',name:'Downtown',icon:'🏙️',gx:1,gz:0,seed:3303,fog:1.1,edgeMsg:'🚗 That road leads to the highway. Much too busy for a guinea pig!',
   height:(x,z)=>fbm(x*.01,z*.01,3)*.6*smooth(8,30,Math.min(Math.abs(z),Math.abs(x-ELM_X)))+rimLift(x,z,5),

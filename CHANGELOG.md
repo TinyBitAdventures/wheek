@@ -1,10 +1,12 @@
 # Changelog
 
-## Unreleased
+## v0.2.0 (2026-09-29)
+
+Wheek! gets much bigger. Walk out of the park into eight new places, crawl down into the warren beneath the woods, and pick up where you left off with save slots.
 
 ### A bigger world
 - The park is now the middle of a 3×3 world. Walk off the edge of any zone (the four sides or the four corners) and you're told you're leaving it and where you're heading, then you arrive on the far side of the next one. Signposts at the edge point the way, and the big map (M) labels each direction.
-- Eight new zones around the park: ❄️ Snowcap Peaks (snowfall, frosted pines, a frozen pond to slide on, and the cold drains your energy), 🌲 The Deep Wood (giant trees, mist, more mushrooms and four-leaf clovers, bolder foxes), 🏙️ Downtown (streets, houses, lawns and friendly townsfolk), 🏖️ Sandy Cove (dunes, a beach and the sea), 🌊 Willow Creek (a winding creek with shallow fords to wade), 🐐 Critter Corner (a petting zoo of pens and hay), 🚜 Sunny Acres Farm (a red barn, carrot fields and a duck pond) and 🌻 Sunflower Fields (a flower maze with a prize in the middle).
+- Eight new zones around the park: ❄️ Snowcap Peaks (snowfall, frosted pines, a frozen pond to slide on, and the cold drains your energy), 🌲 The Deep Wood (giant trees, mist, more mushrooms and four-leaf clovers, bolder foxes), 🏙️ Downtown (shops, a fountain square, busy streets and friendly townsfolk), 🏖️ Sandy Cove (dunes, a beach and the sea), 🌊 Willow Creek (a winding creek with shallow fords to wade), 🐐 Critter Corner (a petting zoo of goats, sheep and ducks), 🚜 Sunny Acres Farm (a red barn, carrot fields, a sheep paddock and a duck pond) and 🌻 Sunflower Fields (a flower maze with a prize in the middle).
 - Each zone has its own burrows to find, its own humans and its own treats. The warren stays under the park.
 - Guinea pigs can wade shallow water but not deep water.
 - Your herd travels with you, and saves remember which zone you're in.
@@ -19,7 +21,7 @@
 - Five hidden chambers to discover: the Glowworm Grotto, Root Cellar, Mushroom Hall, Old Seed Store and Crystal Hollow, each with its own look and treats to eat.
 - A curio stash: nine lost trinkets tucked into the chambers and dead-end nooks, with the Golden Acorn waiting in the deepest one. They get their own page in the journal.
 - Your map fills in as you explore. Press M for a big map; sniff (R) underground to find curios and mark unexplored chambers.
-- Walk to a burrow's den from below to discover it, and climb out there. Passages you've walked end to end become quick routes: from a burrow, you can scurry straight to any burrow you've linked up.
+- Walk to a burrow's den from below to discover it, and climb out there. Passages you've walked end to end become quick routes: from a burrow, you can scurry straight to any burrow you've linked up. (In v0.1.0 any two burrows you'd found were linked; now you open the routes by exploring.)
 - Your herd comes underground with you. Daylight (or moonlight) falls down each burrow's shaft, and the hawk and foxes can't reach you down there.
 
 ### Saves
