@@ -653,11 +653,12 @@ def build_log():
     # little mushrooms on top
     ms = []
     for i in range(4):
-        x = -0.5 + i * 0.28
-        st = limb_bm((x + 0.12, 0.1 * (i % 2), cz + Ro * 0.95), (x + 0.12, 0.1 * (i % 2), cz + Ro * 0.95 + 0.04), 0.008, 0.007, 8)
+        # along the log (y) on its crest, stems sunk into the bark so the bumpy surface never leaves a gap
+        x, y, z0 = 0.05 * (1 if i % 2 else -1), -0.38 + i * 0.28, cz + Ro * 0.86
+        st = limb_bm((x, y, z0), (x, y, z0 + 0.065), 0.008, 0.007, 8)
         cap = sphere_bm(1, 12, 8)
         deform(cap, lambda v: Vector((v.x * 0.03, v.y * 0.03, max(v.z, -0.2) * 0.018)))
-        xform(cap, Matrix.Translation((x + 0.12, 0.1 * (i % 2), cz + Ro * 0.95 + 0.045)))
+        xform(cap, Matrix.Translation((x, y, z0 + 0.07)))
         ms += [st, cap]
     mo = from_bm(merge_bms(ms), "LogShrooms", material("Shroom", rough=0.6), parent=rt)
     paint(mo, lambda p, n: (0.85, 0.75, 0.6) if n.z < 0.2 else (0.72, 0.45, 0.2))

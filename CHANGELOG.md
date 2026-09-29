@@ -28,6 +28,9 @@
 - Autosaves at sunrise and when you close the tab. A save keeps your stats, journal, herd, found burrows and the warren you've mapped, even if you're underground.
 - After a game over, go back to your last save or return to the title.
 
+### Fixes
+- The little mushrooms on hollow logs now grow along the top of the log instead of floating in the air beside it.
+
 ## v0.1.0 (2026-09-28)
 
 The first release. Wheek! moves out of the playground into its own repo.
