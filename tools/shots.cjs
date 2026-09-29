@@ -69,6 +69,23 @@ const scenes = {
     await setup(page, `const n=g.W.nodes.find(n=>n.theme==='${process.env.HALL || 'shrooms'}');if(!g.G.under)g.enterWarren(g.tunnels[0],true);pig.pos.set(n.x+n.r*.7,0,n.z);pig.heading=-Math.PI/2;G.camYaw=pig.heading+Math.PI;G.camPitch=.35`);
     await page.waitForTimeout(3500);
   },
+  // The other zones: visit() builds a zone and drops the pig in at a spot.
+  async peaks(page) {
+    await setup(page, `document.getElementById('mapwrap').classList.remove('big');G.time=11;g.visit('peaks',-10,-4,-2.3)`);
+    await camera(page, 'window.__game.pig.heading+Math.PI', 3.2, .35);
+  },
+  async creek(page) {
+    await setup(page, `G.time=12;g.visit('creek',0,9.5,0)`);
+    await camera(page, 'window.__game.pig.heading+Math.PI', 2.6, .35);
+  },
+  async town(page) {
+    await setup(page, `G.time=10;g.visit('town',-10,4.5,1.2)`);
+    await camera(page, 'window.__game.pig.heading+Math.PI', 4, .35);
+  },
+  async maze(page) {
+    await setup(page, `G.time=12;g.visit('sunflowers',-6,-4,0)`);
+    await camera(page, 'window.__game.pig.heading+Math.PI', 16, 1.15);
+  },
   async map(page) {
     await setup(page, `g.W.edges.forEach(e=>e.pts.forEach(p=>p.seen=true));g.W.nodes.forEach(n=>n.seen=true);document.getElementById('mapwrap').classList.add('big')`);
     await page.waitForTimeout(1200);
@@ -85,7 +102,7 @@ const scenes = {
   // Toasts and "rare find" callouts are timing noise in a still, so clear them first.
   const shot = async name => {
     await page.evaluate(() => { document.getElementById('toasts').innerHTML = ''; const c = document.getElementById('callout'); c.style.transition = 'none'; c.style.opacity = 0; });
-    await page.screenshot({ path: `${out}/${name}.png` });
+    await page.screenshot({ path: `${out}/${name}.png`, timeout: 120000 });
   };
 
   await page.goto(URL);

@@ -1223,6 +1223,409 @@ def build_blanket():
 
 # ---------------------------------------------------------------- run
 only = sys.argv[sys.argv.index("--") + 2:] if "--" in sys.argv else []
+# ================================================================ ZONES (the world around the park)
+def rbox_bm(sx, sy, sz, c=(0, 0, 0), e=0.28, u=24, v=14):
+    """A box with rounded edges: a UV sphere pushed out to a superellipsoid (e -> 0 is sharper)."""
+    bm = sphere_bm(1, u, v)
+    def f(p):
+        n = p.normalized()
+        return Vector((math.copysign(abs(n.x) ** e, n.x) * sx / 2, math.copysign(abs(n.y) ** e, n.y) * sy / 2, math.copysign(abs(n.z) ** e, n.z) * sz / 2)) + Vector(c)
+    return deform(bm, f)
+
+def subdivide(ob, cuts=8):
+    bm = bmesh.new(); bm.from_mesh(ob.data)
+    bmesh.ops.subdivide_edges(bm, edges=bm.edges, cuts=cuts, use_grid_fill=True)
+    bm.to_mesh(ob.data); bm.free()
+    return ob
+
+def quad_legs(rt, mat, hips, top, r1, r2, col, hoof=None, hoof_h=0.05):
+    """Four separate legs (LegFL, LegFR, LegBL, LegBR) pivoting at the hip, like the fox, so the game can swing them."""
+    for nm, (x, y) in hips.items():
+        lg = limb_bm((x, y, top), (x, y, 0.02), r1, r2, 10)
+        lo = from_bm(lg, nm, mat, parent=rt, origin=(x, y, top))
+        paint(lo, (lambda p, n: hoof if p.z < hoof_h else col) if hoof else solid(col))
+
+def build_sunflower():
+    clear()
+    rt = root("Sunflower")
+    H = 1.35
+    pts = [Vector((0, -0.05 * (i / 6) ** 2, H * i / 6)) for i in range(7)]
+    st = merge_bms([limb_bm(pts[i], pts[i + 1], 0.017 - 0.0016 * i, 0.017 - 0.0016 * (i + 1), 7, caps=False) for i in range(6)])
+    so = from_bm(st, "Stem", material("Plant", rough=0.7), parent=rt)
+    paint(so, lambda p, n: scl((0.3, 0.5, 0.15), 0.85 + 0.15 * noise.noise(p * 30)))
+    lv = []
+    for i in range(6):
+        z, a, L = 0.22 + i * 0.16, i * 2.4, 0.2 - i * 0.018
+        lb = sphere_bm(1, 8, 4)
+        def lf(v, L=L):
+            w = max(0.0, 1 - abs(v.y)) ** 0.7
+            return Vector((v.x * L * 0.55 * w, (v.y + 1) * L * 0.5, v.z * 0.004 - 0.1 * L * (v.y + 1) ** 2))
+        deform(lb, lf)
+        xform(lb, Matrix.Translation((0, 0, z)) @ Matrix.Rotation(a, 4, 'Z') @ Euler((-0.3, 0, 0)).to_matrix().to_4x4())
+        lv.append(lb)
+    lo = from_bm(merge_bms(lv), "SunLeaves", material("Plant", rough=0.7), parent=rt)
+    paint(lo, lambda p, n: scl((0.22, 0.45, 0.12), 0.85 + 0.2 * noise.noise(p * 20)))
+    head = Matrix.Translation((0, -0.08, H + 0.02)) @ Euler((math.pi / 2 + 0.3, 0, 0)).to_matrix().to_4x4()
+    disc = sphere_bm(1, 14, 6)
+    deform(disc, lambda v: Vector((v.x * 0.1, v.y * 0.1, v.z * 0.028)))
+    xform(disc, head)
+    do = from_bm(disc, "Disc", material("Seeds", rough=0.9), parent=rt)
+    paint(do, lambda p, n: scl((0.28, 0.16, 0.07), 0.75 + 0.35 * (0.5 + 0.5 * math.sin(p.x * 180) * math.sin(p.z * 180))))
+    bm = bmesh.new()
+    for ring, (rt_, rv, off, z) in enumerate(((0.2, 0.09, 0.0, -0.004), (0.17, 0.08, 0.5, -0.008))):
+        c = bm.verts.new((0, 0, z))
+        vs = []
+        for i in range(44):
+            a = (i + off * 2) / 44 * math.tau
+            r = rt_ if i % 2 == 0 else rv
+            vs.append(bm.verts.new((math.cos(a) * r, math.sin(a) * r, z - (0.03 if i % 2 == 0 else 0.0))))
+        for i in range(44):
+            bm.faces.new((c, vs[i], vs[(i + 1) % 44]))
+    xform(bm, head)
+    po = from_bm(bm, "Petals", material("Petal", rough=0.6), parent=rt, smooth_shade=False)
+    paint(po, lambda p, n: mix((1.0, 0.72, 0.05), (1.0, 0.86, 0.25), noise.noise(p * 60) * 0.5 + 0.5))
+    export("Sunflower")
+
+def build_barn():
+    clear()
+    rt = root("Barn")
+    W, D, Hw = 8.0, 6.0, 3.2
+    RED = (0.62, 0.13, 0.09)
+    wo = from_bm(box_bm(W, D, Hw, (0, 0, Hw / 2)), "BarnWalls", material("BarnWall", rough=0.85), parent=rt, smooth_shade=False)
+    subdivide(wo, 14)
+    def boards(p, n):
+        u = p.x if abs(n.y) > 0.5 else p.y
+        k = 0.82 + 0.18 * (0.5 + 0.5 * math.sin(u * 22)) * (0.9 + 0.1 * noise.noise(p * 4))
+        if p.z < 0.35:
+            return scl((0.55, 0.53, 0.5), 0.85 + 0.15 * noise.noise(p * 6))
+        return scl(RED, k)
+    paint(wo, boards)
+    prof = [(-W / 2 - 0.35, Hw - 0.15), (-W / 2 + 1.2, Hw + 1.9), (0, Hw + 3.1), (W / 2 - 1.2, Hw + 1.9), (W / 2 + 0.35, Hw - 0.15)]
+    bm = bmesh.new()
+    y0, y1 = -D / 2 - 0.45, D / 2 + 0.45
+    for (xa, za), (xb, zb) in zip(prof, prof[1:]):
+        v = [bm.verts.new((xa, y0, za)), bm.verts.new((xb, y0, zb)), bm.verts.new((xb, y1, zb)), bm.verts.new((xa, y1, za))]
+        bm.faces.new(v)
+    bmesh.ops.subdivide_edges(bm, edges=bm.edges, cuts=8, use_grid_fill=True)
+    sol = bmesh.ops.extrude_face_region(bm, geom=bm.faces[:])
+    bmesh.ops.translate(bm, vec=(0, 0, 0.14), verts=[e for e in sol["geom"] if isinstance(e, bmesh.types.BMVert)])
+    bm.normal_update()
+    ro = from_bm(bm, "BarnRoof", material("Roof", rough=0.8), parent=rt, smooth_shade=False)
+    paint(ro, lambda p, n: scl((0.32, 0.33, 0.36), 0.75 + 0.25 * (0.5 + 0.5 * math.sin(p.z * 30 + p.x * 3)) * (0.9 + 0.1 * noise.noise(p * 5))))
+    gb = bmesh.new()
+    inner = [(-W / 2, Hw), (-W / 2 + 1.2, Hw + 1.85), (0, Hw + 3.0), (W / 2 - 1.2, Hw + 1.85), (W / 2, Hw)]
+    for y in (-D / 2, D / 2):
+        vs = [gb.verts.new((x, y, z)) for x, z in inner]
+        gb.faces.new(vs if y > 0 else list(reversed(vs)))
+    bmesh.ops.subdivide_edges(gb, edges=gb.edges, cuts=10, use_grid_fill=True)
+    go = from_bm(gb, "Gables", material("BarnWall", rough=0.85), parent=rt, smooth_shade=False)
+    paint(go, lambda p, n: scl(RED, 0.82 + 0.18 * (0.5 + 0.5 * math.sin(p.x * 22))))
+    door = box_bm(2.8, 0.12, 2.8, (0, -D / 2 - 0.06, 1.4))
+    loft = box_bm(1.3, 0.1, 1.2, (0, -D / 2 - 0.05, Hw + 1.2))
+    dro = from_bm(merge_bms([door, loft]), "BarnDoors", material("Wood", rough=0.8), parent=rt, smooth_shade=False)
+    paint(dro, lambda p, n: scl((0.48, 0.1, 0.07), 0.8 + 0.2 * (0.5 + 0.5 * math.sin(p.x * 26))))
+    tr = []
+    for x in (-1.4, 1.4):
+        tr.append(box_bm(0.14, 0.14, 2.9, (x, -D / 2 - 0.1, 1.45)))
+    tr.append(box_bm(2.95, 0.14, 0.14, (0, -D / 2 - 0.1, 2.85)))
+    for s in (1, -1):   # the white X on the doors
+        b = box_bm(0.12, 0.08, 3.6, (0, 0, 0))
+        xform(b, Matrix.Translation((0, -D / 2 - 0.14, 1.4)) @ Matrix.Rotation(s * 0.78, 4, 'Y'))
+        tr.append(b)
+    for x in (-0.7, 0.7):
+        tr.append(box_bm(0.1, 0.1, 1.3, (x, -D / 2 - 0.09, Hw + 1.2)))
+    tr += [box_bm(1.5, 0.1, 0.1, (0, -D / 2 - 0.09, Hw + 1.85)), box_bm(1.5, 0.1, 0.1, (0, -D / 2 - 0.09, Hw + 0.6))]
+    for sx in (1, -1):
+        for sy in (1, -1):
+            tr.append(box_bm(0.16, 0.16, Hw, (sx * W / 2, sy * D / 2, Hw / 2)))
+    to = from_bm(merge_bms(tr), "BarnTrim", material("Trim", rough=0.6), parent=rt, smooth_shade=False)
+    paint(to, solid((0.95, 0.94, 0.9)))
+    export("Barn")
+
+def build_shop():
+    clear()
+    rt = root("Shop")
+    W, D, H = 6.0, 5.0, 5.6
+    fo = from_bm(box_bm(W, D, H, (0, 0, H / 2)), "Facade", material("Facade", rough=0.9), parent=rt, smooth_shade=False)
+    subdivide(fo, 16)
+    def brick(p, n):
+        row = int(math.floor(p.z * 7))
+        u = (p.x if abs(n.y) > 0.5 else p.y) * 3.5 + (0.5 if row % 2 else 0)
+        mortar = (p.z * 7) % 1 < 0.12 or u % 1 < 0.07
+        c = 0.72 if mortar else 0.9 + 0.1 * noise.noise(Vector((math.floor(u), row, 0)) * 0.7)
+        return (c, c * 0.97, c * 0.93)
+    paint(fo, brick)
+    par = [box_bm(W + 0.3, 0.3, 0.5, (0, -D / 2 + 0.05, H + 0.2)), box_bm(W + 0.4, 0.4, 0.14, (0, -D / 2, H - 0.05)), box_bm(W + 0.2, 0.25, 0.25, (0, -D / 2 - 0.05, 2.95))]
+    frames = []
+    for x in (-1.5, 1.5):   # upper windows
+        frames += [box_bm(1.2, 0.12, 0.1, (x, -D / 2 - 0.04, 3.45)), box_bm(1.2, 0.12, 0.1, (x, -D / 2 - 0.04, 4.75)), box_bm(0.1, 0.12, 1.4, (x - 0.55, -D / 2 - 0.04, 4.1)), box_bm(0.1, 0.12, 1.4, (x + 0.55, -D / 2 - 0.04, 4.1))]
+    frames += [box_bm(3.6, 0.14, 0.12, (-0.9, -D / 2 - 0.05, 0.45)), box_bm(0.12, 0.14, 2.0, (-2.7, -D / 2 - 0.05, 1.45)), box_bm(0.12, 0.14, 2.0, (0.9, -D / 2 - 0.05, 1.45)),
+               box_bm(0.12, 0.14, 2.3, (1.35, -D / 2 - 0.05, 1.15)), box_bm(0.12, 0.14, 2.3, (2.45, -D / 2 - 0.05, 1.15))]
+    tro = from_bm(merge_bms(par + frames), "ShopTrim", material("Trim", rough=0.6), parent=rt, smooth_shade=False)
+    paint(tro, solid((0.95, 0.95, 0.92)))
+    wins = [box_bm(3.5, 0.06, 1.95, (-0.9, -D / 2 - 0.02, 1.47))] + [box_bm(1.0, 0.06, 1.2, (x, -D / 2 - 0.02, 4.1)) for x in (-1.5, 1.5)]
+    wo = from_bm(merge_bms(wins), "ShopWindows", material("Glass", rough=0.05, spec=1.0, emit=(1.0, 0.8, 0.45), emit_str=0.0), parent=rt, smooth_shade=False)
+    paint(wo, lambda p, n: (0.3, 0.38, 0.45) if p.z > 0.8 else (0.22, 0.28, 0.34))
+    do = from_bm(box_bm(1.0, 0.08, 2.2, (1.9, -D / 2 - 0.02, 1.1)), "ShopDoor", material("Wood", rough=0.7), parent=rt, smooth_shade=False)
+    paint(do, lambda p, n: (0.2, 0.3, 0.42) if 1.3 < p.z < 2.0 and abs(p.x - 1.9) < 0.3 else (0.18, 0.28, 0.2))
+    # striped awning, tintable: the stripes are painted light so a tint colours them
+    bm = bmesh.new()
+    y0, y1, z0, z1 = -D / 2, -D / 2 - 1.3, 2.95, 2.45
+    cols = 16
+    grid = [[bm.verts.new((-W / 2 + 0.2 + (W - 0.4) * i / cols, y0 + (y1 - y0) * j, z0 + (z1 - z0) * j)) for j in (0, 1)] for i in range(cols + 1)]
+    for i in range(cols):
+        bm.faces.new((grid[i][0], grid[i + 1][0], grid[i + 1][1], grid[i][1]))
+    for i in range(cols):   # valance
+        a, b = grid[i][1], grid[i + 1][1]
+        c, d = bm.verts.new((b.co.x, b.co.y, b.co.z - 0.3)), bm.verts.new((a.co.x, a.co.y, a.co.z - 0.3))
+        bm.faces.new((a, b, c, d))
+    ao = from_bm(bm, "Awning", material("Cloth", rough=0.8), parent=rt, smooth_shade=False)
+    paint(ao, lambda p, n: (0.97, 0.97, 0.97) if int((p.x + W) / (W - 0.4) * cols) % 2 == 0 else (0.62, 0.62, 0.62))
+    export("Shop")
+
+def build_lamppost():
+    clear()
+    rt = root("LampPost")
+    parts = [limb_bm((0, 0, 0.0), (0, 0, 2.5), 0.05, 0.035, 12, caps=False), cone_bm(0.12, 0.06, 0.35, 12)]
+    xform(parts[1], Matrix.Translation((0, 0, 0.17)))
+    cap = cone_bm(0.2, 0.02, 0.2, 8); xform(cap, Matrix.Translation((0, 0, 2.95)))
+    ring = cone_bm(0.1, 0.14, 0.06, 8); xform(ring, Matrix.Translation((0, 0, 2.55)))
+    io = from_bm(merge_bms(parts + [cap, ring]), "Post", material("Iron", rough=0.5, metal=0.6), parent=rt)
+    paint(io, solid((0.12, 0.16, 0.14)))
+    lamp = cone_bm(0.1, 0.15, 0.32, 8); xform(lamp, Matrix.Translation((0, 0, 2.74)))
+    lo = from_bm(lamp, "Lantern", material("Lamp", rough=0.2, emit=(1.0, 0.8, 0.45), emit_str=0.0), parent=rt, smooth_shade=False)
+    paint(lo, solid((1.0, 0.93, 0.75)))
+    export("LampPost")
+
+def build_bench():
+    clear()
+    rt = root("Bench")
+    sl = [box_bm(1.6, 0.1, 0.035, (0, -0.16 + i * 0.12, 0.45)) for i in range(3)]
+    for i in range(3):
+        b = box_bm(1.6, 0.035, 0.09, (0, 0, 0))
+        xform(b, Matrix.Translation((0, 0.2 + i * 0.02, 0.6 + i * 0.12)) @ Matrix.Rotation(-0.25, 4, 'X'))
+        sl.append(b)
+    wo = from_bm(merge_bms(sl), "Slats", material("Wood", rough=0.8), parent=rt, smooth_shade=False)
+    paint(wo, lambda p, n: scl((0.55, 0.36, 0.2), 0.85 + 0.15 * math.sin(p.x * 30)))
+    fr = []
+    for x in (-0.7, 0.7):
+        fr += [limb_bm((x, -0.18, 0.0), (x, -0.18, 0.45), 0.02, 0.02, 6, caps=False), limb_bm((x, 0.2, 0.0), (x, 0.26, 0.9), 0.02, 0.02, 6, caps=False),
+               limb_bm((x, -0.2, 0.44), (x, 0.22, 0.44), 0.018, 0.018, 6, caps=False), limb_bm((x, -0.2, 0.62), (x, 0.0, 0.62), 0.015, 0.015, 6, caps=False)]
+    io = from_bm(merge_bms(fr), "BenchIron", material("Iron", rough=0.5, metal=0.6), parent=rt)
+    paint(io, solid((0.1, 0.12, 0.1)))
+    export("Bench")
+
+def build_goat():
+    clear()
+    rt = root("Goat")
+    FUR = (0.9, 0.86, 0.78)
+    fur = material("GoatFur", rough=0.9)
+    b = sphere_bm(1, 22, 14)
+    deform(b, lambda v: Vector((v.x * 0.16 * (1 - 0.1 * v.y), v.y * 0.34, v.z * 0.17)) + Vector((0, 0, 0.55)))
+    bo = from_bm(b, "GoatBody", fur, parent=rt)
+    paint(bo, lambda p, n: mix(FUR, (0.45, 0.3, 0.18), smooth(0.2, 0.45, noise.noise(p * 5)) * 0.9))
+    nk = limb_bm((0, -0.24, 0.62), (0, -0.36, 0.8), 0.075, 0.06, 12)
+    hd = sphere_bm(1, 16, 10)
+    deform(hd, lambda v: Vector((v.x * 0.065, v.y * 0.13, v.z * 0.075)))
+    xform(hd, Matrix.Translation((0, -0.45, 0.82)) @ Euler((0.5, 0, 0)).to_matrix().to_4x4())
+    ears = []
+    for sx in (1, -1):
+        e = sphere_bm(1, 8, 5)
+        deform(e, lambda v: Vector((v.x * 0.06, v.y * 0.02, v.z * 0.022)))
+        xform(e, Matrix.Translation((sx * 0.1, -0.4, 0.86)) @ Euler((0, sx * 0.3, 0)).to_matrix().to_4x4())
+        ears.append(e)
+    beard = cone_bm(0.02, 0.002, 0.08, 6); xform(beard, Matrix.Translation((0, -0.52, 0.72)) @ Euler((math.pi, 0, 0)).to_matrix().to_4x4())
+    tail = cone_bm(0.025, 0.005, 0.08, 6); xform(tail, Matrix.Translation((0, 0.34, 0.66)) @ Euler((-0.6, 0, 0)).to_matrix().to_4x4())
+    ho = from_bm(merge_bms([nk, hd, beard, tail] + ears), "GoatHead", fur, parent=rt)
+    paint(ho, lambda p, n: (0.55, 0.45, 0.35) if p.z < 0.75 and p.y < -0.48 else FUR)
+    horns = []
+    for sx in (1, -1):
+        pts = [Vector((sx * 0.03, -0.42 + 0.06 * t, 0.9 + 0.1 * math.sin(t * 1.4))) for t in (0, 0.5, 1.0, 1.5)]
+        horns += [limb_bm(pts[i], pts[i + 1], 0.016 - i * 0.004, 0.012 - i * 0.004, 6) for i in range(3)]
+    hno = from_bm(merge_bms(horns), "Horns", material("Horn", rough=0.5), parent=rt)
+    paint(hno, solid((0.45, 0.4, 0.33)))
+    eo = from_bm(merge_bms([xform(sphere_bm(0.014, 8, 6), Matrix.Translation((sx * 0.055, -0.47, 0.86))) for sx in (1, -1)]), "GoatEyes", material("Eye", rough=0.05, spec=0.9), parent=rt)
+    paint(eo, solid((0.05, 0.04, 0.03)))
+    quad_legs(rt, fur, {"LegFL": (-0.08, -0.2), "LegFR": (0.08, -0.2), "LegBL": (-0.08, 0.22), "LegBR": (0.08, 0.22)}, 0.48, 0.035, 0.025, FUR, (0.25, 0.2, 0.15))
+    export("Goat")
+
+def build_sheep():
+    clear()
+    rt = root("Sheep")
+    WOOL, SKIN = (0.94, 0.92, 0.86), (0.16, 0.13, 0.12)
+    wool = material("Wool", rough=1.0)
+    blobs = []
+    for i in range(16):
+        a = i / 16 * math.tau
+        for zz in (-0.08, 0.06):
+            s = sphere_bm(0.1 + 0.02 * math.sin(i * 1.7), 10, 7)
+            xform(s, Matrix.Translation((math.cos(a) * 0.13, math.sin(a) * 0.26 + 0.02, 0.56 + zz + 0.03 * math.cos(a * 3))))
+            blobs.append(s)
+    core = sphere_bm(1, 16, 10); deform(core, lambda v: Vector((v.x * 0.18, v.y * 0.32, v.z * 0.17)) + Vector((0, 0.02, 0.56)))
+    blobs.append(core)
+    wo = from_bm(merge_bms(blobs), "Fleece", wool, parent=rt)
+    paint(wo, lambda p, n: scl(WOOL, 0.86 + 0.14 * noise.noise(p * 25)))
+    hd = sphere_bm(1, 14, 9)
+    deform(hd, lambda v: Vector((v.x * 0.07, v.y * 0.11, v.z * 0.075)))
+    xform(hd, Matrix.Translation((0, -0.36, 0.66)) @ Euler((0.45, 0, 0)).to_matrix().to_4x4())
+    ears = []
+    for sx in (1, -1):
+        e = sphere_bm(1, 8, 5); deform(e, lambda v: Vector((v.x * 0.06, v.y * 0.025, v.z * 0.018)))
+        xform(e, Matrix.Translation((sx * 0.09, -0.31, 0.7)) @ Euler((0, sx * -0.4, 0)).to_matrix().to_4x4()); ears.append(e)
+    ho = from_bm(merge_bms([hd] + ears), "SheepFace", material("SheepSkin", rough=0.8), parent=rt)
+    paint(ho, solid(SKIN))
+    tuft = sphere_bm(0.07, 10, 7); xform(tuft, Matrix.Translation((0, -0.33, 0.74)))
+    to = from_bm(tuft, "Tuft", wool, parent=rt)
+    paint(to, solid(WOOL))
+    eo = from_bm(merge_bms([xform(sphere_bm(0.012, 8, 6), Matrix.Translation((sx * 0.05, -0.41, 0.69))) for sx in (1, -1)]), "SheepEyes", material("Eye", rough=0.05, spec=0.9), parent=rt)
+    paint(eo, solid((0.9, 0.85, 0.7)))
+    quad_legs(rt, material("SheepSkin", rough=0.8), {"LegFL": (-0.08, -0.17), "LegFR": (0.08, -0.17), "LegBL": (-0.08, 0.2), "LegBR": (0.08, 0.2)}, 0.44, 0.028, 0.022, SKIN)
+    export("Sheep")
+
+def build_duck():
+    clear()
+    rt = root("Duck")
+    b = sphere_bm(1, 18, 12)
+    deform(b, lambda v: Vector((v.x * 0.085, v.y * 0.15 * (1 + 0.15 * v.y), v.z * 0.075 * (1 - 0.25 * max(0, v.y)))) + Vector((0, 0.02, 0.06)))
+    tail = cone_bm(0.04, 0.005, 0.08, 8); xform(tail, Matrix.Translation((0, 0.17, 0.1)) @ Euler((-1.0, 0, 0)).to_matrix().to_4x4())
+    nk = limb_bm((0, -0.08, 0.1), (0, -0.12, 0.2), 0.035, 0.03, 10)
+    hd = sphere_bm(0.05, 14, 9); xform(hd, Matrix.Translation((0, -0.13, 0.23)))
+    fo = from_bm(merge_bms([b, tail, nk, hd]), "DuckBody", material("Feather", rough=0.85), parent=rt)
+    paint(fo, lambda p, n: scl((0.97, 0.96, 0.93), 0.9 + 0.1 * noise.noise(p * 30)))
+    bill = sphere_bm(1, 10, 6); deform(bill, lambda v: Vector((v.x * 0.025, v.y * 0.045, v.z * 0.011)))
+    xform(bill, Matrix.Translation((0, -0.19, 0.22)))
+    bo = from_bm(bill, "Bill", material("Bill", rough=0.4), parent=rt)
+    paint(bo, solid((1.0, 0.6, 0.1)))
+    eo = from_bm(merge_bms([xform(sphere_bm(0.009, 8, 6), Matrix.Translation((sx * 0.035, -0.15, 0.245))) for sx in (1, -1)]), "DuckEyes", material("Eye", rough=0.05, spec=0.9), parent=rt)
+    paint(eo, solid((0.03, 0.03, 0.03)))
+    export("Duck")
+
+def build_car():
+    clear()
+    rt = root("Car")
+    L, Wd = 3.9, 1.72
+    body = rbox_bm(Wd, L, 0.62, (0, 0, 0.62), e=0.22, u=28, v=16)
+    roof = rbox_bm(Wd - 0.22, L * 0.5, 0.1, (0, 0.18, 1.42), e=0.3, u=20, v=8)
+    pil = [box_bm(0.08, 0.1, 0.5, (sx * (Wd / 2 - 0.16), y, 1.16)) for sx in (1, -1) for y in (-0.72, 0.18, 1.06)]
+    po = from_bm(merge_bms([body, roof] + pil), "CarBody", material("CarPaint", rough=0.35, metal=0.2, spec=0.7), parent=rt)
+    paint(po, solid((0.92, 0.92, 0.92)))
+    cab = rbox_bm(Wd - 0.3, L * 0.48, 0.52, (0, 0.18, 1.15), e=0.35, u=20, v=10)
+    go = from_bm(cab, "CarWindows", material("CarGlass", rough=0.1, spec=0.9), parent=rt)
+    paint(go, solid((0.12, 0.16, 0.2)))
+    wh = []
+    for sx in (1, -1):
+        for sy in (1, -1):
+            w = cone_bm(0.34, 0.34, 0.24, 18)
+            xform(w, Matrix.Translation((sx * (Wd / 2 - 0.1), sy * 1.25, 0.34)) @ Euler((0, math.pi / 2, 0)).to_matrix().to_4x4())
+            wh.append(w)
+    wo = from_bm(merge_bms(wh), "Wheels", material("Tire", rough=0.9), parent=rt)
+    paint(wo, lambda p, n: (0.7, 0.7, 0.72) if abs(n.x) > 0.8 and math.hypot(p.y - math.copysign(1.25, p.y), p.z - 0.34) < 0.16 else (0.08, 0.08, 0.08))
+    ch = [box_bm(Wd - 0.1, 0.14, 0.16, (0, -L / 2 - 0.02, 0.45)), box_bm(Wd - 0.1, 0.14, 0.16, (0, L / 2 + 0.02, 0.45))]
+    cho = from_bm(merge_bms(ch), "Bumpers", material("Chrome", rough=0.2, metal=1.0), parent=rt, smooth_shade=False)
+    paint(cho, solid((0.8, 0.8, 0.82)))
+    li = [box_bm(0.3, 0.06, 0.14, (sx * 0.6, -L / 2 + 0.03, 0.72)) for sx in (1, -1)] + [box_bm(0.3, 0.06, 0.12, (sx * 0.6, L / 2 - 0.03, 0.72)) for sx in (1, -1)]
+    lo = from_bm(merge_bms(li), "Lights", material("Light", rough=0.2, emit=(1.0, 0.9, 0.7), emit_str=0.0), parent=rt, smooth_shade=False)
+    paint(lo, lambda p, n: (1.0, 0.97, 0.85) if p.y < 0 else (0.9, 0.1, 0.08))
+    export("Car")
+
+def build_cattail():
+    clear()
+    rt = root("Cattail")
+    bl = []
+    for i in range(9):
+        a = random.random() * math.tau
+        bl.append(grass_blade(random.uniform(0.5, 0.9), 0.03, random.uniform(0.05, 0.2), a, (math.cos(a) * 0.05, math.sin(a) * 0.05, 0), 0.4))
+    st = []
+    for i in range(3):
+        x, y, h = random.uniform(-0.06, 0.06), random.uniform(-0.06, 0.06), random.uniform(0.75, 1.0)
+        st.append(limb_bm((x, y, 0), (x * 1.5, y * 1.5, h), 0.006, 0.005, 6, caps=False))
+        st.append(limb_bm((x * 1.5, y * 1.5, h + 0.02), (x * 1.5, y * 1.5, h + 0.16), 0.022, 0.02, 10))
+    go = from_bm(merge_bms(bl), "Reeds", material("Plant", rough=0.7), parent=rt)
+    paint(go, lambda p, n: mix((0.25, 0.4, 0.12), (0.55, 0.62, 0.3), smooth(0, 0.9, p.z)))
+    so = from_bm(merge_bms(st), "Spikes", material("Cattail", rough=0.9), parent=rt)
+    paint(so, lambda p, n: (0.38, 0.22, 0.1) if p.z > 0.76 else (0.3, 0.42, 0.15))
+    export("Cattail")
+
+def build_umbrella():
+    clear()
+    rt = root("Umbrella")
+    po = from_bm(limb_bm((0, 0, -0.2), (0, 0, 2.1), 0.025, 0.02, 8), "Pole", material("Wood", rough=0.7), parent=rt)
+    paint(po, solid((0.9, 0.88, 0.84)))
+    bm = bmesh.new()
+    tip = bm.verts.new((0, 0, 2.25))
+    n = 16
+    rim = [bm.verts.new((math.cos(i / n * math.tau) * 1.2, math.sin(i / n * math.tau) * 1.2, 1.85)) for i in range(n)]
+    for i in range(n):
+        bm.faces.new((tip, rim[i], rim[(i + 1) % n]))
+    co = from_bm(bm, "Canopy", material("Cloth", rough=0.8), parent=rt, smooth_shade=False)
+    paint(co, lambda p, n: (0.95, 0.95, 0.93) if int((math.atan2(p.y, p.x) + math.pi) / math.tau * 8) % 2 else (0.9, 0.2, 0.2))
+    export("Umbrella")
+
+def build_sandcastle():
+    clear()
+    rt = root("Sandcastle")
+    parts = [box_bm(0.7, 0.7, 0.18, (0, 0, 0.09))]
+    for sx in (1, -1):
+        for sy in (1, -1):
+            t = cone_bm(0.13, 0.1, 0.32, 10); xform(t, Matrix.Translation((sx * 0.32, sy * 0.32, 0.16))); parts.append(t)
+    c = cone_bm(0.16, 0.12, 0.5, 12); xform(c, Matrix.Translation((0, 0, 0.3))); parts.append(c)
+    for i in range(6):
+        a = i / 6 * math.tau
+        parts.append(box_bm(0.05, 0.05, 0.06, (math.cos(a) * 0.1, math.sin(a) * 0.1, 0.58)))
+    so = from_bm(merge_bms(parts), "Castle", material("Sand", rough=1.0), parent=rt, smooth_shade=False)
+    paint(so, lambda p, n: scl((0.88, 0.76, 0.52), 0.85 + 0.15 * noise.noise(p * 30)))
+    fl = [limb_bm((0, 0, 0.6), (0, 0, 0.85), 0.004, 0.004, 5, caps=False), box_bm(0.004, 0.1, 0.06, (0, 0.05, 0.81))]
+    fo = from_bm(merge_bms(fl), "Flag", material("Cloth", rough=0.8), parent=rt, smooth_shade=False)
+    paint(fo, lambda p, n: (0.9, 0.2, 0.2) if p.y > 0.005 else (0.8, 0.8, 0.8))
+    export("Sandcastle")
+
+def build_scarecrow():
+    clear()
+    rt = root("Scarecrow")
+    wd = [limb_bm((0, 0, 0), (0, 0, 1.9), 0.04, 0.035, 8, caps=False), limb_bm((-0.75, 0, 1.4), (0.75, 0, 1.4), 0.03, 0.03, 8, caps=False)]
+    wo = from_bm(merge_bms(wd), "Post", material("Wood", rough=0.8), parent=rt)
+    paint(wo, solid((0.45, 0.32, 0.2)))
+    sh = rbox_bm(0.62, 0.26, 0.6, (0, 0, 1.3), e=0.5, u=16, v=10)
+    sl = [limb_bm((sx * 0.25, 0, 1.45), (sx * 0.7, 0, 1.4), 0.08, 0.07, 10) for sx in (1, -1)]
+    pa = rbox_bm(0.5, 0.24, 0.5, (0, 0, 0.85), e=0.5, u=16, v=10)
+    so = from_bm(merge_bms([sh, pa] + sl), "Clothes", material("Cloth", rough=0.9), parent=rt)
+    paint(so, lambda p, n: ((0.75, 0.2, 0.15) if (int(p.x * 12) + int(p.z * 12)) % 2 else (0.55, 0.12, 0.1)) if p.z > 1.0 else (0.25, 0.35, 0.55))
+    hd = sphere_bm(0.16, 14, 10); xform(hd, Matrix.Translation((0, 0, 1.78)))
+    ho = from_bm(hd, "Sack", material("Sack", rough=1.0), parent=rt)
+    paint(ho, lambda p, n: (0.1, 0.08, 0.06) if n.y < -0.6 and abs(p.x) > 0.03 and abs(p.x) < 0.09 and p.z > 1.8 else (0.8, 0.7, 0.5))
+    hat = [cone_bm(0.3, 0.3, 0.02, 16), cone_bm(0.15, 0.1, 0.18, 12)]
+    xform(hat[0], Matrix.Translation((0, 0, 1.9))); xform(hat[1], Matrix.Translation((0, 0, 1.99)))
+    st = []
+    for i in range(10):
+        a = i / 10 * math.tau
+        st.append(cone_bm(0.015, 0.0, 0.14, 4))
+        xform(st[-1], Matrix.Translation((math.cos(a) * 0.3, math.sin(a) * 0.1 - 0.1, 1.4)) @ Euler((0, math.cos(a) * 1.5, 0)).to_matrix().to_4x4())
+    hao = from_bm(merge_bms(hat + st), "Straw", material("Straw", rough=0.9), parent=rt)
+    paint(hao, lambda p, n: scl((0.85, 0.72, 0.35), 0.85 + 0.15 * noise.noise(p * 40)))
+    export("Scarecrow")
+
+def build_fountain():
+    clear()
+    rt = root("Fountain")
+    bm = bmesh.new()
+    n, R1, R2, H = 32, 1.7, 1.45, 0.5
+    def ringv(r, z):
+        return [bm.verts.new((math.cos(i / n * math.tau) * r, math.sin(i / n * math.tau) * r, z)) for i in range(n)]
+    o0, o1, i1, i0 = ringv(R1, 0), ringv(R1, H), ringv(R2, H), ringv(R2, 0.15)
+    for i in range(n):
+        j = (i + 1) % n
+        bm.faces.new((o0[i], o0[j], o1[j], o1[i])); bm.faces.new((o1[i], o1[j], i1[j], i1[i])); bm.faces.new((i1[i], i1[j], i0[j], i0[i]))
+    ped = cone_bm(0.22, 0.16, 1.1, 16); xform(ped, Matrix.Translation((0, 0, 0.6)))
+    bowl = cone_bm(0.2, 0.7, 0.25, 24); xform(bowl, Matrix.Translation((0, 0, 1.2)))
+    top = cone_bm(0.08, 0.05, 0.5, 10); xform(top, Matrix.Translation((0, 0, 1.5)))
+    so = from_bm(merge_bms([bm, ped, bowl, top]), "Stone", material("Stone", rough=0.9), parent=rt)
+    paint(so, lambda p, n: scl((0.72, 0.7, 0.66), 0.85 + 0.15 * noise.noise(p * 8)))
+    w1 = cone_bm(R2, R2, 0.02, 32); xform(w1, Matrix.Translation((0, 0, 0.4)))
+    w2 = cone_bm(0.66, 0.66, 0.02, 24); xform(w2, Matrix.Translation((0, 0, 1.3)))
+    wo = from_bm(merge_bms([w1, w2]), "FountainWater", material("Water", rough=0.05, spec=1.0), parent=rt)
+    paint(wo, solid((0.35, 0.6, 0.75)))
+    export("Fountain")
+
 jobs = {
     "GuineaPig": build_guinea_pig, "Human": build_human, "Oak": lambda: build_oak("Oak", 1),
     "Oak2": lambda: build_oak("Oak2", 9), "Pine": build_pine, "Birch": build_birch, "Bush": build_bush,
@@ -1239,6 +1642,9 @@ jobs = {
     "FlowerPurple": lambda: build_flower("FlowerPurple", (0.62, 0.35, 0.85)),
     "Hawk": build_hawk, "Fox": build_fox, "House": build_house, "GardenBed": build_gardenbed,
     "Fence": build_fence, "Blanket": build_blanket,
+    "Sunflower": build_sunflower, "Barn": build_barn, "Shop": build_shop, "LampPost": build_lamppost, "Bench": build_bench,
+    "Goat": build_goat, "Sheep": build_sheep, "Duck": build_duck, "Car": build_car, "Cattail": build_cattail,
+    "Umbrella": build_umbrella, "Sandcastle": build_sandcastle, "Scarecrow": build_scarecrow, "Fountain": build_fountain,
 }
 for k, fn in jobs.items():
     if only and k not in only:

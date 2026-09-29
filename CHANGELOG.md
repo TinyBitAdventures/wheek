@@ -2,6 +2,18 @@
 
 ## Unreleased
 
+### A bigger world
+- The park is now the middle of a 3×3 world. Walk off the edge of any zone (the four sides or the four corners) and you're told you're leaving it and where you're heading, then you arrive on the far side of the next one. Signposts at the edge point the way, and the big map (M) labels each direction.
+- Eight new zones around the park: ❄️ Snowcap Peaks (snowfall, frosted pines, a frozen pond to slide on, and the cold drains your energy), 🌲 The Deep Wood (giant trees, mist, more mushrooms and four-leaf clovers, bolder foxes), 🏙️ Downtown (streets, houses, lawns and friendly townsfolk), 🏖️ Sandy Cove (dunes, a beach and the sea), 🌊 Willow Creek (a winding creek with shallow fords to wade), 🐐 Critter Corner (a petting zoo of pens and hay), 🚜 Sunny Acres Farm (a red barn, carrot fields and a duck pond) and 🌻 Sunflower Fields (a flower maze with a prize in the middle).
+- Each zone has its own burrows to find, its own humans and its own treats. The warren stays under the park.
+- Guinea pigs can wade shallow water but not deep water.
+- Your herd travels with you, and saves remember which zone you're in.
+- Goats and sheep wander their pens at Critter Corner and the farm's paddock, and ducks paddle about the ponds and the creek. Say hello to each kind for a happy bonus.
+- Downtown has traffic. Cars keep their distance, take turns at the crossroads and honk, and they'll bump a guinea pig who darts into the road, so look both ways. Street lamps and windows light up at night.
+
+### Models
+- 14 new Blender-built models: sunflowers, a red barn, shops with striped awnings, lamp posts, benches, a fountain, goats, sheep, ducks, cars, cattails, beach umbrellas, sandcastles and a scarecrow.
+
 ### The Warren
 - The burrows now open into a warren you can explore: winding tunnels under the whole wood, laid out to match the map above, so every burrow's den sits right under its entrance. Crawl in from any burrow you've found (E, then "Crawl down into the warren").
 - Five hidden chambers to discover: the Glowworm Grotto, Root Cellar, Mushroom Hall, Old Seed Store and Crystal Hollow, each with its own look and treats to eat.
