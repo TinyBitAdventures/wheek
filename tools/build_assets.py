@@ -1627,6 +1627,522 @@ def build_fountain():
     paint(wo, solid((0.35, 0.6, 0.75)))
     export("Fountain")
 
+# ================================================================ ZONE TREATS: a signature treat for each zone, and the spot it is foraged from
+def ring_sector_bm(r0, r1, a0, a1, z0, z1, seg=12):
+    """A slab shaped like a slice of a ring: r0..r1 between angles a0..a1, from z0 up to z1."""
+    bm = bmesh.new()
+    def ring(r, z):
+        return [bm.verts.new((math.cos(a0 + (a1 - a0) * i / seg) * r, math.sin(a0 + (a1 - a0) * i / seg) * r, z)) for i in range(seg + 1)]
+    ib, ob, it, ot = ring(r0, z0), ring(r1, z0), ring(r0, z1), ring(r1, z1)
+    for i in range(seg):
+        j = i + 1
+        bm.faces.new((it[i], ot[i], ot[j], it[j]))
+        bm.faces.new((ib[j], ob[j], ob[i], ib[i]))
+        bm.faces.new((ob[i], ob[j], ot[j], ot[i]))
+        bm.faces.new((ib[j], ib[i], it[i], it[j]))
+    bm.faces.new((ib[0], ob[0], ot[0], it[0]))
+    bm.faces.new((it[seg], ot[seg], ob[seg], ib[seg]))
+    bmesh.ops.recalc_face_normals(bm, faces=bm.faces)
+    return bm
+
+def revolve_bm(prof, a0, a1, seg=12):
+    """The skin of a profile [(r, z), ...] turned about z from angle a0 to a1."""
+    bm = bmesh.new()
+    rows = [[bm.verts.new((math.cos(a0 + (a1 - a0) * i / seg) * r, math.sin(a0 + (a1 - a0) * i / seg) * r, z)) for i in range(seg + 1)] for r, z in prof]
+    for k in range(len(prof) - 1):
+        for i in range(seg):
+            bm.faces.new((rows[k][i], rows[k][i + 1], rows[k + 1][i + 1], rows[k + 1][i]))
+    return bm
+
+def wedge_caps_bm(prof, a0, a1):
+    """The two flat cut faces of a wedge of a turned profile (the axis out to the profile at a0 and at a1)."""
+    bm = bmesh.new()
+    for a in (a0, a1):
+        axis = [bm.verts.new((0, 0, z)) for r, z in prof]
+        edge = [bm.verts.new((math.cos(a) * r, math.sin(a) * r, z)) for r, z in prof]
+        for k in range(len(prof) - 1):
+            bm.faces.new((axis[k], edge[k], edge[k + 1], axis[k + 1]))
+    return bm
+
+def leaf_bm(L, W, serr=0, curl=0.0, thick=0.002, u=12, v=6):
+    """A flat leaf along +y from the origin: L long, W wide, optionally serrated and curled up at the sides."""
+    lb = sphere_bm(1, u, v)
+    def f(p):
+        w = max(0.0, 1 - abs(p.y)) ** 0.7 * (1 + (0.12 * math.sin(p.y * serr * math.pi) if serr else 0))
+        x = p.x * W * 0.5 * w
+        return Vector((x, (p.y + 1) * L * 0.5, p.z * thick + curl * (x / max(W, 1e-4)) ** 2 * W))
+    return deform(lb, f)
+
+def raspberry_bm(c, r=0.012, u=8, v=5):
+    """A raspberry: a cone of little drupelets."""
+    parts = []
+    for k in range(4):
+        z = r * (1.1 - k * 0.55)
+        n = [1, 6, 8, 7][k]
+        rr = [0.0, r * 0.6, r * 0.75, r * 0.55][k]
+        for i in range(n):
+            a = i / n * math.tau + k
+            s = sphere_bm(r * 0.42, u, v)
+            xform(s, Matrix.Translation(Vector(c) + Vector((math.cos(a) * rr, math.sin(a) * rr, z))))
+            parts.append(s)
+    return merge_bms(parts)
+
+def build_rosehip():
+    clear()
+    rt = root("RoseHip")
+    tw = [limb_bm((-0.045, 0, 0.008), (0.04, 0.004, 0.012), 0.0035, 0.0025, 6)]
+    hips, crowns = [], []
+    for i, (x, y, a) in enumerate(((0.035, 0.0, 0.2), (0.008, 0.022, 1.7), (-0.016, -0.02, -1.4))):
+        d = Vector((math.cos(a), math.sin(a), 0.5)).normalized()
+        base = Vector((x - d.x * 0.012, y - d.y * 0.012, 0.012))
+        tw.append(limb_bm(base - d * 0.012, base, 0.0018, 0.0015, 5, caps=False))
+        h = sphere_bm(1, 14, 10)
+        deform(h, lambda v: Vector((v.x * 0.0115, v.y * 0.0115, v.z * 0.017)))
+        m = Matrix.Translation(base + d * 0.016) @ Vector((0, 0, 1)).rotation_difference(d).to_matrix().to_4x4()
+        xform(h, m)
+        hips.append(h)
+        for k in range(5):
+            c = cone_bm(0.002, 0.0, 0.008, 4)
+            ka = k / 5 * math.tau
+            xform(c, m @ Matrix.Translation((math.cos(ka) * 0.004, math.sin(ka) * 0.004, 0.019)) @ Euler((math.sin(ka) * 0.5, -math.cos(ka) * 0.5, 0)).to_matrix().to_4x4())
+            crowns.append(c)
+    to = from_bm(merge_bms(tw + crowns), "Twig", material("Wood", rough=0.8), parent=rt)
+    paint(to, lambda p, n: scl((0.32, 0.18, 0.1), 0.85 + 0.15 * noise.noise(p * 300)))
+    ho = from_bm(merge_bms(hips), "Hips", material("Veg", rough=0.25, spec=0.8), parent=rt)
+    paint(ho, lambda p, n: mix((0.82, 0.12, 0.04), (0.98, 0.42, 0.08), smooth(-0.4, 0.9, n.z) * 0.7 + 0.15 * noise.noise(p * 200)))
+    lv = []
+    for x, a in ((-0.03, 1.9), (-0.012, -1.3)):
+        lb = leaf_bm(0.026, 0.014, serr=6)
+        xform(lb, Matrix.Translation((x, 0, 0.01)) @ Matrix.Rotation(a, 4, 'Z') @ Euler((0.3, 0, 0)).to_matrix().to_4x4())
+        lv.append(lb)
+    lo = from_bm(merge_bms(lv), "HipLeaves", material("Plant", rough=0.7), parent=rt)
+    paint(lo, solid((0.22, 0.42, 0.14)))
+    export("RoseHip")
+
+def build_raspleaf():
+    clear()
+    rt = root("RaspLeaf")
+    st = [limb_bm((0, -0.05, 0.004), (0, 0.03, 0.01), 0.0025, 0.002, 6)]
+    lv = []
+    for (x, y, a, L) in ((0, 0.03, 0.0, 0.055), (0, 0.005, 1.25, 0.042), (0, 0.005, -1.25, 0.042)):
+        lb = leaf_bm(L, L * 0.62, serr=9, curl=0.25)
+        xform(lb, Matrix.Translation((x, y, 0.01)) @ Matrix.Rotation(-a, 4, 'Z') @ Euler((0.15, 0, 0)).to_matrix().to_4x4())
+        lv.append(lb)
+    so = from_bm(merge_bms(st), "Stalk", material("Wood", rough=0.8), parent=rt)
+    paint(so, solid((0.45, 0.25, 0.2)))
+    lo = from_bm(merge_bms(lv), "RaspLeaves", material("Plant", rough=0.7), parent=rt)
+    def col(p, n):
+        vein = abs(math.sin(math.atan2(p.y - 0.03, p.x) * 9)) < 0.15
+        c = (0.2, 0.42, 0.13) if n.z > -0.2 else (0.48, 0.58, 0.4)
+        return scl(c, 0.85 if vein else 1.0 + 0.1 * noise.noise(p * 200))
+    paint(lo, col)
+    bo = from_bm(raspberry_bm((0.012, -0.03, 0.006)), "Raspberry", material("Veg", rough=0.35, spec=0.6), parent=rt)
+    paint(bo, lambda p, n: scl((0.78, 0.08, 0.16), 0.8 + 0.25 * smooth(-0.5, 1, n.z)))
+    export("RaspLeaf")
+
+def build_lettuce():
+    clear()
+    rt = root("Lettuce")
+    lv = []
+    for i in range(14):
+        a = i * 2.4
+        L = 0.12 - 0.04 * (i / 13)
+        tilt = 0.3 - 0.25 * (i / 13)
+        lb = leaf_bm(L, L * 0.5, serr=4, curl=0.9, thick=0.0025, u=14, v=8)
+        deform(lb, lambda v: Vector((v.x * (1 + 0.12 * math.sin(v.y * 160)), v.y, v.z + 0.004 * math.sin(v.y * 90 + v.x * 200))))
+        xform(lb, Matrix.Rotation(a, 4, 'Z') @ Matrix.Translation((0, 0.004, 0)) @ Euler((math.pi / 2 - tilt, 0, 0)).to_matrix().to_4x4())
+        lv.append(lb)
+    lo = from_bm(merge_bms(lv), "Romaine", material("Plant", rough=0.6, spec=0.4), parent=rt)
+    def col(p, n):
+        r = math.hypot(p.x, p.y)
+        c = mix((0.78, 0.9, 0.55), (0.22, 0.52, 0.14), smooth(0.005, 0.03, r) * smooth(0.0, 0.08, p.z + 0.02))
+        return scl(c, 0.9 + 0.12 * noise.noise(p * 260))
+    paint(lo, col)
+    rt.rotation_euler = (0, math.radians(78), 0)
+    rt.location = (0.05, 0, 0.03)
+    export("Lettuce")
+
+def build_watermelon():
+    clear()
+    rt = root("Watermelon")
+    a0, a1, H, o = -0.55, 0.55, 0.026, (-0.045, 0, 0)
+    fl = from_bm(xform(ring_sector_bm(0.0015, 0.062, a0, a1, 0, H, 14), Matrix.Translation(o)), "Flesh", material("Flesh", rough=0.45, spec=0.6), parent=rt)
+    paint(fl, lambda p, n: scl((0.93, 0.2, 0.22), 0.88 + 0.12 * noise.noise(p * 240)))
+    wb = from_bm(xform(ring_sector_bm(0.062, 0.068, a0, a1, 0, H, 14), Matrix.Translation(o)), "WhiteRind", material("Flesh", rough=0.5), parent=rt)
+    paint(wb, solid((0.92, 0.94, 0.78)))
+    ri = from_bm(xform(ring_sector_bm(0.068, 0.075, a0, a1, 0, H, 14), Matrix.Translation(o)), "Rind", material("Veg", rough=0.4, spec=0.5), parent=rt)
+    paint(ri, lambda p, n: (0.12, 0.38, 0.12) if math.sin(math.atan2(p.y, p.x + 0.045) * 40) > 0.2 else (0.3, 0.55, 0.22))
+    seeds = []
+    for k, (r, a) in enumerate(((0.03, -0.25), (0.036, 0.1), (0.044, 0.32), (0.026, 0.3), (0.046, -0.12), (0.04, -0.38))):
+        for z in (H + 0.0004, -0.0004):
+            s = sphere_bm(1, 8, 5)
+            deform(s, lambda v: Vector((v.x * 0.0045, v.y * 0.0025, v.z * 0.0012)))
+            xform(s, Matrix.Translation((o[0] + math.cos(a) * r, math.sin(a) * r, z)) @ Matrix.Rotation(a, 4, 'Z'))
+            seeds.append(s)
+    so = from_bm(merge_bms(seeds), "MelonSeeds", material("Seeds", rough=0.4), parent=rt)
+    paint(so, solid((0.08, 0.06, 0.05)))
+    export("Watermelon")
+
+def build_cress():
+    clear()
+    rt = root("Cress")
+    st, lv = [], []
+    for s in range(4):
+        a0 = s * 1.6
+        base = Vector((math.cos(a0) * 0.012, math.sin(a0) * 0.012, 0))
+        top = base + Vector((math.cos(a0) * 0.03, math.sin(a0) * 0.03, 0.045 + 0.01 * (s % 2)))
+        st.append(limb_bm(base, top, 0.0022, 0.0018, 6))
+        for i in range(5):
+            t = 0.35 + i * 0.16
+            p = base.lerp(top, min(t, 1.0))
+            side = 1 if i % 2 else -1
+            lb = sphere_bm(1, 10, 6)
+            r = 0.011 if i < 4 else 0.014
+            deform(lb, lambda v, r=r: Vector((v.x * r, v.y * r * 0.9, v.z * 0.0018)))
+            xform(lb, Matrix.Translation(p) @ Matrix.Rotation(a0 + side * 1.2, 4, 'Z') @ Matrix.Translation((0.008, 0, 0)) @ Euler((0, -0.25, 0)).to_matrix().to_4x4())
+            lv.append(lb)
+    so = from_bm(merge_bms(st), "CressStems", material("Plant", rough=0.6), parent=rt)
+    paint(so, solid((0.45, 0.6, 0.3)))
+    lo = from_bm(merge_bms(lv), "CressLeaves", material("Plant", rough=0.35, spec=0.6), parent=rt)
+    paint(lo, lambda p, n: scl((0.12, 0.4, 0.12), 0.85 + 0.2 * noise.noise(p * 300)))
+    export("Cress")
+
+def build_corn():
+    clear()
+    rt = root("Corn")
+    cob = sphere_bm(1, 40, 24)
+    deform(cob, lambda v: Vector((v.x * 0.055, v.y * 0.018 * (1 - 0.25 * max(0, v.x)), v.z * 0.018 * (1 - 0.25 * max(0, v.x)))))
+    xform(cob, Matrix.Translation((0.01, 0, 0.02)))
+    co = from_bm(cob, "Cob", material("Veg", rough=0.7, spec=0.2), parent=rt)
+    def kern(p, n):
+        a = math.atan2(p.z - 0.02, p.y)
+        edge = abs(math.sin(a * 7)) < 0.1 or abs(math.sin(p.x * 260)) < 0.1
+        return (0.9, 0.62, 0.08) if edge else scl((1.0, 0.86, 0.18), 0.92 + 0.08 * noise.noise(p * 300))
+    paint(co, kern)
+    hu = []
+    for i, (a, k) in enumerate(((0.0, 1.0), (1.9, 0.9), (-1.9, 0.95), (3.4, 0.8))):
+        lb = leaf_bm(0.1 * k, 0.04, curl=0.9, thick=0.0015, u=14, v=8)
+        xform(lb, Matrix.Translation((-0.055, 0, 0.02)) @ Matrix.Rotation(-math.pi / 2, 4, 'Z') @ Matrix.Rotation(a, 4, 'Y') @ Matrix.Translation((0, 0, 0.016)) @ Euler((0.18 + 0.12 * (i % 2), 0, 0)).to_matrix().to_4x4())
+        hu.append(lb)
+    silk = [limb_bm((0.064, 0, 0.02), (0.08 + 0.006 * i, 0.006 * (i - 2), 0.024 + 0.003 * i), 0.0008, 0.0006, 4, caps=False) for i in range(5)]
+    ho = from_bm(merge_bms(hu), "Husk", material("Plant", rough=0.7), parent=rt)
+    paint(ho, lambda p, n: mix((0.55, 0.72, 0.32), (0.86, 0.85, 0.6), smooth(-0.05, 0.03, p.x)))
+    sk = from_bm(merge_bms(silk), "Silk", material("Straw", rough=0.8), parent=rt)
+    paint(sk, solid((0.78, 0.6, 0.35)))
+    export("Corn")
+
+def build_apple():
+    clear()
+    rt = root("Apple")
+    H, R = 0.07, 0.04
+    prof = []
+    for i in range(13):
+        t = i / 12
+        r = R * (max(0.0, math.sin(math.pi * t)) ** 0.7) * (1 - 0.1 * t)
+        z = t * H - 0.006 * math.exp(-((t - 1) / 0.12) ** 2) + 0.004 * math.exp(-(t / 0.1) ** 2)
+        prof.append((max(r, 0.0008), z))
+    a0, a1 = -0.55, 0.55
+    sk = from_bm(revolve_bm(prof, a0, a1, 12), "AppleSkin", material("Veg", rough=0.3, spec=0.7), parent=rt)
+    paint(sk, lambda p, n: mix((0.72, 0.06, 0.06), (0.95, 0.35, 0.12), smooth(-0.6, 0.9, noise.noise(p * 90)) * 0.6))
+    fl = from_bm(wedge_caps_bm(prof, a0, a1), "AppleFlesh", material("Flesh", rough=0.6), parent=rt, smooth_shade=False)
+    paint(fl, lambda p, n: (0.42, 0.25, 0.12) if math.hypot(p.x, p.y) < 0.006 and 0.028 < p.z < 0.042 else scl((0.98, 0.94, 0.78), 0.94 + 0.06 * noise.noise(p * 300)))
+    # lay the wedge on its skin, cut faces to the sides
+    rt.rotation_euler = (0, math.radians(90), 0)
+    rt.location = (-0.035, 0, 0.034)
+    export("Apple")
+
+def build_seeds():
+    clear()
+    random.seed(77)
+    rt = root("Seeds")
+    sd = []
+    for i in range(16):
+        rr = math.sqrt(random.random()) * 0.028
+        a = random.random() * math.tau
+        z = 0.004 + (0.028 - rr) * 0.25 + random.random() * 0.003
+        s = sphere_bm(1, 10, 6)
+        deform(s, lambda v: Vector((v.x * 0.0055 * (1 - 0.35 * max(0, v.y)), v.y * 0.011, v.z * 0.003)))
+        xform(s, Matrix.Translation((math.cos(a) * rr, math.sin(a) * rr, z)) @ Euler((random.uniform(-0.5, 0.5), random.uniform(-0.5, 0.5), random.random() * math.tau)).to_matrix().to_4x4())
+        sd.append(s)
+    so = from_bm(merge_bms(sd), "SunSeeds", material("Seeds", rough=0.5, spec=0.5), parent=rt)
+    paint(so, lambda p, n: (0.85, 0.83, 0.78) if abs(math.sin(p.x * 900 + p.y * 500)) < 0.25 else scl((0.12, 0.1, 0.09), 0.85 + 0.3 * noise.noise(p * 400)))
+    export("Seeds")
+
+# ---------------------------------------------------------------- the spots they come from
+def build_snowdrift():
+    clear()
+    random.seed(81)
+    rt = root("Snowdrift")
+    bl = []
+    for i, (x, y, r) in enumerate(((0, 0, 0.42), (0.3, 0.1, 0.3), (-0.28, -0.08, 0.32), (0.05, 0.28, 0.26), (-0.06, -0.26, 0.27))):
+        b = blob_bm(r, 3, 0.2, 1.6, seed=i * 2.3, squash=0.55)
+        deform(b, lambda v: Vector((v.x, v.y, max(v.z, -0.02))))
+        xform(b, Matrix.Translation((x, y, 0.0)))
+        bl.append(b)
+    so = from_bm(merge_bms(bl), "Drift", material("Snow", rough=0.85, spec=0.3), parent=rt)
+    paint(so, lambda p, n: mix((0.7, 0.78, 0.92), (0.97, 0.98, 1.0), smooth(-0.3, 0.7, n.z) * 0.8 + 0.2 * (noise.noise(p * 12) * 0.5 + 0.5)))
+    canes, hips = [], []
+    for k, (a, L) in enumerate(((0.6, 0.5), (2.4, 0.42), (4.1, 0.46))):
+        d = Vector((math.cos(a), math.sin(a), 0))
+        pts = [d * (0.12 + 0.02 * k) + Vector((0, 0, 0.12)), d * (0.24 + L * 0.3) + Vector((0, 0, 0.38)), d * (0.3 + L * 0.6) + Vector((0, 0, 0.26))]
+        canes.append(limb_bm(pts[0], pts[1], 0.009, 0.007, 6))
+        canes.append(limb_bm(pts[1], pts[2], 0.007, 0.004, 6))
+        for t in (0.3, 0.7, 1.0):
+            p = pts[1].lerp(pts[2], t) if t < 1 else pts[2]
+            h = sphere_bm(1, 10, 7)
+            deform(h, lambda v: Vector((v.x * 0.02, v.y * 0.02, v.z * 0.028)))
+            xform(h, Matrix.Translation(p + Vector((0, 0, -0.02))))
+            hips.append(h)
+    co = from_bm(merge_bms(canes), "Canes", material("Wood", rough=0.8), parent=rt)
+    paint(co, solid((0.3, 0.16, 0.1)))
+    ho = from_bm(merge_bms(hips), "DriftHips", material("Veg", rough=0.25, spec=0.8), parent=rt)
+    paint(ho, lambda p, n: mix((0.8, 0.1, 0.04), (0.98, 0.4, 0.08), smooth(-0.4, 0.9, n.z) * 0.7))
+    export("Snowdrift")
+
+def build_bramble():
+    clear()
+    random.seed(83)
+    rt = root("Bramble")
+    canes, leaves, berries = [], [], []
+    for k in range(9):
+        a = k / 9 * math.tau + random.uniform(-0.3, 0.3)
+        d = Vector((math.cos(a), math.sin(a), 0))
+        L = random.uniform(0.45, 0.6)
+        P = [d * (L * t) + Vector((0, 0, 0.62 * math.sin(math.pi * t * 0.85) * (0.75 + 0.25 * random.random()))) for t in (0.0, 0.25, 0.5, 0.75, 1.0)]
+        for i in range(4):
+            canes.append(limb_bm(P[i], P[i + 1], 0.011 - i * 0.0018, 0.009 - i * 0.0018, 6, caps=False))
+        for i in (1, 2, 3, 4):
+            for s in (-1, 1):
+                lb = leaf_bm(0.09, 0.06, serr=8, curl=0.2, thick=0.003, u=8, v=4)
+                xform(lb, Matrix.Translation(P[i]) @ Matrix.Rotation(a + s * 1.3 + random.uniform(-0.3, 0.3), 4, 'Z') @ Euler((random.uniform(-0.6, 0.1), 0, 0)).to_matrix().to_4x4())
+                leaves.append(lb)
+            if random.random() < 0.55:
+                berries.append(raspberry_bm(P[i] + Vector((0, 0, -0.03)), 0.016, 5, 3))
+    for i in range(5):
+        b = blob_bm(0.2, 2, 0.4, 2.0, seed=i * 4.1, squash=0.7)
+        a = i / 5 * math.tau
+        xform(b, Matrix.Translation((math.cos(a) * 0.2, math.sin(a) * 0.2, 0.22)))
+        leaves.append(b)
+    co = from_bm(merge_bms(canes), "Canes", material("Wood", rough=0.8), parent=rt)
+    paint(co, lambda p, n: mix((0.42, 0.18, 0.16), (0.3, 0.38, 0.14), noise.noise(p * 20) * 0.5 + 0.5))
+    lo = from_bm(merge_bms(leaves), "BrambleLeaves", material("Leaves", rough=0.85, spec=0.25), parent=rt)
+    paint(lo, leaf_color((0.1, 0.24, 0.07), (0.17, 0.33, 0.09)))
+    bo = from_bm(merge_bms(berries), "Berry", material("Berry", rough=0.3, spec=0.7), parent=rt)
+    paint(bo, lambda p, n: scl((0.72, 0.06, 0.14), 0.8 + 0.25 * smooth(-0.5, 1, n.z)))
+    export("Bramble")
+
+def build_market_stall():
+    clear()
+    random.seed(85)
+    rt = root("MarketStall")
+    W, D, T = 2.0, 0.9, 0.8
+    wd = [box_bm(W, D, 0.06, (0, 0, T))]
+    for sx in (-1, 1):
+        for sy in (-1, 1):
+            wd.append(box_bm(0.06, 0.06, T, (sx * (W / 2 - 0.06), sy * (D / 2 - 0.06), T / 2)))
+        wd.append(box_bm(0.06, 0.06, 2.2, (sx * (W / 2 - 0.03), D / 2 - 0.03, 1.1)))
+        wd.append(box_bm(0.06, 0.06, 1.95, (sx * (W / 2 - 0.03), -D / 2 - 0.25, 0.975)))
+    crates, veg, leafy = [], [], []
+    def crate(cx, cy, cz, sx=0.56, sy=0.4, h=0.15):
+        crates.extend([box_bm(sx, sy, 0.02, (cx, cy, cz + 0.01)), box_bm(sx, 0.02, h, (cx, cy - sy / 2, cz + h / 2)), box_bm(sx, 0.02, h, (cx, cy + sy / 2, cz + h / 2)),
+                       box_bm(0.02, sy, h, (cx - sx / 2, cy, cz + h / 2)), box_bm(0.02, sy, h, (cx + sx / 2, cy, cz + h / 2))])
+    for i, kind in enumerate(("lettuce", "carrot", "pepper")):
+        cx = -0.64 + i * 0.64
+        crate(cx, 0.05, T + 0.03)
+        for k in range(7 if kind != "lettuce" else 4):
+            x, y = cx + random.uniform(-0.2, 0.2), 0.05 + random.uniform(-0.13, 0.13)
+            if kind == "lettuce":
+                b = blob_bm(0.09, 2, 0.35, 3.0, seed=k * 1.7 + i, squash=0.75); xform(b, Matrix.Translation((x, y, T + 0.15))); leafy.append(b)
+            elif kind == "carrot":
+                c = cone_bm(0.022, 0.004, 0.16, 8); xform(c, Matrix.Translation((x, y, T + 0.13)) @ Euler((math.pi / 2, 0, random.random() * math.tau)).to_matrix().to_4x4()); veg.append(c)
+            else:
+                s = sphere_bm(0.045, 10, 7); xform(s, Matrix.Translation((x, y, T + 0.14))); veg.append(s)
+    crate(0.0, -D / 2 - 0.42, 0.0, 0.62, 0.42, 0.16)   # the crate on the ground in front, where a guinea pig can reach
+    for k in range(5):
+        b = blob_bm(0.08, 2, 0.35, 3.0, seed=k * 2.9 + 11, squash=0.8)
+        xform(b, Matrix.Translation((-0.2 + k * 0.1, -D / 2 - 0.42 + random.uniform(-0.1, 0.1), 0.13)))
+        leafy.append(b)
+    wo = from_bm(merge_bms(wd + crates), "StallWood", material("Wood", rough=0.8), parent=rt, smooth_shade=False)
+    paint(wo, lambda p, n: scl((0.62, 0.44, 0.26), 0.82 + 0.18 * math.sin(p.x * 40 + p.z * 13)))
+    vo = from_bm(merge_bms(veg), "StallVeg", material("Veg", rough=0.4, spec=0.6), parent=rt)
+    paint(vo, lambda p, n: (0.95, 0.45, 0.06) if p.x < -0.3 + 0.64 * 0.5 else ((0.85, 0.1, 0.06) if noise.noise(p * 9) > 0 else (0.95, 0.75, 0.1)))
+    lo = from_bm(merge_bms(leafy), "StallLettuce", material("Plant", rough=0.6), parent=rt)
+    paint(lo, lambda p, n: mix((0.25, 0.55, 0.15), (0.65, 0.85, 0.4), smooth(-0.3, 0.9, n.z) * 0.6 + 0.2 * noise.noise(p * 40)))
+    bm = bmesh.new()
+    cols, y0, y1, z0, z1 = 12, D / 2 + 0.05, -D / 2 - 0.4, 2.22, 1.92
+    grid = [[bm.verts.new((-W / 2 - 0.1 + (W + 0.2) * i / cols, y0 + (y1 - y0) * j, z0 + (z1 - z0) * j)) for j in (0, 1)] for i in range(cols + 1)]
+    for i in range(cols):
+        bm.faces.new((grid[i][0], grid[i + 1][0], grid[i + 1][1], grid[i][1]))
+        a, b = grid[i][1], grid[i + 1][1]
+        c, d = bm.verts.new((b.co.x, b.co.y, b.co.z - 0.22)), bm.verts.new((a.co.x, a.co.y, a.co.z - 0.22))
+        bm.faces.new((a, b, c, d))
+    ao = from_bm(bm, "StallAwning", material("Cloth", rough=0.8), parent=rt, smooth_shade=False)
+    paint(ao, lambda p, n: (0.95, 0.95, 0.92) if int((p.x + W / 2 + 0.1) / (W + 0.2) * cols) % 2 == 0 else (0.25, 0.6, 0.3))
+    export("MarketStall")
+
+def build_basket():
+    clear()
+    rt = root("Basket")
+    bo = from_bm(rbox_bm(0.38, 0.26, 0.2, (0, 0, 0.1), e=0.35, u=28, v=16), "BasketBody", material("Wicker", rough=0.9), parent=rt)
+    def weave(p, n):
+        u = (p.x if abs(n.x) < 0.7 else p.y) * 70
+        w = (math.sin(u) * math.sin(p.z * 70)) > 0
+        return scl((0.72, 0.52, 0.28), 0.8 if w else 1.0)
+    paint(bo, weave)
+    lid = from_bm(rbox_bm(0.4, 0.28, 0.04, (0, 0, 0.21), e=0.35, u=24, v=10), "BasketLid", material("Wicker", rough=0.9), parent=rt)
+    paint(lid, lambda p, n: scl((0.68, 0.48, 0.26), 0.85 + 0.15 * math.sin(p.x * 120)))
+    hd = []
+    for i in range(8):
+        a, b = math.pi * i / 8, math.pi * (i + 1) / 8
+        hd.append(limb_bm((math.cos(a) * 0.14, 0, 0.22 + math.sin(a) * 0.14), (math.cos(b) * 0.14, 0, 0.22 + math.sin(b) * 0.14), 0.01, 0.01, 6, caps=False))
+    ho = from_bm(merge_bms(hd), "Handle", material("Wicker", rough=0.9), parent=rt)
+    paint(ho, solid((0.6, 0.42, 0.22)))
+    cl = sphere_bm(1, 16, 8)
+    deform(cl, lambda v: Vector((v.x * 0.12, v.y * 0.09, v.z * 0.012 - 0.04 * max(0, v.y) ** 2)))
+    xform(cl, Matrix.Translation((0.05, -0.12, 0.2)) @ Euler((0.5, 0, 0.3)).to_matrix().to_4x4())
+    co = from_bm(cl, "Napkin", material("Cloth", rough=0.95), parent=rt)
+    paint(co, lambda p, n: (0.85, 0.2, 0.2) if (int(math.floor(p.x * 40)) + int(math.floor(p.y * 40))) % 2 else (0.95, 0.93, 0.88))
+    export("Basket")
+
+def build_cress_bed():
+    clear()
+    random.seed(87)
+    rt = root("CressBed")
+    lv, st = [], []
+    for i in range(120):
+        rr = math.sqrt(random.random()) * 0.48
+        a = random.random() * math.tau
+        x, y = math.cos(a) * rr * 1.2, math.sin(a) * rr
+        z = 0.012 + random.random() * 0.025 * (1 - rr / 0.5)
+        lb = sphere_bm(1, 8, 4)
+        r = random.uniform(0.022, 0.036)
+        deform(lb, lambda v, r=r: Vector((v.x * r, v.y * r * 0.9, v.z * 0.002)))
+        xform(lb, Matrix.Translation((x, y, z)) @ Euler((random.uniform(-0.3, 0.3), random.uniform(-0.3, 0.3), random.random() * math.tau)).to_matrix().to_4x4())
+        lv.append(lb)
+        if i % 4 == 0:
+            st.append(limb_bm((x, y, -0.04), (x * 1.02, y * 1.02, z), 0.0025, 0.002, 5, caps=False))
+    lo = from_bm(merge_bms(lv), "CressPads", material("Plant", rough=0.35, spec=0.6), parent=rt)
+    paint(lo, lambda p, n: scl(mix((0.1, 0.34, 0.1), (0.24, 0.5, 0.16), noise.noise(p * 30) * 0.5 + 0.5), 0.9 + 0.15 * noise.noise(p * 200)))
+    so = from_bm(merge_bms(st), "CressStalks", material("Plant", rough=0.6), parent=rt)
+    paint(so, solid((0.4, 0.55, 0.28)))
+    export("CressBed")
+
+def build_trough():
+    clear()
+    random.seed(89)
+    rt = root("Trough")
+    L, Wd, H = 1.3, 0.42, 0.2
+    wd = [box_bm(L, 0.04, H, (0, -Wd / 2, 0.04 + H / 2)), box_bm(L, 0.04, H, (0, Wd / 2, 0.04 + H / 2)),
+          box_bm(0.04, Wd + 0.04, H + 0.03, (-L / 2, 0, 0.04 + H / 2)), box_bm(0.04, Wd + 0.04, H + 0.03, (L / 2, 0, 0.04 + H / 2)), box_bm(L, Wd, 0.03, (0, 0, 0.055))]
+    for sx in (-1, 1):
+        wd.append(box_bm(0.06, Wd + 0.12, 0.05, (sx * (L / 2 - 0.12), 0, 0.025)))
+    wo = from_bm(merge_bms(wd), "TroughWood", material("Wood", rough=0.85), parent=rt, smooth_shade=False)
+    paint(wo, lambda p, n: scl((0.5, 0.36, 0.22), 0.8 + 0.2 * math.sin(p.x * 30 + p.z * 70) * (0.5 + 0.5 * noise.noise(p * 6))))
+    st = []
+    for i in range(90):
+        x, y = random.uniform(-L / 2 + 0.06, L / 2 - 0.06), random.uniform(-Wd / 2 + 0.04, Wd / 2 - 0.04)
+        a = random.random() * math.tau
+        l = random.uniform(0.12, 0.22)
+        z = 0.1 + random.random() * 0.12
+        st.append(limb_bm((x - math.cos(a) * l / 2, y - math.sin(a) * l / 2 * 0.5, z), (x + math.cos(a) * l / 2, y + math.sin(a) * l / 2 * 0.5, z + random.uniform(-0.03, 0.05)), 0.003, 0.0025, 4, caps=False))
+    so = from_bm(merge_bms(st), "TroughHay", material("Straw", rough=0.8), parent=rt)
+    paint(so, lambda p, n: mix((0.78, 0.68, 0.32), (0.58, 0.62, 0.26), noise.noise(p * 60) * 0.5 + 0.5))
+    cobs, husks = [], []
+    for k, (x, y, a) in enumerate(((-0.35, 0.05, 0.4), (0.05, -0.06, -0.3), (0.38, 0.08, 0.9))):
+        c = sphere_bm(1, 14, 10)
+        deform(c, lambda v: Vector((v.x * 0.11, v.y * 0.035, v.z * 0.035)))
+        m = Matrix.Translation((x, y, 0.22)) @ Euler((0, -0.35, a)).to_matrix().to_4x4()
+        xform(c, m)
+        cobs.append(c)
+        for s in (-1, 1):
+            lb = leaf_bm(0.16, 0.06, curl=0.8, thick=0.002)
+            xform(lb, m @ Matrix.Translation((-0.08, 0, 0)) @ Matrix.Rotation(-math.pi / 2 + s * 0.5, 4, 'Z') @ Euler((0.3, 0, 0)).to_matrix().to_4x4())
+            husks.append(lb)
+    co = from_bm(merge_bms(cobs), "TroughCorn", material("Veg", rough=0.45, spec=0.5), parent=rt)
+    paint(co, lambda p, n: scl((1.0, 0.8, 0.22), 0.8 + 0.2 * abs(math.sin(p.x * 220) * math.sin(p.y * 220 + p.z * 220))))
+    ho = from_bm(merge_bms(husks), "TroughHusks", material("Plant", rough=0.7), parent=rt)
+    paint(ho, solid((0.6, 0.72, 0.36)))
+    export("Trough")
+
+def build_apple_tree():
+    clear()
+    random.seed(91)
+    rt = root("AppleTree")
+    H = 1.9
+    tr = trunk_bm(H, 0.15, rings=18, seg=16, flare=0.6, top=0.5, bend=0.3)
+    branches = []
+    for i in range(5):
+        a = i / 5 * math.tau + random.random()
+        s = Vector((0.1 * math.sin(2.0), 0, H * (0.65 + 0.07 * i)))
+        e = s + Vector((math.cos(a) * 0.9, math.sin(a) * 0.9, 0.55 + random.random() * 0.4))
+        branches.append(limb_bm(s, e, 0.07, 0.03, 8))
+    t = from_bm(merge_bms([tr] + branches), "Trunk", material("Bark", rough=0.95), parent=rt)
+    paint(t, bark_color)
+    centers = [(Vector((0.1, 0, H + 0.75)), 1.0)]
+    for i in range(6):
+        a = i / 6 * math.tau + random.random() * 0.4
+        centers.append((Vector((math.cos(a) * 0.95, math.sin(a) * 0.95, H + 0.35 + random.random() * 0.5)), 0.7 + random.random() * 0.2))
+    blobs = []
+    for i, (c, r) in enumerate(centers):
+        b = blob_bm(r, 3, 0.3, 1.4, seed=i * 5.3 + 2, squash=0.8)
+        xform(b, Matrix.Translation(c))
+        blobs.append(b)
+    lv = from_bm(merge_bms(blobs), "Leaves", material("Leaves", rough=0.85, spec=0.25), parent=rt)
+    paint(lv, leaf_color((0.15, 0.36, 0.08), (0.28, 0.5, 0.12)))
+    ap = []
+    for i in range(34):
+        c, r = centers[random.randrange(len(centers))]
+        d = Vector((random.uniform(-1, 1), random.uniform(-1, 1), random.uniform(-0.6, 0.8))).normalized()
+        p = c + Vector((d.x, d.y, d.z * 0.8)) * r * 1.0
+        if p.z < 1.4:
+            continue
+        s = sphere_bm(0.055, 10, 7)
+        xform(s, Matrix.Translation(p))
+        ap.append(s)
+    for i in range(8):   # windfalls on the grass
+        a = random.random() * math.tau
+        rr = random.uniform(0.35, 1.2)
+        s = sphere_bm(0.05, 10, 7)
+        xform(s, Matrix.Translation((math.cos(a) * rr, math.sin(a) * rr, 0.045)))
+        ap.append(s)
+    ao = from_bm(merge_bms(ap), "Fruit", material("Fruit", rough=0.3, spec=0.7), parent=rt)
+    paint(ao, lambda p, n: mix((0.7, 0.05, 0.05), (0.95, 0.3, 0.1), smooth(-0.5, 0.8, n.z) * 0.6 + 0.2 * noise.noise(p * 30)))
+    export("AppleTree")
+
+def build_sunflower_head():
+    clear()
+    rt = root("SunflowerHead")
+    tilt = Matrix.Translation((0, 0, 0.05)) @ Euler((0.28, 0.12, 0)).to_matrix().to_4x4()
+    disc = sphere_bm(1, 28, 10)
+    deform(disc, lambda v: Vector((v.x * 0.17, v.y * 0.17, v.z * 0.035)))
+    xform(disc, tilt)
+    do = from_bm(disc, "HeadDisc", material("Seeds", rough=0.9), parent=rt)
+    gold = math.pi * (3 - math.sqrt(5))
+    def seeds(p, n):
+        q = tilt.inverted() @ p
+        r = math.hypot(q.x, q.y)
+        if n.z < 0.2:
+            return (0.3, 0.38, 0.14)
+        k = (math.atan2(q.y, q.x) - math.sqrt(r) * 60) / gold
+        s = abs(math.sin(k * 3.0)) < 0.3
+        c = mix((0.25, 0.14, 0.06), (0.42, 0.28, 0.12), smooth(0.02, 0.15, r))
+        return scl(c, 0.7 if s else 1.0)
+    paint(do, seeds)
+    bm = bmesh.new()
+    for i in range(26):
+        a = i / 26 * math.tau
+        droop = 0.03 + 0.03 * math.sin(i * 1.7)
+        lb = leaf_bm(0.09, 0.035, thick=0.0015, u=8, v=4)
+        xform(lb, Matrix.Rotation(a - math.pi / 2, 4, 'Z') @ Matrix.Translation((0, 0.15, 0)) @ Euler((-droop * 6, 0, 0)).to_matrix().to_4x4())
+        me = bpy.data.meshes.new("tmp"); lb.to_mesh(me); bm.from_mesh(me); lb.free(); bpy.data.meshes.remove(me)
+    xform(bm, tilt)
+    po = from_bm(bm, "HeadPetals", material("Petal", rough=0.6), parent=rt)
+    paint(po, lambda p, n: mix((0.95, 0.62, 0.04), (1.0, 0.82, 0.22), noise.noise(p * 50) * 0.5 + 0.5))
+    stb = limb_bm((0.12, -0.12, 0.03), (0.38, -0.3, 0.02), 0.018, 0.014, 8)
+    so = from_bm(stb, "Stalk", material("Plant", rough=0.7), parent=rt)
+    paint(so, solid((0.3, 0.48, 0.15)))
+    export("SunflowerHead")
+
 jobs = {
     "GuineaPig": build_guinea_pig, "Human": build_human, "Oak": lambda: build_oak("Oak", 1),
     "Oak2": lambda: build_oak("Oak2", 9), "Pine": build_pine, "Birch": build_birch, "Bush": build_bush,
@@ -1646,6 +2162,10 @@ jobs = {
     "Sunflower": build_sunflower, "Barn": build_barn, "Shop": build_shop, "LampPost": build_lamppost, "Bench": build_bench,
     "Goat": build_goat, "Sheep": build_sheep, "Duck": build_duck, "Car": build_car, "Cattail": build_cattail,
     "Umbrella": build_umbrella, "Sandcastle": build_sandcastle, "Scarecrow": build_scarecrow, "Fountain": build_fountain,
+    "RoseHip": build_rosehip, "RaspLeaf": build_raspleaf, "Lettuce": build_lettuce, "Watermelon": build_watermelon, "Cress": build_cress,
+    "Corn": build_corn, "Apple": build_apple, "Seeds": build_seeds, "Snowdrift": build_snowdrift, "Bramble": build_bramble,
+    "MarketStall": build_market_stall, "Basket": build_basket, "CressBed": build_cress_bed, "Trough": build_trough,
+    "AppleTree": build_apple_tree, "SunflowerHead": build_sunflower_head,
 }
 for k, fn in jobs.items():
     if only and k not in only:

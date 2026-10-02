@@ -60,7 +60,7 @@ A new model also needs its name in `MODELS` in `js/game.js`. Each model has its 
     PW=/path/to/node_modules/playwright node tools/check.cjs              # every check
     PW=/path/to/node_modules/playwright node tools/check.cjs reach saves  # just these
 
-Runs in a tiny headless window and tests the world through `window.__game`: from every way into each zone, a walkability grid (the game's own collision, deep water and the rim) must reach every exit, burrow, forage spot, plant, human and animal; the same underground for every chamber, curio and treat. Then night in every zone, random key mashing, eating and foraging, continuing old and zoned saves, and memory after visiting everything. Exits 1 on any failure or console error.
+Runs in a tiny headless window and tests the world through `window.__game`: from every way into each zone, a walkability grid (the game's own collision, deep water and the rim) must reach every exit, burrow, forage spot, plant, human and animal; the same underground for every chamber, curio and treat. Then night in every zone, random key mashing, eating and foraging, every zone's signature treat (and wading in to forage watercress), continuing old and zoned saves, and memory after visiting everything. Exits 1 on any failure or console error.
 
 ## Screenshots
 

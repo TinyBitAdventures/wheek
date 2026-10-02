@@ -1,6 +1,6 @@
 // World checks: loads the game in a tiny headless window and tests the world's logic through window.__game.
 // Usage: PW=/path/to/node_modules/playwright node tools/check.cjs [check ...]
-//   checks: reach warren night chaos eat saves memory (default: all). URL defaults to the local dev site.
+//   checks: reach warren night chaos eat treats saves memory (default: all). URL defaults to the local dev site.
 // Prints a report and exits 1 if anything failed.
 const { chromium } = require(process.env.PW || 'playwright');
 const URL = process.env.URL || 'https://wheek.localhost/';
@@ -57,7 +57,9 @@ const frames = (page, n) => page.evaluate(n => new Promise(r => { let k = 0; (fu
     // placement: nothing to eat, enter or pet stands in water, and animals are where they belong
     const p = await page.evaluate(() => { const g = window.__game, Z = g.Z(), bad = [], wet = (x, z) => Z.waterY !== undefined && g.heightAt(x, z) < Z.waterY;
       for (const t of Z.tunnels) if (wet(t.ex, t.ez)) bad.push('burrow in water ' + t.name);
-      for (const s of Z.spots) if (wet(s.x, s.z)) bad.push(s.type + ' spot in water');
+      for (const s of Z.spots) if (s.type === 'cress' ? Z.waterY - g.heightAt(s.x, s.z) > .07 : wet(s.x, s.z)) bad.push(s.type + (s.type === 'cress' ? ' too deep to wade to' : ' spot in water'));
+      const sig = { peaks: 'drift', deepwood: 'bramble', town: 'stall', beach: 'picnic', creek: 'cress', zoo: 'trough', farm: 'apples', sunflowers: 'seedhead' }[Z.id];
+      if (sig && Z.spots.filter(s => s.type === sig).length < 3) bad.push('only ' + Z.spots.filter(s => s.type === sig).length + ' ' + sig + ' spots');
       for (const ps of Z.pickSets) for (const it of ps.items) if (wet(it.x, it.z)) bad.push(ps.type + ' in water');
       for (const h of Z.humans) if (wet(h.x, h.z)) bad.push('human in water ' + h.name);
       for (const c of Z.critters) { const swim = c.kind === 'Duck'; if (swim && !(Z.waterY - g.heightAt(c.x, c.z) > .05)) bad.push('duck on land'); if (!swim && wet(c.x, c.z)) bad.push(c.kind + ' in water') }
@@ -121,6 +123,22 @@ const frames = (page, n) => page.evaluate(n => new Promise(r => { let k = 0; (fu
     const foraged = await page.waitForFunction(() => { const g = window.__game, s = g.Z().spots[window.__spot]; if (s.ready) { g.pig.pos.set(s.x + s.r + .1, g.heightAt(s.x + s.r + .1, s.z), s.z); window.__game.keys.KeyF = true; const a = (g.G.acts || []).find(a => a.k === 'F' && a.spot); if (a && !document.getElementById('forage').style.display.includes('block')) document.dispatchEvent(new KeyboardEvent('keydown', { code: 'KeyF' })) } return !s.ready }, null, { timeout: 120000, polling: 250 }).then(() => true, () => false);
     await page.keyboard.up('KeyF');
     report(`eat & forage ${id}`, ate && foraged, `ate a ${setup}: ${ate} · foraged a ${spot}: ${foraged}`);
+  }
+
+  // 5b. every zone's signature treat: reveal it at one of its spots and eat it (the model loads, the journal counts it);
+  //     then wade in and forage a watercress bed for real
+  if (pick('treats')) {
+    const r = await page.evaluate(async () => { const g = window.__game, out = [];
+      for (const [type, it] of Object.entries(g.ITEMS)) { if (!it.zone) continue; g.visit(it.zone, 0, 0, 0); const n0 = g.G.found[type] || 0, s = g.Z().spots.find(s => s.ready);
+        g.revealItem(type, s); const t0 = performance.now(); while (!((g.G.found[type] || 0) > n0) && performance.now() - t0 < 60000) await new Promise(r => setTimeout(r, 100));
+        if (!((g.G.found[type] || 0) > n0)) out.push(type) }
+      return out });
+    report('signature treats', !r.length, r.length ? 'never eaten: ' + r.join(', ') : '8 zones');
+    await page.evaluate(() => { const g = window.__game; g.G.time = 11; g.visit('creek', 0, 0, 0); const s = g.Z().spots.find(s => s.type === 'cress'); window.__cress = g.Z().spots.indexOf(s); g.G.forages0 = g.G.forages; g.pig.pos.set(s.x, g.heightAt(s.x, s.z), s.z) });
+    await page.keyboard.down('KeyF');
+    const ok = await page.waitForFunction(() => { const g = window.__game, s = g.Z().spots[window.__cress]; if (s.ready) { g.pig.pos.set(s.x, g.heightAt(s.x, s.z), s.z); if (!document.getElementById('forage').style.display.includes('block')) document.dispatchEvent(new KeyboardEvent('keydown', { code: 'KeyF' })) } return !s.ready && g.G.wade !== undefined }, null, { timeout: 120000, polling: 250 }).then(() => true, () => false);
+    await page.keyboard.up('KeyF');
+    report('wade & forage watercress', ok, ok ? '' : 'the cress bed never got foraged');
   }
 
   // 6. saves: continue a game saved before zones existed, and one saved in a zone

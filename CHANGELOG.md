@@ -1,5 +1,16 @@
 # Changelog
 
+## Unreleased
+
+### Every zone has its own treat
+- Each of the eight zones around the park has a signature treat you can only find there, and a new place to forage it: rose hips under the snowdrifts on ❄️ Snowcap Peaks, raspberry leaves in 🌲 The Deep Wood's brambles, romaine from the market crates round 🏙️ Downtown's fountain, watermelon in 🏖️ Sandy Cove's picnic baskets, watercress in 🌊 Willow Creek's shallows (wade in to forage it), corn husks from 🐐 Critter Corner's feed troughs, apple slices under 🚜 Sunny Acres' new apple trees and sunflower seeds from the fallen heads in 🌻 Sunflower Fields.
+- The journal has 23 treats now. One you haven't found yet shows which zone it grows in.
+- The humans in Downtown, Sandy Cove, Critter Corner and on the farm sometimes toss you their zone's treat.
+- The Deep Wood's brambles are thorny cover: the hawk can't reach you in one.
+
+### Models
+- 16 new Blender-built models: rose hips, raspberry leaves, romaine, a watermelon slice, watercress, a corn husk, an apple slice and sunflower seeds, plus a snowdrift, a bramble, a market stall, a picnic basket, a watercress bed, a feed trough, an apple tree and a fallen sunflower head.
+
 ## v0.2.0 (2026-09-29)
 
 Wheek! gets much bigger. Walk out of the park into eight new places, crawl down into the warren beneath the woods, and pick up where you left off with save slots.

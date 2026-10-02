@@ -91,6 +91,13 @@ const scenes = {
     await page.waitForTimeout(1200);
   },
 };
+// Each zone's signature forage spot (sig-peaks, sig-town, ...): the pig stands just off it, looking at it.
+for (const [zone, type, dist] of [['peaks', 'drift', 2], ['deepwood', 'bramble', 2.2], ['town', 'stall', 3.4], ['beach', 'picnic', 1.8], ['creek', 'cress', 1.8], ['zoo', 'trough', 2.2], ['farm', 'apples', 3.6], ['sunflowers', 'seedhead', 1.6]])
+  scenes['sig-' + zone] = async page => {
+    await setup(page, `document.getElementById('mapwrap').classList.remove('big');G.time=11;g.visit('${zone}',0,0,0);const s=g.Z().spots.find(s=>s.type==='${type}');
+      const a=[0,1,2,3,4,5].map(k=>k*1.05).find(a=>g.freeAt(s.x+Math.cos(a)*(s.r+.35),s.z+Math.sin(a)*(s.r+.35),.12))||0;pig.pos.set(s.x+Math.cos(a)*(s.r+.35),0,s.z+Math.sin(a)*(s.r+.35));pig.heading=Math.atan2(s.x-pig.pos.x,s.z-pig.pos.z)`);
+    await camera(page, 'window.__game.pig.heading+Math.PI+.5', dist, .32);
+  };
 
 (async () => {
   const browser = await chromium.launch({ args: ['--use-angle=swiftshader', '--enable-unsafe-swiftshader', '--ignore-gpu-blocklist'] });
