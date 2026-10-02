@@ -1181,7 +1181,7 @@ function openTunnel(t){
 }
 function closeTunnel(){G.modal=false;G.hidden=false;$('tunnelMenu').classList.add('hidden')}
 function findTunnel(tu,below){tu.found=true;G.tunnels++;const zid=tu.node?'park':Z.id,zt=tu.node?PARK.tunnels:tunnels;(G.zfound[zid]||(G.zfound[zid]=[])).push(zt.indexOf(tu));SFX.find('rare');callout('rare','🕳 '+tu.name,100);
-  toast(below?`🕳 <b>You found ${tu.name} from below!</b> Climb out here any time.`:`🕳 <b>Tunnel discovered: ${tu.name}!</b> Press E at the entrance to nap, hide or crawl into the warren.`,'gold',5);addScore(100,'tunnel!','#7fd0ff');
+  toast(below?`🕳 <b>You found ${tu.name} from below!</b> Climb out here any time.`:`🕳 <b>Tunnel discovered: ${tu.name}!</b> ${G.input==='touch'?'At the entrance, tap Enter tunnel':'Press '+kb('E')+' at the entrance'} to nap, hide or crawl into the warren.`,'gold',5);addScore(100,'tunnel!','#7fd0ff');
   if(zt.every(t=>t.found)){if(zid==='park'){toast('🏆 <b>You found every tunnel in the park!</b> +1000','gold',6);addScore(1000,'all tunnels!','#ffd23f')}else{toast(`🏆 <b>Every burrow in ${Z.name}!</b> +400`,'gold',6);addScore(400,'all burrows!','#ffd23f')}}}
 function restInTunnel(){flash('rgba(0,0,0,1)',1);G.time+=2;G.energy=100;G.hp=Math.min(100,G.hp+20);G.full=Math.max(0,G.full-8);G.vitc=Math.max(0,G.vitc-5);if(herd.length){G.happy=Math.min(100,G.happy+herd.length*6);toast(`💤 You and your herd of ${herd.length+1} snuggled up in a warm pile. Energy restored!`,'good')}else toast('💤 You curled up in the cozy burrow. Energy restored!','good');addScore(10+herd.length*10)}
 function startTravel(a,b){
@@ -1379,7 +1379,7 @@ function enterWarren(t,quiet){const n=t.node;G.under=true;G.hidden=true;W.from=t
   herd.forEach(f=>{swapScene(f.obj,wScene);f.blob.visible=false;f.tag.style.display='none';f.pos.set(n.x,0,n.z);f.vel.set(0,0,0);f.air=false;f.vy=0});
   snapCamera();W.revealT=0;W.lightT=0;
   if(quiet)return;
-  if(!G.warrenTip){G.warrenTip=true;toast('🕳 <b>The Warren.</b> Explore to fill in your map (<kbd>M</kbd>). Walk a passage end to end and it becomes a quick route between burrows.','gold',9)}
+  if(!G.warrenTip){G.warrenTip=true;toast(`🕳 <b>The Warren.</b> Explore to fill in your map (${kb('M','🗺')}). Walk a passage end to end and it becomes a quick route between burrows.`,'gold',9)}
   else toast(`🕳 Down into the warren under <b>${t.name}</b>`)}
 function exitWarren(n){const t=n.den;G.under=false;G.hidden=false;SFX.whoosh();flash('rgba(0,0,0,1)',1);
   swapScene(pig.obj,scene);swapScene(pts,scene);pig.blob.visible=true;
@@ -1630,7 +1630,7 @@ function updateFriends(dt,t){
     if(f.state==='wild'){
       if(d<14)f.known=true;
       if(G.started&&sprinting&&d<(f.shy?5:2.6)&&f.spookT<=0){f.spookT=3;f.friend=Math.max(0,f.friend-.35);SFX.pop();floaty('eek!','#ffd0e8',_fv.set(f.pos.x,f.pos.y+.22,f.pos.z).clone());
-        if(!G.spookTip){G.spookTip=true;toast(`😳 ${esc(f.name)} got spooked! Walk up gently (no sprinting), then hold <kbd>C</kbd> to chat.`,'',6)}}
+        if(!G.spookTip){G.spookTip=true;toast(`😳 ${esc(f.name)} got spooked! Walk up gently (no sprinting), then hold ${kb('C','the Chat button')} to chat.`,'',6)}}
       if(f.spookT>0){tx=f.pos.x-dx/d*2;tz=f.pos.z-dz/d*2;speed=2.3}
       else if(f===ct){face=Math.atan2(dx,dz);if(pSpeed<.3)pig.heading+=angDiff(pig.heading,Math.atan2(-dx,-dz))*Math.min(1,dt*6);f.friend+=dt/((f.shy?5.5:3.2)/G.perk.social*(1+herd.length*.12));f.chatT-=dt;
         if(f.chatT<=0){f.chatT=.5;SFX.chut();heart(f.pos.x,f.pos.y+.17,f.pos.z);if(rand()<.4){pig.eating=.2}}
@@ -1704,7 +1704,7 @@ function updatePig(dt,t){
   const P=pig.parts;
   // input
   let ix=0,iz=0;if(keys.KeyW||keys.ArrowUp)iz+=1;if(keys.KeyS||keys.ArrowDown)iz-=1;if(keys.KeyA||keys.ArrowLeft)ix-=1;if(keys.KeyD||keys.ArrowRight)ix+=1;
-  if(joy.active){ix=joy.x;iz=-joy.y}
+  if(joy.active){ix=joy.x;iz=-joy.y}else if(pad.on){ix=pad.x;iz=-pad.y}
   const busy=forageState||pig.eating>.25;
   let len=Math.hypot(ix,iz);if(len>1){ix/=len;iz/=len;len=1}
   const yaw=G.camYaw;const fx=-Math.sin(yaw),fz=-Math.cos(yaw),rx=Math.cos(yaw),rz=-Math.sin(yaw);
@@ -1867,12 +1867,13 @@ function updateHUD(dt){
   else dg.style.display='none';
   // prompts
   const acts=G.inTunnel?[]:G.under?warrenActions():currentActions();G.acts=acts;
-  $('prompt').innerHTML=acts.map(a=>`<div class="pill" style="${a.disabled?'opacity:.6':''}"><kbd>${a.k}</kbd>${a.hold?'hold · ':''}${a.label}</div>`).join('')+(G.happy>70&&G.popcornCD<=0?'<div class="pill"><kbd>␣</kbd>Popcorn!</div>':'')+(G.huddle?`<div class="pill">🐹 Huddling with your herd · happy &amp; rested</div>`:'')+edgeHint();
+  const ph=acts.map((a,i)=>`<div class="pill${a.disabled?' off':''}" data-i="${i}" data-k="${a.k}"><kbd>${keyLabel(a.k)}</kbd>${a.hold?'hold · ':''}${a.label}</div>`).join('')+(G.happy>70&&G.popcornCD<=0?`<div class="pill" data-k="␣"><kbd>${keyLabel('␣')}</kbd>Popcorn!</div>`:'')+(G.huddle?`<div class="pill info">🐹 Huddling with your herd · happy &amp; rested</div>`:'')+edgeHint();
+  if(ph!==G.promptHTML){G.promptHTML=ph;$('prompt').innerHTML=ph}
   if(calloutT>0){calloutT-=.1;if(calloutT<=0)$('callout').style.opacity=0}
   drawMap();
 }
 function edgeHint(){if(G.under||Math.hypot(pig.pos.x,pig.pos.z)<EDGE-6)return '';const nb=neighbour(Z,sectorAt(pig.pos.x,pig.pos.z));
-  return nb?`<div class="pill">➜ ${nb.icon} ${nb.name} this way · keep going to leave ${Z.name}</div>`:''}
+  return nb?`<div class="pill info">➜ ${nb.icon} ${nb.name} this way · keep going to leave ${Z.name}</div>`:''}
 const mapC=$('map'),mctx=mapC.getContext('2d');let mapBg=null;
 function drawMapBg(){const c=document.createElement('canvas');c.width=c.height=340;const g=c.getContext('2d');const img=g.createImageData(340,340);
   const col=Z.mapColor||((x,z)=>Z.ground(x,z,heightAt(x,z)).map(v=>v*290));
@@ -1970,32 +1971,85 @@ function continueGame(i){const s=lsGet(slotKey(i),null);if(!s)return renderSlots
   startPlaying(()=>toast(`🐹 Welcome back, ${esc(G.name)}! Day ${G.day}${G.under?', down in the warren':''}.`,'good',5))}
 function startPlaying(welcome){
   friends.forEach(f=>{if(f.name===G.name)f.name=PIG_NAMES.find(n=>n!==G.name&&!friends.some(o=>o.name===n))});
-  G.selecting=false;camera.clearViewOffset();$('select').classList.add('hidden');G.started=true;G.camDist=.95;G.camPitch=.2;G.camYaw=pig.heading+Math.PI;$('title').classList.add('hidden');['stats','top','mapwrap','help'].forEach(i=>$(i).classList.remove('hidden'));SFX.wheek();
+  G.selecting=false;camera.clearViewOffset();$('select').classList.add('hidden');G.started=true;$('touchui').classList.remove('hidden');G.camDist=.95;G.camPitch=.2;G.camYaw=pig.heading+Math.PI;$('title').classList.add('hidden');['stats','top','mapwrap','help'].forEach(i=>$(i).classList.remove('hidden'));SFX.wheek();
   welcome();saveGame(true)}
 addEventListener('pagehide',()=>saveGame(true));
 
 // ============================================================ input
-addEventListener('keydown',e=>{
-  if(!G.started)return;keys[e.code]=true;if(AC&&AC.state==='suspended')AC.resume();
-  if(e.code==='Escape'){if(!$('journal').classList.contains('hidden'))closeJournal();else if(!$('tunnelMenu').classList.contains('hidden'))closeTunnel();else togglePause();return}
-  if(e.code==='KeyP'){togglePause();return}
-  if(e.code==='KeyJ'){if($('journal').classList.contains('hidden'))openJournal();else closeJournal();return}
-  if(G.modal||G.paused||G.over||G.inTunnel||e.repeat)return;
-  if(e.code==='Space'){e.preventDefault();if(!pig.air){pig.vy=1.55;pig.air=true;SFX.jump();if(G.happy>70&&G.popcornCD<=0){G.popcornCD=3;addScore(15,'popcorn!','#ffb0e0');herdPopcorn();emit(pig.pos.x,pig.pos.y+.1,pig.pos.z,10,{col:[1,.8,.9],spread:.5,up:.8,size:.015,life:.6})}}}
-  if(e.code==='KeyE'){const a=(G.acts||currentActions()).find(a=>a.k==='E'&&!a.hold);if(a)a.do()}
-  if(e.code==='KeyM')$('mapwrap').classList.toggle('big');
-  if(e.code==='KeyF'&&!G.under){const a=currentActions().find(a=>a.k==='F'&&a.spot);if(a&&!forageState)startForage(a.spot)}
-  if(e.code==='KeyR')sniff();
-  if(e.code==='KeyQ')wheek();
-});
-addEventListener('keyup',e=>{keys[e.code]=false});
+// Every action goes through press/release, whatever pressed it: the keyboard, a touch button or a gamepad.
+function press(code,repeat=false){
+  if(!G.started)return;keys[code]=true;if(AC&&AC.state==='suspended')AC.resume();
+  if(code==='Escape'){if(!$('journal').classList.contains('hidden'))closeJournal();else if(!$('tunnelMenu').classList.contains('hidden'))closeTunnel();else togglePause();return}
+  if(code==='KeyP'){togglePause();return}
+  if(code==='KeyJ'){if($('journal').classList.contains('hidden'))openJournal();else closeJournal();return}
+  if(G.modal||G.paused||G.over||G.inTunnel||repeat)return;
+  if(code==='Space'){if(!pig.air){pig.vy=1.55;pig.air=true;SFX.jump();if(G.happy>70&&G.popcornCD<=0){G.popcornCD=3;addScore(15,'popcorn!','#ffb0e0');herdPopcorn();emit(pig.pos.x,pig.pos.y+.1,pig.pos.z,10,{col:[1,.8,.9],spread:.5,up:.8,size:.015,life:.6})}}}
+  if(code==='KeyE'){const a=(G.acts||currentActions()).find(a=>a.k==='E'&&!a.hold);if(a)a.do()}
+  if(code==='KeyM')$('mapwrap').classList.toggle('big');
+  if(code==='KeyF'&&!G.under){const a=currentActions().find(a=>a.k==='F'&&a.spot);if(a&&!forageState)startForage(a.spot)}
+  if(code==='KeyR')sniff();
+  if(code==='KeyQ')wheek();
+}
+function release(code){keys[code]=false}
+addEventListener('keydown',e=>{if(e.target&&e.target.tagName==='INPUT'&&e.target.type!=='range')return;if(G.started&&e.code==='Space')e.preventDefault();if(G.started)setInput('kb');press(e.code,e.repeat)});
+addEventListener('keyup',e=>release(e.code));
+// which buttons the prompts show: the keyboard's, a gamepad's, or none (on touch the prompts are buttons themselves)
+const PAD_GLYPH={E:'Ⓐ',F:'Ⓧ',C:'Ⓨ',Q:'LB',R:'RB','␣':'Ⓑ'};
+function keyLabel(k){return G.input==='pad'?PAD_GLYPH[k]||k:k}
+// a key in a tip: <kbd>E</kbd> on a keyboard, Ⓐ on a gamepad; on touch, what the button that pops up is called
+function kb(k,touch){return G.input==='touch'?touch:`<kbd>${keyLabel(k)}</kbd>`}
+function setInput(m){if(G.input===m)return;G.input=m;document.body.classList.toggle('touch',m==='touch');document.body.classList.toggle('pad',m==='pad');renderHelp();G.promptHTML=''}
+function renderHelp(){$('help').innerHTML=G.input==='pad'?'<kbd>L</kbd>move <kbd>R</kbd>look <kbd>RT</kbd>scurry <kbd>Ⓑ</kbd>popcorn <kbd>Ⓐ</kbd>eat/enter <kbd>Ⓧ</kbd>forage <kbd>Ⓨ</kbd>befriend <kbd>RB</kbd>sniff <kbd>LB</kbd>wheek <kbd>⧉</kbd>map <kbd>▲</kbd>journal <kbd>☰</kbd>pause'
+  :'<kbd>WASD</kbd>move <kbd>⇧</kbd>scurry <kbd>␣</kbd>popcorn <kbd>E</kbd>eat/enter <kbd>F</kbd>forage <kbd>R</kbd>sniff <kbd>Q</kbd>wheek <kbd>C</kbd>befriend <kbd>M</kbd>map <kbd>J</kbd>journal <kbd>P</kbd>pause · drag to look'}
+
+// ---- touch: a joystick on the left of the screen, look around on the right (pinch to zoom), buttons for the rest
+// The prompts become buttons too: tap one to do it, or hold it for the hold actions (munch, forage, chat).
+const touchHeld=new Map();   // pointerId -> key held by a touch button
+function touchPress(e,code){e.preventDefault();setInput('touch');audioInit();if(AC&&AC.state==='suspended')AC.resume();touchHeld.set(e.pointerId,code);press(code)}
+addEventListener('pointerup',e=>{const c=touchHeld.get(e.pointerId);if(c){touchHeld.delete(e.pointerId);release(c)}});
+addEventListener('pointercancel',e=>{const c=touchHeld.get(e.pointerId);if(c){touchHeld.delete(e.pointerId);release(c)}});
+document.querySelectorAll('#touchui .tb').forEach(b=>b.addEventListener('pointerdown',e=>touchPress(e,b.dataset.k)));
+$('prompt').addEventListener('pointerdown',e=>{const el=e.target.closest('.pill');if(!el||!G.started)return;e.preventDefault();setInput('touch');
+  if(el.dataset.k==='␣'){touchPress(e,'Space');return}const a=(G.acts||[])[+el.dataset.i];if(!a||a.disabled)return;
+  if(a.do&&!a.hold){a.do();return}touchPress(e,'Key'+a.k)});
 addEventListener('blur',()=>{for(const k in keys)keys[k]=false;if(G.started&&!G.over&&!G.modal)togglePause(true)});
 function togglePause(force){if(G.over)return;G.paused=force??!G.paused;$('pause').classList.toggle('hidden',!G.paused)}
-canvas.addEventListener('pointerdown',e=>{if(e.pointerType==='touch'&&e.clientX<innerWidth*.4){joy.start(e);return}G.drag=true;G.dragId=e.pointerId;canvas.classList.add('drag');canvas.setPointerCapture(e.pointerId)});
-canvas.addEventListener('pointermove',e=>{if(joy.id===e.pointerId){joy.move(e);return}if(!G.drag||e.pointerId!==G.dragId)return;G.camYaw-=e.movementX*.006;G.camPitch=clamp(G.camPitch+e.movementY*.004,-.05,1.2);G.lastDrag=performance.now()});
-canvas.addEventListener('pointerup',e=>{if(joy.id===e.pointerId){joy.end();return}G.drag=false;canvas.classList.remove('drag');G.lastDrag=performance.now()});
+const looks=new Map();   // touch pointers looking around (two of them pinch to zoom)
+canvas.addEventListener('pointerdown',e=>{if(e.pointerType==='touch'){setInput('touch');if(e.clientX<innerWidth*.4&&!joy.active){joy.start(e);return}looks.set(e.pointerId,{x:e.clientX,y:e.clientY});if(looks.size===2){const [a,b]=[...looks.values()];G.pinch=Math.hypot(a.x-b.x,a.y-b.y)}}
+  G.drag=true;G.dragId=e.pointerId;canvas.classList.add('drag');canvas.setPointerCapture(e.pointerId)});
+canvas.addEventListener('pointermove',e=>{if(joy.id===e.pointerId){joy.move(e);return}
+  if(looks.has(e.pointerId)){looks.set(e.pointerId,{x:e.clientX,y:e.clientY});if(looks.size>=2){const [a,b]=[...looks.values()],d=Math.hypot(a.x-b.x,a.y-b.y);if(G.pinch)G.camDist=clamp(G.camDist*G.pinch/d,.45,4);G.pinch=d;return}}
+  if(!G.drag||e.pointerId!==G.dragId)return;G.camYaw-=e.movementX*.006;G.camPitch=clamp(G.camPitch+e.movementY*.004,-.05,1.2);G.lastDrag=performance.now()});
+const endPtr=e=>{if(joy.id===e.pointerId){joy.end();return}looks.delete(e.pointerId);G.pinch=0;if(e.pointerId===G.dragId){G.drag=false;canvas.classList.remove('drag');G.lastDrag=performance.now()}};
+canvas.addEventListener('pointerup',endPtr);canvas.addEventListener('pointercancel',endPtr);
 canvas.addEventListener('wheel',e=>{G.camDist=clamp(G.camDist*(1+e.deltaY*.001),.45,4)},{passive:true});
-const joy={active:false,id:null,x:0,y:0,ox:0,oy:0,start(e){this.id=e.pointerId;this.active=true;this.ox=e.clientX;this.oy=e.clientY;canvas.setPointerCapture(e.pointerId)},move(e){this.x=clamp((e.clientX-this.ox)/50,-1,1);this.y=clamp((e.clientY-this.oy)/50,-1,1)},end(){this.active=false;this.id=null;this.x=this.y=0}};
+const joy={active:false,id:null,x:0,y:0,ox:0,oy:0,
+  start(e){this.id=e.pointerId;this.active=true;this.ox=e.clientX;this.oy=e.clientY;canvas.setPointerCapture(e.pointerId);const r=$('joyring');r.style.left=this.ox+'px';r.style.top=this.oy+'px';r.classList.add('on');this.knob(0,0)},
+  move(e){this.x=clamp((e.clientX-this.ox)/50,-1,1);this.y=clamp((e.clientY-this.oy)/50,-1,1);const l=Math.hypot(this.x,this.y);if(l>1){this.x/=l;this.y/=l}this.knob(this.x,this.y)},
+  end(){this.active=false;this.id=null;this.x=this.y=0;$('joyring').classList.remove('on')},
+  knob(x,y){$('joyring').firstElementChild.style.transform=`translate(${x*38}px,${y*38}px)`}};
+
+// ---- gamepad: left stick moves, right stick looks, buttons as in renderHelp; in menus the d-pad or stick moves between buttons, Ⓐ picks, Ⓑ goes back
+const PADMAP={0:'KeyE',2:'KeyF',3:'KeyC',1:'Space',5:'KeyR',4:'KeyQ',7:'ShiftLeft',6:'ShiftLeft',9:'KeyP',8:'KeyM',12:'KeyJ'};
+const pad={x:0,y:0,on:false,prev:[],menu:false,navT:0};
+function topOverlay(){for(const id of ['over','journal','tunnelMenu','pause','select','title']){const el=$(id);if(el&&!el.classList.contains('hidden'))return el}return null}
+function padTargets(ov){return [...ov.querySelectorAll('button,input[type=range]')].filter(el=>!el.disabled&&el.offsetParent!==null&&!el.closest('.hidden'))}
+function pollPad(dt){const gp=[...(navigator.getGamepads?navigator.getGamepads():[])].find(g=>g&&g.connected);if(!gp){pad.on=false;return}
+  const b=gp.buttons.map(x=>x.pressed||x.value>.5),dz=v=>Math.abs(v)<.2?0:v,lx=dz(gp.axes[0]||0),ly=dz(gp.axes[1]||0),rx=dz(gp.axes[2]||0),ry=dz(gp.axes[3]||0),edge=i=>b[i]&&!pad.prev[i];
+  if(b.some(Boolean)||lx||ly||rx||ry){if(G.input!=='pad'){setInput('pad');audioInit()}if(AC&&AC.state==='suspended')AC.resume()}
+  const ov=topOverlay();
+  if(ov){if(!pad.menu){pad.menu=true;pad.on=false;for(const c of Object.values(PADMAP))release(c)}
+    const list=padTargets(ov);let i=list.indexOf(document.activeElement);pad.navT-=dt;
+    const dir=edge(13)||edge(15)?1:edge(12)||edge(14)?-1:pad.navT<=0&&Math.abs(ly)>.5?Math.sign(ly):0;
+    if(dir&&list.length){pad.navT=.25;const el=document.activeElement;if(el&&el.type==='range'&&(edge(14)||edge(15))){el.value=+el.value+(edge(15)?1:-1)*(+el.step||.05);el.dispatchEvent(new Event('input'))}
+      else{i=i<0?0:(i+dir+list.length)%list.length;list[i].focus();list[i].scrollIntoView({block:'nearest'})}}
+    if(edge(0)){const el=i>=0?list[i]:list[0];if(el&&el.type!=='range')el.click()}
+    if(edge(1)||edge(9)&&ov.id==='pause'){if(ov.id==='journal')closeJournal();else if(ov.id==='tunnelMenu')closeTunnel();else if(ov.id==='pause')togglePause(false)}
+  }else if(G.started){pad.menu=false;pad.x=lx;pad.y=ly;pad.on=!!(lx||ly);
+    if(rx||ry){G.camYaw-=rx*dt*2.6;G.camPitch=clamp(G.camPitch+ry*dt*1.6,-.05,1.2);G.lastDrag=performance.now()}
+    for(const [k,code] of Object.entries(PADMAP)){if(edge(k))press(code);else if(!b[k]&&pad.prev[k]&&!(code==='ShiftLeft'&&(b[6]||b[7])))release(code)}}
+  pad.prev=b}
+addEventListener('gamepadconnected',()=>toast('🎮 Gamepad connected! Left stick to scurry, Ⓐ to eat, Ⓧ to forage.','good',5));
 
 // ============================================================ breed select
 function selOffset(){if(!G.selecting)return;const w=innerWidth,h=innerHeight;if(w>700)camera.setViewOffset(w,h,-w*.2,0,w,h);else camera.setViewOffset(w,h,0,h*.24,w,h)}
@@ -2015,7 +2069,7 @@ function openSelect(){G.selecting=true;G.camDist=.62;G.camPitch=.2;$('pigName').
 const clock=new THREE.Clock();let frame=0;
 function loop(){
   requestAnimationFrame(loop);
-  const dt=Math.min(clock.getDelta(),.05);const t=clock.elapsedTime;U.time.value=t;
+  const dt=Math.min(clock.getDelta(),.05);const t=clock.elapsedTime;U.time.value=t;pollPad(dt);
   if(G.started&&!G.paused&&!G.over&&!G.modal){
     if(G.inTunnel&&travel){updateTravel(dt);updateParticles(dt);renderer.render(tScene,tCam);return}
     if(G.under){updateWarren(dt,t);updateSurvival(dt);updateHawk(dt,t);updateFoxes(dt,t);updateDay(dt)}else{
@@ -2048,14 +2102,14 @@ function loop(){
   updatePig(0.016,0);updateDay(0);
   $('loading').textContent=G.best?`Best score: ${G.best.toLocaleString()}`:'';
   G.camDist=2.4;G.camPitch=.32;
-  bar.classList.add('hidden');renderSlots();$('slots').classList.remove('hidden');
+  bar.classList.add('hidden');renderSlots();$('slots').classList.remove('hidden');setInput(matchMedia('(pointer: coarse)').matches?'touch':'kb');
   loop();
   $('goBtn').onclick=()=>{const nm=$('pigName').value.trim().slice(0,14);G.name=nm||PIG_NAMES[0];lsSet('wheek-pig',{breed:G.breed,coat:G.coat,name:G.name});
-    startPlaying(()=>{toast(`🐹 Welcome, ${esc(G.name)}! Munch grass (hold <kbd>E</kbd>) and forage (hold <kbd>F</kbd>).`,'good',6);setTimeout(()=>toast('💡 Humans kneeling in the meadow give pets — walk up to their hand and stay still.','',7),2500);setTimeout(()=>toast('💡 Sniff with <kbd>R</kbd> to find forage spots and hidden tunnels.','',7),6000);setTimeout(()=>toast('🐹 Other guinea pigs live in the meadow and woods. Walk up gently and hold <kbd>C</kbd> to befriend them — piggies are happier in a herd!','',8),10000)})};
+    startPlaying(()=>{toast(G.input==='touch'?`🐹 Welcome, ${esc(G.name)}! When there's something to do, a button pops up on the right: hold it to munch grass or forage.`:`🐹 Welcome, ${esc(G.name)}! Munch grass (hold ${kb('E')}) and forage (hold ${kb('F')}).`,'good',6);setTimeout(()=>toast('💡 Humans kneeling in the meadow give pets — walk up to their hand and stay still.','',7),2500);setTimeout(()=>toast(`💡 Sniff with ${kb('R','👃')} to find forage spots and hidden tunnels.`,'',7),6000);setTimeout(()=>toast(`🐹 Other guinea pigs live in the meadow and woods. Walk up gently and hold ${kb('C','the Chat button')} to befriend them — piggies are happier in a herd!`,'',8),10000)})};
   // "Back to your last save" after a game over reloads the page and lands here
   {let r=null;try{r=sessionStorage.getItem('wheek-continue');sessionStorage.removeItem('wheek-continue')}catch(e){}if(r&&lsGet(slotKey(+r),null))continueGame(+r)}
   $('dice').onclick=()=>{let n;do{n=PIG_NAMES[Math.floor(Math.random()*PIG_NAMES.length)]}while(n===$('pigName').value);$('pigName').value=n};
   $('resumeBtn').onclick=()=>togglePause(false);$('saveBtn').onclick=()=>saveGame();$('quitBtn').onclick=()=>{saveGame(true);location.reload()};$('jclose').onclick=closeJournal;$('againBtn').onclick=()=>location.reload();
   $('retryBtn').onclick=()=>{try{sessionStorage.setItem('wheek-continue',G.slot)}catch(e){}location.reload()};
-  window.__game={G,W,WS,ZONE,PARK,EDGE,ITEMS,revealItem,wSdf,neighbour,freeAt,Z:()=>Z,visit:(id,x=0,z=0,h=0)=>arriveZone(ZONE[id],0,{x,z,h}),enterWarren,exitWarren,pig,friends,herd,joinHerd,keys,applyLook,humans,tunnels,spots,hawk,foxes,heightAt,renderer,scene,camera};
+  window.__game={G,W,WS,ZONE,PARK,EDGE,ITEMS,revealItem,setInput,wSdf,neighbour,freeAt,Z:()=>Z,visit:(id,x=0,z=0,h=0)=>arriveZone(ZONE[id],0,{x,z,h}),enterWarren,exitWarren,pig,friends,herd,joinHerd,keys,applyLook,humans,tunnels,spots,hawk,foxes,heightAt,renderer,scene,camera};
 })().catch(e=>{console.error(e);$('loading').textContent='Failed to load: '+e.message});

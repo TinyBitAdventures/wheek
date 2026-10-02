@@ -1,6 +1,6 @@
 // World checks: loads the game in a tiny headless window and tests the world's logic through window.__game.
 // Usage: PW=/path/to/node_modules/playwright node tools/check.cjs [check ...]
-//   checks: reach warren night chaos eat treats saves memory (default: all). URL defaults to the local dev site.
+//   checks: reach warren night chaos eat treats saves touch pad memory (default: all). URL defaults to the local dev site.
 // Prints a report and exits 1 if anything failed.
 const { chromium } = require(process.env.PW || 'playwright');
 const URL = process.env.URL || 'https://wheek.localhost/';
@@ -175,6 +175,77 @@ const frames = (page, n) => page.evaluate(n => new Promise(r => { let k = 0; (fu
     await page.waitForFunction(() => window.__game && window.__game.G.started, null, { timeout: 60000 });
     const r = await page.evaluate(() => { const g = window.__game; return { zone: g.Z().id, herd: g.herd.map(f => f.name), pals: g.G.pals } });
     report('save round trip (farm guinea pig)', r.zone === 'farm' && r.herd.includes(want.name) && r.pals.includes(want.i), `${r.zone}, herd ${r.herd.join(',')}, befriended ${r.pals.join(',')}`);
+  }
+
+  // 6c. touch, on a phone held sideways: the joystick moves, prompts tap and hold, the round buttons work
+  if (pick('touch')) {
+    await page.goto('about:blank');   // one game at a time: headless WebGL is slow enough already
+    const tp = await browser.newPage({ viewport: { width: 844, height: 390 }, hasTouch: true, ignoreHTTPSErrors: true });
+    tp.on('console', m => { if (m.type() === 'error') errors.push(m.text().slice(0, 300)); }); tp.on('pageerror', e => errors.push('PAGE ' + e.message));
+    const cdp = await tp.context().newCDPSession(tp), touch = (type, x, y) => cdp.send('Input.dispatchTouchEvent', { type, touchPoints: type === 'touchEnd' ? [] : [{ x, y, id: 1 }] });
+    const tapEl = async sel => { await tp.locator(sel).first().scrollIntoViewIfNeeded(); const b = await tp.locator(sel).first().boundingBox(); await touch('touchStart', b.x + b.width / 2, b.y + b.height / 2); await frames(tp, 2); await touch('touchEnd'); await frames(tp, 2) };
+    await tp.goto(URL, { timeout: 180000 });
+    await tp.waitForFunction(() => !document.getElementById('slots').classList.contains('hidden'), null, { timeout: 180000 });
+    await tapEl('#slots .new'); await tapEl('#goBtn');
+    await tp.waitForFunction(() => window.__game && window.__game.G.started, null, { timeout: 60000 });
+    const ui = await tp.evaluate(() => ({ touch: document.body.classList.contains('touch'), shown: getComputedStyle(document.getElementById('touchui')).display !== 'none', help: getComputedStyle(document.getElementById('help')).display }));
+    // joystick: thumb down on the left, slide up, hold
+    const p0 = await tp.evaluate(() => { const g = window.__game; g.G.time = 11; g.pig.pos.set(4, g.heightAt(4, 4), 4); return [g.pig.pos.x, g.pig.pos.z] });
+    await touch('touchStart', 120, 280); await frames(tp, 2); await touch('touchMove', 120, 220);
+    for (let k = 0; k < 20; k++) { await touch('touchMove', 120, 220 + (k % 2)); await frames(tp, 2) }   // ~40 frames: a couple of seconds of game time
+    const ring = await tp.evaluate(() => document.getElementById('joyring').classList.contains('on'));
+    await touch('touchEnd');
+    const moved = await tp.evaluate(p0 => { const g = window.__game; return Math.hypot(g.pig.pos.x - p0[0], g.pig.pos.z - p0[1]) }, p0);
+    // tap the Eat prompt by a plant
+    await tp.evaluate(() => { const g = window.__game, Z = g.Z(), ps = Z.pickSets.find(p => p.items.some(i => i.alive)), it = ps.items.find(i => i.alive && g.freeAt(i.x - .15, i.z, .12)); window.__it = [Z.pickSets.indexOf(ps), ps.items.indexOf(it)]; window.__eaten = g.G.eaten });
+    await tp.waitForFunction(() => { const g = window.__game, it = g.Z().pickSets[window.__it[0]].items[window.__it[1]]; g.pig.pos.set(it.x - .15, g.heightAt(it.x - .15, it.z), it.z); g.pig.heading = Math.PI / 2; return [...document.querySelectorAll('#prompt .pill')].some(p => p.textContent.includes('Eat')) }, null, { timeout: 60000, polling: 200 });
+    const pillI = await tp.evaluate(() => [...document.querySelectorAll('#prompt .pill')].findIndex(p => p.textContent.includes('Eat')));
+    await tapEl(`#prompt .pill >> nth=${pillI}`);
+    const ate = await tp.evaluate(() => window.__game.G.eaten > window.__eaten);
+    // hold the Forage prompt at a spot until it's foraged
+    await tp.evaluate(() => { const g = window.__game, s = g.Z().spots.find(s => s.ready && g.freeAt(s.x + s.r + .1, s.z, .12)); window.__s = g.Z().spots.indexOf(s) });
+    await tp.waitForFunction(() => { const g = window.__game, s = g.Z().spots[window.__s]; g.pig.pos.set(s.x + s.r + .1, g.heightAt(s.x + s.r + .1, s.z), s.z); return [...document.querySelectorAll('#prompt .pill')].some(p => p.textContent.includes('Forage')) }, null, { timeout: 60000, polling: 200 });
+    const fb = await tp.locator('#prompt .pill', { hasText: 'Forage' }).first().boundingBox();
+    await touch('touchStart', fb.x + fb.width / 2, fb.y + fb.height / 2);
+    const foraged = await tp.waitForFunction(() => { const g = window.__game, s = g.Z().spots[window.__s]; if (s.ready) g.pig.pos.set(s.x + s.r + .1, g.heightAt(s.x + s.r + .1, s.z), s.z); return !s.ready }, null, { timeout: 120000, polling: 250 }).then(() => true, () => false);
+    await touch('touchEnd'); await frames(tp, 2);
+    const fHeld = await tp.evaluate(() => !!window.__game.keys.KeyF);
+    // round buttons: sniff, then the map
+    await tapEl('#tbtns [data-k=KeyR]'); await tapEl('#tsys [data-k=KeyM]');
+    const btns = await tp.evaluate(() => ({ sniff: window.__game.G.sniffCD > 0, map: document.getElementById('mapwrap').classList.contains('big') && getComputedStyle(document.getElementById('mapwrap')).display !== 'none' }));
+    report('touch controls', ui.touch && ui.shown && ui.help === 'none' && ring && moved > .8 && ate && foraged && !fHeld && btns.sniff && btns.map,
+      `touch ui ${ui.touch && ui.shown} · joystick moved ${moved.toFixed(2)} m (ring ${ring}) · tap eat ${ate} · hold forage ${foraged} (released ${!fHeld}) · sniff ${btns.sniff} · map ${btns.map}`);
+    await tp.close();
+    await page.goto(URL); await start();
+  }
+
+  // 6d. a gamepad (a stand-in for navigator.getGamepads): start a game from the menus, move, eat, look, pause and resume
+  if (pick('pad')) {
+    await page.goto('about:blank');
+    const gp = await browser.newPage({ viewport: { width: 640, height: 400 }, ignoreHTTPSErrors: true });
+    gp.on('console', m => { if (m.type() === 'error') errors.push(m.text().slice(0, 300)); }); gp.on('pageerror', e => errors.push('PAGE ' + e.message));
+    await gp.addInitScript(() => { window.__pad = { b: Array(17).fill(0), a: [0, 0, 0, 0] }; navigator.getGamepads = () => [{ connected: true, id: 'stand-in', mapping: 'standard', buttons: window.__pad.b.map(v => ({ pressed: v > .5, value: v })), axes: window.__pad.a }] });
+    const btn = async i => { await gp.evaluate(i => window.__pad.b[i] = 1, i); await frames(gp, 3); await gp.evaluate(i => window.__pad.b[i] = 0, i); await frames(gp, 3) };
+    await gp.goto(URL, { timeout: 180000 });
+    await gp.waitForFunction(() => !document.getElementById('slots').classList.contains('hidden'), null, { timeout: 180000 });
+    await gp.evaluate(() => { for (let i = 1; i <= 3; i++) localStorage.removeItem('wheek-slot-' + i) }); await gp.reload(); await gp.waitForFunction(() => !document.getElementById('slots').classList.contains('hidden'), null, { timeout: 180000 });
+    await btn(13); await btn(0);   // focus the first slot, pick it
+    let toGo = 0; while (toGo++ < 30 && !(await gp.evaluate(() => document.activeElement && document.activeElement.id === 'goBtn'))) await btn(13);
+    await btn(0);
+    const started = await gp.waitForFunction(() => window.__game && window.__game.G.started, null, { timeout: 30000 }).then(() => true, () => false);
+    const p0 = await gp.evaluate(() => { const g = window.__game; g.G.time = 11; return [g.pig.pos.x, g.pig.pos.z] });
+    await gp.evaluate(() => window.__pad.a[1] = -1); await frames(gp, 40); await gp.evaluate(() => window.__pad.a[1] = 0);
+    const moved = await gp.evaluate(p0 => { const g = window.__game; return Math.hypot(g.pig.pos.x - p0[0], g.pig.pos.z - p0[1]) }, p0);
+    await gp.evaluate(() => { const g = window.__game, Z = g.Z(), ps = Z.pickSets.find(p => p.items.some(i => i.alive)), it = ps.items.find(i => i.alive && g.freeAt(i.x - .15, i.z, .12)); window.__it = [Z.pickSets.indexOf(ps), ps.items.indexOf(it)]; window.__eaten = g.G.eaten });
+    await gp.waitForFunction(() => { const g = window.__game, it = g.Z().pickSets[window.__it[0]].items[window.__it[1]]; g.pig.pos.set(it.x - .15, g.heightAt(it.x - .15, it.z), it.z); g.pig.heading = Math.PI / 2; return (g.G.acts || []).some(a => a.label.startsWith('Eat')) }, null, { timeout: 60000, polling: 200 });
+    const glyph = await gp.evaluate(() => document.querySelector('#prompt kbd')?.textContent);
+    await btn(0); const ate = await gp.evaluate(() => window.__game.G.eaten > window.__eaten);
+    const y0 = await gp.evaluate(() => window.__game.G.camYaw); await gp.evaluate(() => window.__pad.a[2] = 1); await frames(gp, 10); await gp.evaluate(() => window.__pad.a[2] = 0);
+    const looked = await gp.evaluate(y0 => Math.abs(window.__game.G.camYaw - y0) > .05, y0);
+    await btn(9); const paused = await gp.evaluate(() => window.__game.G.paused); await btn(1); const resumed = await gp.evaluate(() => !window.__game.G.paused);
+    report('gamepad', started && moved > .8 && glyph === 'Ⓐ' && ate && looked && paused && resumed, `menus → game ${started} · moved ${moved.toFixed(2)} m · prompt shows ${glyph} · eat ${ate} · look ${looked} · pause ${paused} / resume ${resumed}`);
+    await gp.close();
+    await page.goto(URL); await start();
   }
 
   // 7. after visiting every zone: memory and what the renderer holds

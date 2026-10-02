@@ -15,6 +15,12 @@
 ### The journal
 - A Places page: the nine places laid out as they lie on the map, each with a checklist of burrows found, guinea pigs befriended, its signature treat and the animals to say hello to (and the warren's hidden chambers for the park). Finish everything in a place for a +300 bonus.
 
+### Touch screens and gamepads
+- Play on a phone or tablet: a joystick appears wherever you put your thumb on the left of the screen, drag on the right to look around and pinch to zoom. Round buttons wheek, sniff, hop and scurry, with map, journal and pause buttons at the top.
+- Whatever you can do right now (eat, forage, chat, enter a tunnel, wheek at a human) pops up as a button on the right: tap it, or hold it to munch, forage and chat.
+- On a phone the screen makes room: no minimap (the map button opens the big one), smaller stats, and a shorter title screen when you hold the phone sideways.
+- Gamepads work everywhere, menus included: left stick to scurry, right stick to look, Ⓐ eat and enter, Ⓧ forage, Ⓨ chat, Ⓑ popcorn, RB sniff, LB wheek, RT scurry, Back for the map, d-pad up for the journal and Start to pause. The prompts and tips show whichever buttons you're using.
+
 ### Models
 - 16 new Blender-built models: rose hips, raspberry leaves, romaine, a watermelon slice, watercress, a corn husk, an apple slice and sunflower seeds, plus a snowdrift, a bramble, a market stall, a picnic basket, a watercress bed, a feed trough, an apple tree and a fallen sunflower head.
 

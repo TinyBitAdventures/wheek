@@ -91,6 +91,13 @@ const scenes = {
     await page.waitForTimeout(1200);
   },
 };
+// The touch controls (run with TOUCH=1 and a phone-sized W/H): by a berry bush in the meadow, so the prompts show as buttons.
+scenes.touchui = async page => {
+  await setup(page, `document.getElementById('mapwrap').classList.remove('big');G.time=11;g.visit('park',0,0,0);const s=g.spots.filter(s=>s.type==='bush'&&s.ready).sort((a,b)=>Math.hypot(a.x,a.z)-Math.hypot(b.x,b.z))[0];
+    pig.pos.set(s.x+s.r+.12,0,s.z);pig.heading=-Math.PI/2;g.setInput('touch')`);
+  await camera(page, 'window.__game.pig.heading+Math.PI+.4', 1.2, .3);
+  await page.waitForFunction(() => document.querySelectorAll('#prompt .pill').length > 0, null, { timeout: 30000, polling: 250 });
+};
 // A guinea pig who lives out on the beach, chatting.
 scenes.zonepig = async page => {
   await setup(page, `document.getElementById('mapwrap').classList.remove('big');G.time=10.5;g.visit('beach',0,0,0);const f=g.friends.find(f=>f.origin==='beach');pig.pos.set(f.pos.x+.7,0,f.pos.z+.3);pig.heading=Math.atan2(f.pos.x-pig.pos.x,f.pos.z-pig.pos.z)`);
@@ -106,7 +113,7 @@ for (const [zone, type, dist] of [['peaks', 'drift', 2], ['deepwood', 'bramble',
 
 (async () => {
   const browser = await chromium.launch({ args: ['--use-angle=swiftshader', '--enable-unsafe-swiftshader', '--ignore-gpu-blocklist'] });
-  const page = await browser.newPage({ viewport: { width: W, height: H }, ignoreHTTPSErrors: true });
+  const page = await browser.newPage({ viewport: { width: W, height: H }, hasTouch: !!process.env.TOUCH, ignoreHTTPSErrors: true });
   const errors = [];
   page.on('console', m => { if (m.type() === 'error') errors.push(m.text().slice(0, 300)); });
   page.on('pageerror', e => errors.push('PAGE ' + e.message));

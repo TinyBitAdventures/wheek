@@ -13,7 +13,7 @@
 }
 *{box-sizing:border-box}
 html,body{margin:0;height:100%;overflow:hidden;background:#1a140c;font-family:Fredoka,system-ui,sans-serif;color:var(--ink);user-select:none;-webkit-user-select:none}
-#c{position:fixed;inset:0;width:100%;height:100%;display:block;cursor:grab}
+#c{position:fixed;inset:0;width:100%;height:100%;display:block;cursor:grab;touch-action:none}
 #c.drag{cursor:grabbing}
 .hud{position:fixed;pointer-events:none;z-index:5}
 #stats{top:14px;left:14px;display:flex;flex-direction:column;gap:6px;background:var(--panel);padding:10px 12px;border-radius:14px;border:1px solid var(--edge);backdrop-filter:blur(6px);min-width:210px}
@@ -125,8 +125,40 @@ kbd{display:inline-block;min-width:20px;text-align:center;padding:0 5px;margin-r
 #zonecard .a{font-size:18px;color:var(--ink-dim)}
 #zonecard{text-align:center;padding:16px}
 #zonecard .b{font-size:clamp(26px,6vw,42px);font-weight:700;line-height:1.15;text-shadow:0 3px 14px rgba(0,0,0,.6)}
+/* touch: a joystick that appears under your thumb, round action buttons, prompts you can tap */
+#touchui{display:none;inset:0;z-index:6}
+body.touch #touchui{display:block}
+body.touch #help{display:none}
+#joyring{position:fixed;width:110px;height:110px;margin:-55px 0 0 -55px;border-radius:50%;border:2px solid rgba(255,248,236,.45);background:rgba(28,22,14,.25);display:none}
+#joyring.on{display:block}
+#joyring i{position:absolute;left:30px;top:30px;width:50px;height:50px;border-radius:50%;background:rgba(255,248,236,.75);box-shadow:0 2px 8px rgba(0,0,0,.4)}
+.tb{pointer-events:auto;touch-action:none;font-family:inherit;color:var(--ink);background:var(--panel);border:1px solid var(--edge);border-radius:50%;width:58px;height:58px;font-size:22px;line-height:1;display:flex;flex-direction:column;align-items:center;justify-content:center;gap:1px;backdrop-filter:blur(6px);-webkit-tap-highlight-color:transparent;padding:0}
+.tb small{font-size:10px;color:var(--ink-dim)}
+.tb:active{background:rgba(255,210,63,.35)}
+.tb.big{width:70px;height:70px;font-size:26px}
+.tb.sm{width:44px;height:44px;font-size:18px}
+#tbtns{position:fixed;right:14px;bottom:14px;display:grid;grid-template-columns:repeat(2,auto);gap:10px;align-items:end;justify-items:center}
+#tsys{position:fixed;right:200px;top:14px;display:flex;gap:8px}
+body.touch #prompt{left:auto;right:14px;bottom:182px;transform:none;flex-direction:column-reverse;align-items:flex-end}
+body.touch #prompt .pill{pointer-events:auto;touch-action:none;font-size:15px;padding:9px 14px;-webkit-tap-highlight-color:transparent}
+body.touch #prompt .pill.off,body.touch #prompt .pill.info{pointer-events:none}
+body.touch #prompt kbd{display:none}
+body.touch #prompt .pill:not(.off):not(.info){border-color:rgba(255,210,63,.55)}
+body.touch #forage,body.touch #befriend{bottom:auto;top:46%}
+.pill.off{opacity:.6}
+.touchonly{display:none}
+body.touch .touchonly{display:block}
+body.touch .keyonly{display:none}
+.btn:focus-visible,.breed:focus-visible,.coat:focus-visible,.tb:focus-visible{outline:3px solid var(--gold);outline-offset:2px}
+body.pad .btn:focus,body.pad .breed:focus,body.pad .coat:focus{outline:3px solid var(--gold);outline-offset:2px}
 .hidden{display:none!important}
-@media (max-width:700px){.overlay.sel{align-items:flex-end;background:linear-gradient(0deg,rgba(15,10,5,.75),rgba(15,10,5,.1) 60%,transparent)}.selcard{max-height:62%;padding:16px}.breed span{display:none}#mapwrap{display:none}#toasts{top:auto;bottom:110px}#stats{min-width:170px}}
+@media (max-height:540px){.card{padding:16px 22px}.card h1{font-size:34px}.card h1 small{font-size:14px;margin-top:4px}#title .intro{display:none}.tlist{margin:8px 0}}
+/* touch on a phone: no minimap (the map button opens the big one), smaller stats, the score out of the buttons' way */
+@media (max-width:700px),(max-height:540px){body.touch #mapwrap:not(.big){display:none}#tsys{right:14px}body.touch #stats{transform:scale(.8);transform-origin:top left}body.touch #mult{display:none}}
+@media (max-height:540px){body.touch #toasts{top:96px;right:auto;left:50%;transform:translateX(-50%);align-items:center;width:min(360px,46vw)}}
+@media (max-width:700px){#tsys{flex-direction:column}body.touch #top{left:auto;right:66px;transform:none;text-align:right}body.touch #score{font-size:26px}body.touch #clock{font-size:11px;max-width:150px;white-space:normal}
+  body.touch #toasts{top:190px;right:66px;bottom:auto;width:auto;max-width:calc(100% - 80px)}}
+@media (max-width:700px){#mapwrap.big{display:block!important}.overlay.sel{align-items:flex-end;background:linear-gradient(0deg,rgba(15,10,5,.75),rgba(15,10,5,.1) 60%,transparent)}.selcard{max-height:62%;padding:16px}.breed span{display:none}#mapwrap{display:none}#toasts{top:auto;bottom:110px}#stats{min-width:170px}}
 </style>
 </head>
 <body>
@@ -158,12 +190,18 @@ kbd{display:inline-block;min-width:20px;text-align:center;padding:0 5px;margin-r
 <div id="toasts" class="hud"></div>
 <div id="callout" class="hud"><div class="r"></div><div class="i"></div><div class="p"></div></div>
 <div id="help" class="hud hidden"><kbd>WASD</kbd>move <kbd>⇧</kbd>scurry <kbd>␣</kbd>popcorn <kbd>E</kbd>eat/enter <kbd>F</kbd>forage <kbd>R</kbd>sniff <kbd>Q</kbd>wheek <kbd>C</kbd>befriend <kbd>M</kbd>map <kbd>J</kbd>journal <kbd>P</kbd>pause · drag to look</div>
+<div id="touchui" class="hud hidden">
+  <div id="joyring"><i></i></div>
+  <div id="tbtns"><button class="tb" data-k="KeyQ">📣<small>Wheek</small></button><button class="tb" data-k="KeyR">👃<small>Sniff</small></button><button class="tb big" data-k="Space">⤴<small>Hop</small></button><button class="tb big" data-k="ShiftLeft">🏃<small>Scurry</small></button></div>
+  <div id="tsys"><button class="tb sm" data-k="KeyM" title="Map">🗺</button><button class="tb sm" data-k="KeyJ" title="Journal">📖</button><button class="tb sm" data-k="KeyP" title="Pause">⏸</button></div>
+</div>
 
 <div id="title" class="overlay">
   <div class="card">
     <h1>Wheek!<small>A guinea pig survival forage in the big green woods</small></h1>
-    <p>You are one small, brave guinea pig. Munch grass, forage the forest for rare treats, find the hidden burrows, explore the warren beneath the woods, wander out to the farm, the town, the beach and the snowy peaks, and charm the humans for pets. Keep your tummy full and your vitamin C up. Watch the sky for hawks, and don't linger in the woods after dark. Guinea pigs are happiest in a herd, so befriend the other piggies you meet and bring them along.</p>
-    <div class="keys">
+    <p class="intro">You are one small, brave guinea pig. Munch grass, forage the forest for rare treats, find the hidden burrows, explore the warren beneath the woods, wander out to the farm, the town, the beach and the snowy peaks, and charm the humans for pets. Keep your tummy full and your vitamin C up. Watch the sky for hawks, and don't linger in the woods after dark. Guinea pigs are happiest in a herd, so befriend the other piggies you meet and bring them along.</p>
+    <p class="touchonly">👆 Slide a thumb on the left of the screen to scurry, drag on the right to look (pinch to zoom). When there's something to do, a button pops up on the right: tap it, or hold it to munch, forage and chat.</p>
+    <div class="keys keyonly">
       <div><kbd>W</kbd><kbd>A</kbd><kbd>S</kbd><kbd>D</kbd> scurry around</div>
       <div><kbd>Shift</kbd> sprint (costs energy)</div>
       <div><kbd>E</kbd> eat · enter tunnels</div>
