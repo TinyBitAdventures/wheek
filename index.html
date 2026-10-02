@@ -159,6 +159,17 @@ body.touch .touchonly{display:block}
 body.touch .keyonly{display:none}
 .btn:focus-visible,.breed:focus-visible,.coat:focus-visible,.tb:focus-visible{outline:3px solid var(--gold);outline-offset:2px}
 body.pad .btn:focus,body.pad .breed:focus,body.pad .coat:focus{outline:3px solid var(--gold);outline-offset:2px}
+/* settings */
+.setcard{max-width:460px}
+.srow{display:grid;grid-template-columns:150px 1fr;align-items:center;gap:10px;margin:12px 0;font-size:15px}
+.srow input[type=range]{width:100%;accent-color:var(--gold);pointer-events:auto}
+.seg{display:flex;gap:6px;flex-wrap:wrap}
+.seg button{pointer-events:auto;cursor:pointer;font-family:inherit;font-size:14px;color:var(--ink);background:rgba(0,0,0,.3);border:2px solid var(--edge);border-radius:10px;padding:6px 12px}
+.seg button.on{border-color:var(--gold);background:rgba(255,210,63,.15)}
+.snote{font-size:12px;margin:14px 0 4px}
+#title .card{position:relative}
+#setBtn{position:absolute;top:16px;right:16px;font-size:14px;padding:7px 12px;margin:0}
+@media (max-width:480px){.srow{grid-template-columns:1fr;gap:4px}}
 .hidden{display:none!important}
 @media (max-height:540px){.card{padding:16px 22px}.card h1{font-size:34px}.card h1 small{font-size:14px;margin-top:4px}#title .intro{display:none}.tlist{margin:8px 0}}
 /* touch on a phone: no minimap (the map button opens the big one), smaller stats, the score out of the buttons' way */
@@ -225,6 +236,7 @@ body.pad .btn:focus,body.pad .breed:focus,body.pad .coat:focus{outline:3px solid
     </div>
     <button class="btn" id="startBtn" disabled>Loading…</button>
     <div id="slots" class="tlist hidden"></div>
+    <button class="btn alt" id="setBtn">⚙️ Settings</button>
     <div id="loading"></div>
     <div id="ver"></div>
   </div>
@@ -239,8 +251,18 @@ body.pad .btn:focus,body.pad .breed:focus,body.pad .coat:focus{outline:3px solid
   <div class="perk" id="perk"></div>
   <button class="btn" id="goBtn">Start scurrying</button>
 </div></div>
-<div id="pause" class="overlay hidden"><div class="card" style="text-align:center"><h2>Paused</h2><p>Your guinea pig is having a little think.</p><div class="tlist" style="max-width:320px;margin:14px auto 0"><button class="btn" id="resumeBtn">Resume</button><button class="btn alt" id="saveBtn">💾 Save</button><button class="btn alt" id="quitBtn">🏠 Save &amp; quit to menu</button></div></div></div>
+<div id="pause" class="overlay hidden"><div class="card" style="text-align:center"><h2>Paused</h2><p>Your guinea pig is having a little think.</p><div class="tlist" style="max-width:320px;margin:14px auto 0"><button class="btn" id="resumeBtn">Resume</button><button class="btn alt" id="saveBtn">💾 Save</button><button class="btn alt" id="setBtn2">⚙️ Settings</button><button class="btn alt" id="quitBtn">🏠 Save &amp; quit to menu</button></div></div></div>
 <div id="journal" class="overlay hidden"><div class="card"><h2>🌿 Forager's Journal</h2><p id="jsub"></p><div class="jgrid" id="jgrid"></div><div id="jherd"></div><div id="jplaces"></div><div id="jgoals"></div><div id="jwarren"></div><div style="text-align:center;margin-top:16px"><button class="btn" id="jclose">Close</button></div></div></div>
+<div id="settings" class="overlay hidden"><div class="card setcard"><h2>⚙️ Settings</h2>
+  <div class="srow"><label for="s-master">🔊 Volume</label><input type="range" id="s-master" min="0" max="1" step="0.05"></div>
+  <div class="srow"><label for="s-music">🎵 Music</label><input type="range" id="s-music" min="0" max="1" step="0.05"></div>
+  <div class="srow"><label for="s-sfx">🐹 Sound effects</label><input type="range" id="s-sfx" min="0" max="1" step="0.05"></div>
+  <div class="srow"><span>🖥 Graphics</span><div class="seg" data-k="quality"><button data-v="high">High</button><button data-v="low">Low (faster)</button></div></div>
+  <div class="srow"><span>⚡ Screen flashes</span><div class="seg" data-k="flashes"><button data-v="1">On</button><button data-v="0">Off</button></div></div>
+  <div class="srow"><span>👆 Touch controls</span><div class="seg" data-k="touch"><button data-v="auto">Auto</button><button data-v="on">Always</button><button data-v="off">Never</button></div></div>
+  <p class="snote">Low graphics turns off shadows, thins the fur and draws less of the world far away: try it if the game runs slowly. Settings are saved in this browser.</p>
+  <div style="text-align:center"><button class="btn" id="setClose">Done</button></div>
+</div></div>
 <div id="tunnelMenu" class="overlay hidden"><div class="card"><h2 id="tmTitle">🕳 Tunnel</h2><p>The burrow is warm and smells of earth. Where to?</p><div class="tlist" id="tmList"></div></div></div>
 <div id="over" class="overlay hidden"><div class="card" style="text-align:center"><h2 id="overTitle">Your adventure is over</h2><p id="overWhy"></p><div id="overStats" style="font-size:16px;line-height:1.8;margin:10px 0"></div><div class="tlist" style="max-width:320px;margin:14px auto 0"><button class="btn hidden" id="retryBtn">↺ Back to your last save</button><button class="btn alt" id="againBtn">🏠 Main menu</button></div></div></div>
 

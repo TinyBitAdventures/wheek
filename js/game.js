@@ -22,6 +22,8 @@ function fbm(x,y,o=4){let s=0,a=.5,f=1;for(let i=0;i<o;i++){s+=a*vnoise(x*f,y*f)
 function pick(weights){let t=0;for(const k in weights)t+=weights[k];let r=rand()*t;for(const k in weights){r-=weights[k];if(r<=0)return k}return Object.keys(weights)[0]}
 const lsGet=(k,d)=>{try{const v=localStorage.getItem(k);return v==null?d:JSON.parse(v)}catch(e){return d}};
 const lsSet=(k,v)=>{try{localStorage.setItem(k,JSON.stringify(v))}catch(e){}};
+// settings, saved in this browser: volumes 0-1, graphics quality, screen flashes, whether to show the touch controls
+const SET={master:.8,music:.6,sfx:.8,quality:'high',flashes:true,touch:'auto',...lsGet('wheek-settings',{})};
 
 // ============================================================ renderer / scene
 const canvas=$('c');
@@ -297,14 +299,28 @@ let colliders=[],boxes=[];
 let trees=[],bushes=[],logs=[],tunnels=[],spots=[],patches=[],humans=[],pickSets=[],drops=[];   // the active zone's (see useZone)
 
 // ============================================================ audio (synth)
-let AC=null,master=null,ambGain=null;
-function audioInit(){if(AC)return;AC=new (window.AudioContext||window.webkitAudioContext)();master=AC.createGain();master.gain.value=.55;master.connect(AC.destination);
+let AC=null,master=null,ambGain=null,out=null,musicGain=null;   // master is the sound effects' bus; out is the overall volume
+function audioInit(){if(AC)return;AC=new (window.AudioContext||window.webkitAudioContext)();out=AC.createGain();out.connect(AC.destination);master=AC.createGain();master.connect(out);
+  musicGain=AC.createGain();musicGain.connect(out);applyAudio();loadMusic();
   // wind bed
   const nb=noiseBuf(4);const src=AC.createBufferSource();src.buffer=nb;src.loop=true;const lp=AC.createBiquadFilter();lp.type='lowpass';lp.frequency.value=420;ambGain=AC.createGain();ambGain.gain.value=.05;src.connect(lp).connect(ambGain).connect(master);src.start()}
 let _nb=null;function noiseBuf(sec=1){if(_nb&&sec===1)return _nb;const b=AC.createBuffer(1,AC.sampleRate*sec,AC.sampleRate);const d=b.getChannelData(0);for(let i=0;i<d.length;i++)d[i]=Math.random()*2-1;if(sec===1)_nb=b;return b}
 function env(g,t,a,peak,d){g.gain.setValueAtTime(0.0001,t);g.gain.exponentialRampToValueAtTime(peak,t+a);g.gain.exponentialRampToValueAtTime(0.0001,t+a+d)}
 function tone(type,f0,f1,dur,vol,t0=0,filt){if(!AC)return;const t=AC.currentTime+t0;const o=AC.createOscillator();o.type=type;o.frequency.setValueAtTime(f0,t);o.frequency.exponentialRampToValueAtTime(Math.max(20,f1),t+dur);const g=AC.createGain();env(g,t,.012,vol,dur);let n=o;if(filt){const f=AC.createBiquadFilter();f.type=filt[0];f.frequency.value=filt[1];f.Q.value=filt[2]||1;o.connect(f);n=f}n.connect(g).connect(master);o.start(t);o.stop(t+dur+.05);return o}
 function noise(dur,vol,type,freq,q=1,t0=0){if(!AC)return;const t=AC.currentTime+t0;const s=AC.createBufferSource();s.buffer=noiseBuf();const f=AC.createBiquadFilter();f.type=type;f.frequency.value=freq;f.Q.value=q;const g=AC.createGain();env(g,t,.005,vol,dur);s.connect(f).connect(g).connect(master);s.start(t,Math.random()*.5);s.stop(t+dur+.05)}
+function applyAudio(){if(!AC)return;out.gain.value=SET.master;master.gain.value=.55*SET.sfx;musicGain.gain.value=MUSIC_LEVEL*SET.music}
+// ---- music: three seamless loops made with Wavelength (assets/music), cross-faded by where you are and the time of day.
+// len is each loop's exact length. A browser that keeps the MP3's encoder delay at the start gets loopStart past it.
+const MUSIC={meadow:{len:32*4*60/100},moonlight:{len:24*4*60/72},warren:{len:32*4*60/88}},MUSIC_LEVEL=.7;let musicNow=null,musicT=0;
+async function loadMusic(){for(const k in MUSIC){try{const r=await fetch(`assets/music/${k}.mp3?v=${VERSION}`);const buf=await AC.decodeAudioData(await r.arrayBuffer());MUSIC[k].start=musicStart(buf,MUSIC[k].len);MUSIC[k].buf=buf}catch(e){console.warn('music',k,e)}}}
+function musicStart(buf,len){const extra=buf.duration-len;if(extra<.002)return 0;const d=buf.getChannelData(0),n=Math.min(d.length,Math.ceil(extra*buf.sampleRate));let i=0;while(i<n&&Math.abs(d[i])<1e-4)i++;return i/buf.sampleRate}
+function updateMusic(dt){if(!musicGain)return;musicT-=dt;if(musicT>0)return;musicT=.5;
+  const want=!G.started?'meadow':G.under?'warren':isNight()?'moonlight':'meadow',m=MUSIC[want];if(musicNow&&musicNow.k===want||!m.buf)return;
+  const t=AC.currentTime;if(musicNow){const o=musicNow;o.g.gain.cancelScheduledValues(t);o.g.gain.setValueAtTime(o.g.gain.value,t);o.g.gain.linearRampToValueAtTime(0,t+3);o.src.stop(t+3.1)}
+  const src=AC.createBufferSource(),g=AC.createGain();src.buffer=m.buf;src.loop=true;src.loopStart=m.start;src.loopEnd=m.start+m.len;
+  g.gain.setValueAtTime(0,t);g.gain.linearRampToValueAtTime(1,t+(musicNow?3:1.5));src.connect(g).connect(musicGain);src.start(t,m.start);musicNow={k:want,src,g}}
+// a hidden tab goes quiet
+document.addEventListener('visibilitychange',()=>{if(!AC)return;if(document.hidden)AC.suspend();else AC.resume()});
 const SFX={
   wheek(){if(!AC)return;for(let k=0;k<2;k++){const t=AC.currentTime+k*.28;const o=AC.createOscillator();o.type='sawtooth';o.frequency.setValueAtTime(1100,t);o.frequency.exponentialRampToValueAtTime(2600,t+.16);o.frequency.exponentialRampToValueAtTime(2200,t+.24);const l=AC.createOscillator();l.frequency.value=38;const lg=AC.createGain();lg.gain.value=90;l.connect(lg).connect(o.frequency);const f=AC.createBiquadFilter();f.type='bandpass';f.frequency.value=2400;f.Q.value=1.4;const g=AC.createGain();env(g,t,.02,.35,.22);o.connect(f).connect(g).connect(master);o.start(t);l.start(t);o.stop(t+.3);l.stop(t+.3)}},
   chomp(){noise(.05,.25,'bandpass',1800,1.5);noise(.04,.18,'bandpass',1300,1.5,.09)},
@@ -1017,7 +1033,7 @@ function updateSnow(dt,t){const cx=camera.position.x,cz=camera.position.z,base=p
 function toast(html,cls='',dur=3.2){const d=document.createElement('div');d.className='toast '+cls;d.innerHTML=html;$('toasts').prepend(d);while($('toasts').children.length>6)$('toasts').lastChild.remove();setTimeout(()=>{d.classList.add('out');setTimeout(()=>d.remove(),450)},dur*1000)}
 let calloutT=0;
 function callout(rarity,name,pts){const [c,label]=RARITY[rarity];const el=$('callout');el.querySelector('.r').textContent=label;el.querySelector('.r').style.color=c;el.querySelector('.i').textContent=name;el.querySelector('.i').style.color=c;el.querySelector('.p').textContent=pts?(pts>0?'+':'')+pts+' pts':'';el.style.opacity=1;calloutT=rarity==='legendary'?3:2}
-function flash(color,op=.5){const f=$('flash');f.style.transition='none';f.style.background=color;f.style.opacity=op;requestAnimationFrame(()=>{f.style.transition='opacity .9s';f.style.opacity=0})}
+function flash(color,op=.5){if(!SET.flashes&&!color.startsWith('rgba(0,0,0'))return;const f=$('flash');f.style.transition='none';f.style.background=color;f.style.opacity=op;requestAnimationFrame(()=>{f.style.transition='opacity .9s';f.style.opacity=0})}
 const _v=new THREE.Vector3();
 function floaty(text,color='#fff',wpos=null){const p=wpos||pig.pos.clone().add(new THREE.Vector3(0,.25,0));_v.copy(p).project(camera);if(_v.z>1)return;const d=document.createElement('div');d.className='floaty';d.textContent=text;d.style.color=color;
   let x=(_v.x*.5+.5)*innerWidth,y=(-_v.y*.5+.5)*innerHeight;d.style.left=x+'px';d.style.top=y+'px';document.body.appendChild(d);const t0=performance.now();x+=R(-20,20);
@@ -1430,7 +1446,7 @@ function updateWarren(dt,t){
     f.pos.x+=f.vel.x*dt;f.pos.z+=f.vel.z*dt;const dx=f.pos.x-pig.pos.x,dz=f.pos.z-pig.pos.z,d=Math.hypot(dx,dz);if(d<.2&&d>1e-4){f.pos.x+=dx/d*(.2-d);f.pos.z+=dz/d*(.2-d)}
     for(const o of herd){if(o===f)continue;const ox=f.pos.x-o.pos.x,oz=f.pos.z-o.pos.z,od=Math.hypot(ox,oz);if(od<.18&&od>1e-4){f.pos.x+=ox/od*(.18-od)*.5;f.pos.z+=oz/od*(.18-od)*.5}}
     warrenCollide(f.pos,.09);f.pos.y=0;const moving=Math.hypot(f.vel.x,f.vel.z)>.1;
-    f.obj.position.set(f.pos.x,moving?Math.abs(Math.sin(f.phase))*.008:0,f.pos.z);f.obj.rotation.set(0,f.heading,0,'YXZ');for(const s of f.fur)s.visible=true;animatePigLegs(dt,Math.hypot(f.vel.x,f.vel.z),moving,f)});
+    f.obj.position.set(f.pos.x,moving?Math.abs(Math.sin(f.phase))*.008:0,f.pos.z);f.obj.rotation.set(0,f.heading,0,'YXZ');f.fur.forEach((s,i)=>s.visible=i%FUR_STEP()===0);animatePigLegs(dt,Math.hypot(f.vel.x,f.vel.z),moving,f)});
   for(const f of W.foods)if(!f.alive){f.respawn-=dt;if(f.respawn<=0&&Math.hypot(f.x-pig.pos.x,f.z-pig.pos.z)>3){f.alive=true;f.obj.visible=true}}
   for(const c of W.curios)if(!c.got){c.obj.position.y=c.y+Math.sin(t*2+c.x)*.012;c.mesh.rotation.y+=dt*1.2}
   // daylight (or moonlight) down the shafts follows the sky above
@@ -1566,7 +1582,7 @@ function updateFoxes(dt,t){
 }
 
 function damage(n,cause){G.hp=Math.max(0,G.hp-n);G.cause=cause;hurtFx();SFX.hurt();toast(`💥 Ouch! −${n} ❤️`,'bad')}
-function hurtFx(){const h=$('hurt');h.style.transition='none';h.style.opacity=1;requestAnimationFrame(()=>{h.style.transition='opacity 1.2s';h.style.opacity=0})}
+function hurtFx(){const h=$('hurt');h.style.transition='none';h.style.opacity=SET.flashes?1:.35;requestAnimationFrame(()=>{h.style.transition='opacity 1.2s';h.style.opacity=0})}
 
 
 // ============================================================ other guinea pigs (herd)
@@ -1685,7 +1701,7 @@ function updateFriends(dt,t){
     if(f.air||f.vy>0){f.vy-=9.8*dt;f.pos.y+=f.vy*dt;f.popSpin+=dt*14;if(f.pos.y<=gy){f.pos.y=gy;f.vy=0;f.air=false;f.popSpin=0}}else f.pos.y=gy;
     // visibility & pose
     const vis=d<48||f.state==='herd';f.obj.visible=vis;f.blob.visible=vis&&!G.inTunnel;if(!vis){f.tag.style.display='none';continue}
-    const showFur=d<24;for(const s of f.fur)s.visible=showFur;
+    const showFur=d<24;f.fur.forEach((s,i)=>s.visible=showFur&&i%FUR_STEP()===0);
     const moving=Math.hypot(f.vel.x,f.vel.z)>.1;const o=f.obj;
     const hf=heightAt(f.pos.x+Math.sin(f.heading)*.12,f.pos.z+Math.cos(f.heading)*.12),hb=heightAt(f.pos.x-Math.sin(f.heading)*.12,f.pos.z-Math.cos(f.heading)*.12);
     const bob=moving&&!f.air?Math.abs(Math.sin(f.phase))*.008:Math.sin(t*2.2+f.seed)*.0015;
@@ -2048,14 +2064,14 @@ function press(code,repeat=false){
   if(code==='KeyQ')wheek();
 }
 function release(code){keys[code]=false}
-addEventListener('keydown',e=>{if(e.target&&e.target.tagName==='INPUT'&&e.target.type!=='range')return;if(G.started&&e.code==='Space')e.preventDefault();if(G.started)setInput('kb');press(e.code,e.repeat)});
+addEventListener('keydown',e=>{if(e.target&&e.target.tagName==='INPUT'&&e.target.type!=='range')return;if(e.code==='Escape'&&!$('settings').classList.contains('hidden')){closeSettings();return}if(G.started&&e.code==='Space')e.preventDefault();if(G.started)setInput('kb');press(e.code,e.repeat)});
 addEventListener('keyup',e=>release(e.code));
 // which buttons the prompts show: the keyboard's, a gamepad's, or none (on touch the prompts are buttons themselves)
 const PAD_GLYPH={E:'Ⓐ',F:'Ⓧ',C:'Ⓨ',Q:'LB',R:'RB','␣':'Ⓑ'};
 function keyLabel(k){return G.input==='pad'?PAD_GLYPH[k]||k:k}
 // a key in a tip: <kbd>E</kbd> on a keyboard, Ⓐ on a gamepad; on touch, what the button that pops up is called
 function kb(k,touch){return G.input==='touch'?touch:`<kbd>${keyLabel(k)}</kbd>`}
-function setInput(m){if(G.input===m)return;G.input=m;document.body.classList.toggle('touch',m==='touch');document.body.classList.toggle('pad',m==='pad');renderHelp();G.promptHTML=''}
+function setInput(m,force){if(G.input===m&&!force)return;G.input=m;document.body.classList.toggle('touch',SET.touch==='on'||SET.touch!=='off'&&m==='touch');document.body.classList.toggle('pad',m==='pad');renderHelp();G.promptHTML=''}
 function renderHelp(){$('help').innerHTML=G.input==='pad'?'<kbd>L</kbd>move <kbd>R</kbd>look <kbd>RT</kbd>scurry <kbd>Ⓑ</kbd>popcorn <kbd>Ⓐ</kbd>eat/enter <kbd>Ⓧ</kbd>forage <kbd>Ⓨ</kbd>befriend <kbd>RB</kbd>sniff <kbd>LB</kbd>wheek <kbd>⧉</kbd>map <kbd>▲</kbd>journal <kbd>☰</kbd>pause'
   :'<kbd>WASD</kbd>move <kbd>⇧</kbd>scurry <kbd>␣</kbd>popcorn <kbd>E</kbd>eat/enter <kbd>F</kbd>forage <kbd>R</kbd>sniff <kbd>Q</kbd>wheek <kbd>C</kbd>befriend <kbd>M</kbd>map <kbd>J</kbd>journal <kbd>P</kbd>pause · drag to look'}
 
@@ -2071,6 +2087,17 @@ $('prompt').addEventListener('pointerdown',e=>{const el=e.target.closest('.pill'
   if(a.do&&!a.hold){a.do();return}touchPress(e,'Key'+a.k)});
 addEventListener('blur',()=>{for(const k in keys)keys[k]=false;if(G.started&&!G.over&&!G.modal)togglePause(true)});
 function togglePause(force){if(G.over)return;G.paused=force??!G.paused;$('pause').classList.toggle('hidden',!G.paused)}
+// ---- settings: from the title screen and the pause menu
+const FUR_STEP=()=>SET.quality==='low'?2:1;
+function applyQuality(){const low=SET.quality==='low';renderer.setPixelRatio(low?1:Math.min(devicePixelRatio,1.75));renderer.setSize(innerWidth,innerHeight);sun.castShadow=!low;
+  (pig.fur||[]).forEach((s,i)=>s.visible=i%FUR_STEP()===0)}
+function openSettings(){renderSettings();$('settings').classList.remove('hidden')}
+function closeSettings(){$('settings').classList.add('hidden');lsSet('wheek-settings',SET)}
+function renderSettings(){for(const k of ['master','music','sfx'])$('s-'+k).value=SET[k];
+  document.querySelectorAll('#settings .seg').forEach(sg=>{const v=SET[sg.dataset.k];sg.querySelectorAll('button').forEach(b=>b.classList.toggle('on',String(v===true?1:v===false?0:v)===b.dataset.v))})}
+for(const k of ['master','music','sfx'])$('s-'+k).addEventListener('input',e=>{SET[k]=+e.target.value;applyAudio();lsSet('wheek-settings',SET)});
+document.querySelectorAll('#settings .seg button').forEach(b=>b.addEventListener('click',()=>{const k=b.parentElement.dataset.k;SET[k]=k==='flashes'?b.dataset.v==='1':b.dataset.v;
+  if(k==='quality')applyQuality();if(k==='touch')setInput(G.input||'kb',true);renderSettings();lsSet('wheek-settings',SET)}));
 const looks=new Map();   // touch pointers looking around (two of them pinch to zoom)
 canvas.addEventListener('pointerdown',e=>{if(e.pointerType==='touch'){setInput('touch');if(e.clientX<innerWidth*.4&&!joy.active){joy.start(e);return}looks.set(e.pointerId,{x:e.clientX,y:e.clientY});if(looks.size===2){const [a,b]=[...looks.values()];G.pinch=Math.hypot(a.x-b.x,a.y-b.y)}}
   G.drag=true;G.dragId=e.pointerId;canvas.classList.add('drag');canvas.setPointerCapture(e.pointerId)});
@@ -2089,7 +2116,7 @@ const joy={active:false,id:null,x:0,y:0,ox:0,oy:0,
 // ---- gamepad: left stick moves, right stick looks, buttons as in renderHelp; in menus the d-pad or stick moves between buttons, Ⓐ picks, Ⓑ goes back
 const PADMAP={0:'KeyE',2:'KeyF',3:'KeyC',1:'Space',5:'KeyR',4:'KeyQ',7:'ShiftLeft',6:'ShiftLeft',9:'KeyP',8:'KeyM',12:'KeyJ'};
 const pad={x:0,y:0,on:false,prev:[],menu:false,navT:0};
-function topOverlay(){for(const id of ['over','journal','tunnelMenu','pause','select','title']){const el=$(id);if(el&&!el.classList.contains('hidden'))return el}return null}
+function topOverlay(){for(const id of ['settings','over','journal','tunnelMenu','pause','select','title']){const el=$(id);if(el&&!el.classList.contains('hidden'))return el}return null}
 function padTargets(ov){return [...ov.querySelectorAll('button,input[type=range]')].filter(el=>!el.disabled&&el.offsetParent!==null&&!el.closest('.hidden'))}
 function pollPad(dt){const gp=[...(navigator.getGamepads?navigator.getGamepads():[])].find(g=>g&&g.connected);if(!gp){pad.on=false;return}
   const b=gp.buttons.map(x=>x.pressed||x.value>.5),dz=v=>Math.abs(v)<.2?0:v,lx=dz(gp.axes[0]||0),ly=dz(gp.axes[1]||0),rx=dz(gp.axes[2]||0),ry=dz(gp.axes[3]||0),edge=i=>b[i]&&!pad.prev[i];
@@ -2101,7 +2128,7 @@ function pollPad(dt){const gp=[...(navigator.getGamepads?navigator.getGamepads()
     if(dir&&list.length){pad.navT=.25;const el=document.activeElement;if(el&&el.type==='range'&&(edge(14)||edge(15))){el.value=+el.value+(edge(15)?1:-1)*(+el.step||.05);el.dispatchEvent(new Event('input'))}
       else{i=i<0?0:(i+dir+list.length)%list.length;list[i].focus();list[i].scrollIntoView({block:'nearest'})}}
     if(edge(0)){const el=i>=0?list[i]:list[0];if(el&&el.type!=='range')el.click()}
-    if(edge(1)||edge(9)&&ov.id==='pause'){if(ov.id==='journal')closeJournal();else if(ov.id==='tunnelMenu')closeTunnel();else if(ov.id==='pause')togglePause(false)}
+    if(edge(1)||edge(9)&&ov.id==='pause'){if(ov.id==='settings')closeSettings();else if(ov.id==='journal')closeJournal();else if(ov.id==='tunnelMenu')closeTunnel();else if(ov.id==='pause')togglePause(false)}
   }else if(G.started){pad.menu=false;pad.x=lx;pad.y=ly;pad.on=!!(lx||ly);
     if(rx||ry){G.camYaw-=rx*dt*2.6;G.camPitch=clamp(G.camPitch+ry*dt*1.6,-.05,1.2);G.lastDrag=performance.now()}
     for(const [k,code] of Object.entries(PADMAP)){if(edge(k))press(code);else if(!b[k]&&pad.prev[k]&&!(code==='ShiftLeft'&&(b[6]||b[7])))release(code)}}
@@ -2126,7 +2153,7 @@ function openSelect(){G.selecting=true;G.camDist=.62;G.camPitch=.2;$('pigName').
 const clock=new THREE.Clock();let frame=0;
 function loop(){
   requestAnimationFrame(loop);
-  const dt=Math.min(clock.getDelta(),.05);const t=clock.elapsedTime;U.time.value=t;pollPad(dt);
+  const dt=Math.min(clock.getDelta(),.05);const t=clock.elapsedTime;U.time.value=t;pollPad(dt);updateMusic(dt);
   if(G.started&&!G.paused&&!G.over&&!G.modal){
     if(G.inTunnel&&travel){updateTravel(dt);updateParticles(dt);renderer.render(tScene,tCam);return}
     if(G.under){updateWarren(dt,t);updateSurvival(dt);updateHawk(dt,t);updateFoxes(dt,t);updateDay(dt)}else{
@@ -2141,7 +2168,7 @@ function loop(){
   // fireflies
   if(ffMat.opacity>0){for(let i=0;i<ffN;i++){const f=ffData[i];let x=pig.pos.x+f.x+Math.sin(t*.3+f.p)*1.5,z=pig.pos.z+f.z+Math.cos(t*.25+f.p)*1.5;ffPos[i*3]=x;ffPos[i*3+2]=z;ffPos[i*3+1]=heightAt(x,z)+f.y+Math.sin(t*.8+f.p)*.3}ffGeo.attributes.position.needsUpdate=true;ffMat.size=.1+Math.sin(t*4)*.03}
   // chunk culling
-  if((frame++&7)===0){const cx=camera.position.x,cz=camera.position.z;for(const b of CHUNKS){const v=Math.hypot(b.cx-cx,b.cz-cz)<b.view;for(const m of b.meshes)m.visible=v}}
+  if((frame++&7)===0){const cx=camera.position.x,cz=camera.position.z,k=SET.quality==='low'?.65:1;for(const b of CHUNKS){const v=Math.hypot(b.cx-cx,b.cz-cz)<b.view*k;for(const m of b.meshes)m.visible=v}}
   if(G.started)updateHUD(dt);
   renderer.render(G.under?wScene:scene,camera);
 }
@@ -2166,7 +2193,8 @@ function loop(){
   // "Back to your last save" after a game over reloads the page and lands here
   {let r=null;try{r=sessionStorage.getItem('wheek-continue');sessionStorage.removeItem('wheek-continue')}catch(e){}if(r&&lsGet(slotKey(+r),null))continueGame(+r)}
   $('dice').onclick=()=>{let n;do{n=PIG_NAMES[Math.floor(Math.random()*PIG_NAMES.length)]}while(n===$('pigName').value);$('pigName').value=n};
+  $('setBtn').onclick=openSettings;$('setBtn2').onclick=openSettings;$('setClose').onclick=closeSettings;applyQuality();
   $('resumeBtn').onclick=()=>togglePause(false);$('saveBtn').onclick=()=>saveGame();$('quitBtn').onclick=()=>{saveGame(true);location.reload()};$('jclose').onclick=closeJournal;$('againBtn').onclick=()=>location.reload();
   $('retryBtn').onclick=()=>{try{sessionStorage.setItem('wheek-continue',G.slot)}catch(e){}location.reload()};
-  window.__game={G,W,WS,ZONE,PARK,EDGE,ITEMS,revealItem,setInput,wSdf,neighbour,freeAt,Z:()=>Z,visit:(id,x=0,z=0,h=0)=>arriveZone(ZONE[id],0,{x,z,h}),enterWarren,exitWarren,pig,friends,herd,joinHerd,keys,applyLook,humans,tunnels,spots,hawk,foxes,heightAt,renderer,scene,camera};
+  window.__game={G,W,WS,ZONE,PARK,EDGE,ITEMS,revealItem,setInput,SET,sun,music:()=>({now:musicNow&&musicNow.k,gain:musicGain&&musicGain.gain.value,tracks:Object.fromEntries(Object.entries(MUSIC).map(([k,m])=>[k,m.buf?{dur:+m.buf.duration.toFixed(4),start:m.start,len:m.len}:null]))}),wSdf,neighbour,freeAt,Z:()=>Z,visit:(id,x=0,z=0,h=0)=>arriveZone(ZONE[id],0,{x,z,h}),enterWarren,exitWarren,pig,friends,herd,joinHerd,keys,applyLook,humans,tunnels,spots,hawk,foxes,heightAt,renderer,scene,camera};
 })().catch(e=>{console.error(e);$('loading').textContent='Failed to load: '+e.message});

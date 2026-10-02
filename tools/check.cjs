@@ -1,6 +1,6 @@
 // World checks: loads the game in a tiny headless window and tests the world's logic through window.__game.
 // Usage: PW=/path/to/node_modules/playwright node tools/check.cjs [check ...]
-//   checks: reach warren night chaos eat treats goals saves touch pad memory (default: all). URL defaults to the local dev site.
+//   checks: reach warren night chaos eat treats goals music saves touch pad memory (default: all). URL defaults to the local dev site.
 // Prints a report and exits 1 if anything failed.
 const { chromium } = require(process.env.PW || 'playwright');
 const URL = process.env.URL || 'https://wheek.localhost/';
@@ -25,7 +25,7 @@ function near(R,seen,x,z,rad){const {N,res,O,cx}=R;for(let j=Math.max(0,Math.flo
 const frames = (page, n) => page.evaluate(n => new Promise(r => { let k = 0; (function f() { if (++k >= n) r(); else requestAnimationFrame(f) })() }), n);
 
 (async () => {
-  const browser = await chromium.launch({ args: ['--use-angle=swiftshader', '--enable-unsafe-swiftshader', '--ignore-gpu-blocklist', '--enable-precise-memory-info'] });
+  const browser = await chromium.launch({ args: ['--use-angle=swiftshader', '--enable-unsafe-swiftshader', '--ignore-gpu-blocklist', '--enable-precise-memory-info', '--autoplay-policy=no-user-gesture-required'] });
   const page = await browser.newPage({ viewport: { width: 200, height: 130 }, ignoreHTTPSErrors: true });
   const errors = [];
   page.on('console', m => { if (m.type() === 'error') errors.push(m.text().slice(0, 300)); });
@@ -146,16 +146,41 @@ const frames = (page, n) => page.evaluate(n => new Promise(r => { let k = 0; (fu
 
   // 5c. goals and requests: a goal completes and pays out, Farmer Gus gets his brass key back
   if (pick('goals')) {
-    const g1 = await page.evaluate(async () => { const g = window.__game, G = g.G; g.visit('park', 0, 0, 0); G.time = 11; const before = G.score, line = document.getElementById('goalline').textContent;
-      G.forages = Math.max(G.forages, 1); const t0 = performance.now(); while (!G.goals.forage && performance.now() - t0 < 60000) await new Promise(r => setTimeout(r, 100));
+    const g1 = await page.evaluate(async () => { const g = window.__game, G = g.G; g.visit('park', 0, 0, 0); G.time = 11; const line = document.getElementById('goalline').textContent;
+      // earlier checks may have foraged already: take the goal back first
+      delete G.goals.forage; const before = G.score; G.forages = Math.max(G.forages, 1); const t0 = performance.now(); while (!G.goals.forage && performance.now() - t0 < 60000) await new Promise(r => setTimeout(r, 100));
       return { line, done: !!G.goals.forage, paid: G.score - before, next: document.getElementById('goalline').textContent } });
-    report('goal completes', g1.line.includes('First Forage') && g1.done && g1.paid >= 25 && !g1.next.includes('First Forage'), `"${g1.line}" → done ${g1.done}, +${g1.paid}, then "${g1.next}"`);
+    report('goal completes', g1.line.startsWith('🎯 Next') && g1.done && g1.paid >= 25 && !g1.next.includes('First Forage'), `"${g1.line}" → done ${g1.done}, +${g1.paid}, then "${g1.next}"`);
     await page.evaluate(() => { const g = window.__game, G = g.G; G.time = 11; g.visit('farm', 0, 0, 0); G.curios.key = true; const h = g.Z().humans.find(h => h.name === 'Farmer Gus'); window.__gus = h; window.__drops = g.Z().drops.length; window.__heard = G.heard.key });
     const heard = await page.waitForFunction(() => { const g = window.__game, h = window.__gus, a = h.obj.rotation.y; g.pig.pos.set(h.obj.position.x + Math.sin(a) * .9, 0, h.obj.position.z + Math.cos(a) * .9); g.pig.pos.y = g.heightAt(g.pig.pos.x, g.pig.pos.z);
       return (g.G.acts || []).some(x => x.label.startsWith('Give')) }, null, { timeout: 60000, polling: 250 }).then(() => true, () => false);
     await page.keyboard.press('KeyE'); await frames(page, 4);
     const gave = await page.evaluate(() => { const g = window.__game; return { given: g.G.given.key, drops: g.Z().drops.length - window.__drops, toast: document.getElementById('toasts').textContent.includes('My key') } });
     report('request: Farmer Gus and the brass key', heard && gave.given === 'Farmer Gus' && gave.drops === 2 && gave.toast, `offered ${heard} · given to ${gave.given} · ${gave.drops} gifts · thanks ${gave.toast}`);
+  }
+
+  // 5d. music and settings: the three loops decode, the music follows day, night and the warren; settings apply and stick
+  if (pick('music')) {
+    const loaded = await page.waitForFunction(() => { const m = window.__game.music(); return Object.values(m.tracks).every(Boolean) && m }, null, { timeout: 120000, polling: 500 }).then(h => h.jsonValue(), () => null);
+    const okLoops = loaded && Object.values(loaded.tracks).every(t => t.start >= 0 && t.start + t.len <= t.dur + .001 && t.dur - t.len < .1);
+    report('music loads', !!okLoops, loaded ? Object.entries(loaded.tracks).map(([k, t]) => `${k} ${t.dur}s (loop ${t.len.toFixed(2)}s from ${t.start.toFixed(4)})`).join(' · ') : 'never loaded');
+    const follow = [];
+    for (const [setup, want] of [['g.G.time=11', 'meadow'], ['g.G.time=22', 'moonlight'], ['g.enterWarren(g.PARK.tunnels[0],true)', 'warren'], ['g.exitWarren(g.PARK.tunnels[0].node);g.G.time=11', 'meadow']]) {
+      await page.evaluate(`(()=>{const g=window.__game;g.visit('park',0,0,0);${setup}})()`);
+      follow.push(await page.waitForFunction(w => window.__game.music().now === w, want, { timeout: 30000, polling: 200 }).then(() => want, () => want + '✗'));
+    }
+    report('music follows the day, night and warren', !follow.some(f => f.endsWith('✗')), follow.join(' → '));
+    await page.keyboard.press('KeyP'); await page.click('#setBtn2');
+    await page.click('#settings .seg[data-k=quality] button[data-v=low]');
+    await page.evaluate(() => { const r = document.getElementById('s-music'); r.value = 0; r.dispatchEvent(new Event('input')) });
+    const low = await page.evaluate(() => { const g = window.__game; return { pr: g.renderer.getPixelRatio(), shadow: g.sun.castShadow, gain: g.music().gain } });
+    await page.click('#setClose');
+    const stored = await page.evaluate(() => JSON.parse(localStorage.getItem('wheek-settings') || '{}'));
+    await page.click('#setBtn2'); await page.click('#settings .seg[data-k=quality] button[data-v=high]');
+    await page.evaluate(() => { const r = document.getElementById('s-music'); r.value = .6; r.dispatchEvent(new Event('input')) }); await page.click('#setClose'); await page.click('#resumeBtn');
+    const high = await page.evaluate(() => ({ shadow: window.__game.sun.castShadow, paused: window.__game.G.paused }));
+    report('settings apply and are saved', low.pr === 1 && !low.shadow && low.gain === 0 && stored.quality === 'low' && stored.music === 0 && high.shadow && !high.paused,
+      `low: pixel ratio ${low.pr}, shadows ${low.shadow}, music gain ${low.gain} · saved ${JSON.stringify(stored)} · back to high: shadows ${high.shadow}`);
   }
 
   // 6. saves: continue a game saved before zones existed, and one saved in a zone

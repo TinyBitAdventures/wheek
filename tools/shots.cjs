@@ -142,6 +142,8 @@ for (const [zone, type, dist] of [['peaks', 'drift', 2], ['deepwood', 'bramble',
     await shot(name);
   }
   if (pick('journal')) { await page.keyboard.press('KeyJ'); await page.waitForTimeout(600); await shot('journal'); await page.keyboard.press('KeyJ'); }
+  // The settings panel, from the pause menu.
+  if (pick('settings')) { await page.keyboard.press('KeyP'); await page.click('#setBtn2'); await page.waitForTimeout(400); await shot('settings'); await page.click('#setClose'); await page.click('#resumeBtn'); }
   // The journal's goals and requests, a few done, two requests heard (one curio in hand).
   if (pick('goals')) {
     await page.evaluate(() => { const { G } = window.__game; Object.assign(G.goals, { forage: 1, friend: 1, burrows3: 1, night1: 1 }); Object.assign(G.heard, { key: 1, marble: 1 }); G.curios.marble = true; G.given.coin = 'Grandpa Joe'; G.curios.coin = true });
