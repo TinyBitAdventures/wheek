@@ -161,6 +161,24 @@ scenes.butterscotch = async page => {
   await setup(page, `G.camYaw=pig.heading+Math.PI+.6;G.camDist=1.3;G.camPitch=.35;G.lastDrag=performance.now()+1e6`);
   await page.waitForFunction(() => { const g = window.__game; return g.camera.position.distanceTo(g.pig.pos) < 1.5 }, null, { timeout: 120000, polling: 250 });
 };
+// Willow Creek's leaf raft: beached at the top of the creek, riding the rapids at a ford, and Willow Island at the end.
+scenes.raftstart = async page => {
+  await setup(page, `document.getElementById('mapwrap').classList.remove('big');G.time=10.5;if(G.inside)g.exitBarn();g.visit('creek',0,0,0);const R=g.Z().raft;pig.pos.set(R.ex+Math.sin(R.out+Math.PI)*-.5,0,R.ez+Math.cos(R.out+Math.PI)*-.5);pig.heading=R.out`);
+  await camera(page, 'window.__game.pig.heading+Math.PI+.6', 2.2, .32);
+};
+scenes.raft = async page => {
+  await setup(page, `G.time=11;if(g.Z().id!=='creek')g.visit('creek',0,0,0);if(!G.raft)g.startRaft();const F=G.raft,R=g.Z().raft;let best=R.s0,bd=1e9;for(let s=R.s0;s<R.send;s+=.2){const c=g.creekAt(s),d=Math.hypot(c.x-0,c.z-14);if(d<bd){bd=d;best=s}}F.s=best-4.5;F.lat=-.4;F.speed=1.7`);
+  await page.waitForFunction(() => { const g = window.__game; return g.G.raft && g.camera.position.distanceTo(g.pig.pos) < 2.6 }, null, { timeout: 120000, polling: 250 });
+  await setup(page, `if(G.raft){G.raft.inv=99}`);
+};
+scenes.island = async page => {
+  await setup(page, `G.time=16;if(G.raft){G.raft.s=g.Z().raft.send-.2}`);
+  await page.waitForFunction(() => window.__game.G.inside && window.__game.G.inside.kind === 'island', null, { timeout: 120000, polling: 250 });
+  await setup(page, `pig.pos.set(1.2,0,4.2);pig.heading=Math.PI+.3`);
+  await page.waitForTimeout(600);
+  await setup(page, `G.camYaw=pig.heading+Math.PI;G.camDist=3.6;G.camPitch=.32;G.lastDrag=performance.now()+1e6`);
+  await page.waitForFunction(() => { const g = window.__game; return g.camera.position.distanceTo(g.pig.pos) < 4 }, null, { timeout: 120000, polling: 250 });
+};
 // A guinea pig who lives out on the beach, chatting.
 scenes.zonepig = async page => {
   await setup(page, `document.getElementById('mapwrap').classList.remove('big');G.time=10.5;g.visit('beach',0,0,0);const f=g.friends.find(f=>f.origin==='beach');pig.pos.set(f.pos.x+.7,0,f.pos.z+.3);pig.heading=Math.atan2(f.pos.x-pig.pos.x,f.pos.z-pig.pos.z)`);

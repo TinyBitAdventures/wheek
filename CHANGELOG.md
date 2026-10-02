@@ -8,6 +8,12 @@
 - The humans in Downtown, Sandy Cove, Critter Corner and on the farm sometimes toss you their zone's treat.
 - The Deep Wood's brambles are thorny cover: the hawk can't reach you in one.
 
+### The leaf raft and Willow Island
+- A big leaf lies on the bank at the top of Willow Creek, beside a little "Leaf rides!" sign (sniff to find it). Hop on and the current carries you all the way down the creek: steer left and right, push forward to paddle, pull back to slow down.
+- The stepping-stone fords are rapids now: the water speeds up and you thread between the stones. Fallen branches reach out from the banks, ducks paddle in your way, and treats float by to scoop up. Three bumps and you tip off into the shallows and scramble ashore.
+- Make it to the end and the creek carries you round the bend to Willow Island: a hidden islet with a giant weeping willow. Curl up in its roots for a nap, forage the driftwood and the watercress, then ride the leaf back up the creek. Your herd waits on the bank, and the hawk and foxes leave you alone on the water.
+- New goals: Raft Rider and Not a Splash (the whole creek without a bump). Willow Creek's checklist includes the island.
+
 ### The pet shop
 - One of Downtown's shops is a pet shop (look for its sign). After closing time, 6 PM to 7:30 AM, the cat flap in its back door lets a guinea pig in. Sniff to find it.
 - Inside, after hours: fish tanks glowing in the dark, shelves of supplies, guinea pig tubes all over the floor, and Duchess the shop cat asleep in her bed. Tiptoe: scurrying, rummaging, hopping and wheeking fill her noise meter, and if she wakes up she hunts you. Hide in the tubes and she loses you; if she catches you she boops you back out through the flap, and watches it for a while.
@@ -55,6 +61,7 @@
 ### Models
 - The barn's inside, a hay pile, the holes in the barn walls and a fallen twig, built in Blender like everything else.
 - The pet shop's inside, its back door with the cat flap, Duchess (awake and curled up asleep) and a pile of pellets.
+- A leaf raft and a giant weeping willow.
 - 16 new Blender-built models: rose hips, raspberry leaves, romaine, a watermelon slice, watercress, a corn husk, an apple slice and sunflower seeds, plus a snowdrift, a bramble, a market stall, a picnic basket, a watercress bed, a feed trough, an apple tree and a fallen sunflower head.
 
 ## v0.2.0 (2026-09-29)

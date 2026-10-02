@@ -73,7 +73,7 @@ const furNoise=(()=>{const n=256,d=new Uint8Array(n*n*4);for(let i=0;i<n*n;i++){
 const MODELS=['Birch','Blanket','Burrow','Bush','Carrot','Clover','Clover4','Dandelion','Fence','Fern','FlowerPurple','FlowerWhite','Fox','GardenBed','Grass','GuineaPig','Hawk','Hay','House','Human','LeafPile','Log','LushGrass','MushroomBrown','MushroomRed','Oak','Oak2','Pepper','Pine','Rock','Rock2','Strawberry',
   'Sunflower','Barn','Shop','LampPost','Bench','Goat','Sheep','Duck','Car','Cattail','Umbrella','Sandcastle','Scarecrow','Fountain',
   'RoseHip','RaspLeaf','Lettuce','Watermelon','Cress','Corn','Apple','Seeds','Snowdrift','Bramble','MarketStall','Basket','CressBed','Trough','AppleTree','SunflowerHead',
-  'BarnInside','HayPile','BarnHole','Twig','PetShopInside','CatFlap','Cat','CatLoaf','Pellets'];
+  'BarnInside','HayPile','BarnHole','Twig','PetShopInside','CatFlap','Cat','CatLoaf','Pellets','LeafRaft','Willow'];
 const M={};
 const DOUBLE=new Set(['Grass','Plant','Leaves','DryLeaves','Petal','Needles','Cloth','Skin','Flesh']);
 async function loadAssets(progress){
@@ -215,6 +215,7 @@ function buildZone(z){
   if(z!==PARK)placeZoneFriends(z);
   for(const b of z.barns)setupBarn(b);
   if(z.id==='town')setupPetShop(z);
+  if(z.id==='creek')setupRaft(z);
   placeTwigs(z);
   // a plant that ended up inside a rock or trunk can never be eaten: leave it out (without touching the seeded layout)
   for(const ps of z.pickSets)for(const it of ps.items)if(z.colliders.some(c=>Math.hypot(c.x-it.x,c.z-it.z)<c.r)||insideBox(it.x,it.z)){it.alive=false;it.respawn=Infinity;ps.set.setMatrix(it.i,ZERO)}
@@ -270,9 +271,10 @@ const LOOT={
   seedhead:{seeds:40,daisy:14,violet:12,dandelion:12,clover4:2,goldDandelion:1.5,nothing:18},
   shopspill:{pellets:55,hay:15,carrot:10,clover:10,nothing:10},
   shopbin:{pellets:25,strawberry:18,carrot:15,pepper:14,apple:8,goldCarrot:4,clover4:2,nothing:4},
+  islandlog:{watercress:18,berries:15,strawberry:14,chanterelle:12,raspleaf:8,clover4:5,goldDandelion:4,nothing:10},
 };
 const SPOTNAME={leafpile:'Leaf Pile',bush:'Berry Bush',log:'Mossy Log',rock:'Mossy Rock',bed:'Garden Bed',hay:'Hay Bale',prize:'the Maze Prize',
-  drift:'Snowdrift',bramble:'Bramble Patch',stall:'Market Crate',picnic:'Picnic Basket',cress:'Watercress Bed',trough:'Feed Trough',apples:'Windfall Apples',seedhead:'Sunflower Head',shopspill:'Spilled Pellets',shopbin:'Treat Bin'};
+  drift:'Snowdrift',bramble:'Bramble Patch',stall:'Market Crate',picnic:'Picnic Basket',cress:'Watercress Bed',trough:'Feed Trough',apples:'Windfall Apples',seedhead:'Sunflower Head',shopspill:'Spilled Pellets',shopbin:'Treat Bin',islandlog:'Driftwood'};
 // ============================================================ breeds & coats
 const BREEDS={
   american:{name:'American',tag:'Smooth & speedy',desc:'A short, sleek coat. The classic all-rounder.',perk:'🏃 Scurries 12% faster, and sprinting costs less energy',fur:{len:1,droop:1,swirl:0,dens:[340,200],face:.8,layers:16},coats:['tricolor','golden','dutch','agouti','himalayan'],speed:1.12,sprintCost:.75},
@@ -299,7 +301,7 @@ const RANKS=[[0,'Nibbler'],[4,'Sniffer'],[12,'Rummager'],[25,'Master Forager'],[
 const G={started:false,paused:false,over:false,modal:false,inTunnel:false,
   hp:100,full:80,vitc:75,energy:100,happy:50,score:0,best:lsGet('wheek-best',0),
   day:1,time:7.0,combo:0,comboT:0,forages:0,pets:0,petStreak:0,lastPetHuman:null,petStreakT:0,
-  found:{},curios:{},tunnels:0,zfound:{},visited:{park:1},met:{},pals:[],placesDone:{},goals:{},bestStreak:0,hawkDodged:0,foxEscapes:0,mazePrize:0,heard:{},given:{},barns:{},hayFinds:0,teethT:0,gnaws:0,cleanGnaws:0,shop:0,fullHerd:0,luckT:0,giftT:40,huddle:false,wheekT:0,sniffCD:0,popcornCD:0,cause:'',nightsSurvived:0,eaten:0};
+  found:{},curios:{},tunnels:0,zfound:{},visited:{park:1},met:{},pals:[],placesDone:{},goals:{},bestStreak:0,hawkDodged:0,foxEscapes:0,mazePrize:0,heard:{},given:{},barns:{},hayFinds:0,teethT:0,gnaws:0,cleanGnaws:0,shop:0,fullHerd:0,island:0,rafts:0,cleanRaft:0,luckT:0,giftT:40,huddle:false,wheekT:0,sniffCD:0,popcornCD:0,cause:'',nightsSurvived:0,eaten:0};
 const pig={pos:new THREE.Vector3(2.5,0,-1.5),vel:new THREE.Vector3(),heading:Math.PI,vy:0,air:false,phase:0,obj:null,parts:{},eating:0,foraging:0,knock:0,popSpin:0,fur:[]};
 (()=>{const s=lsGet('wheek-pig',null);const b=s&&BREEDS[s.breed]?s.breed:'american';G.breed=b;G.coat=s&&BREEDS[b].coats.includes(s.coat)?s.coat:BREEDS[b].coats[0];G.name=(s&&s.name)||PIG_NAMES[Math.floor(Math.random()*PIG_NAMES.length)];G.perk=perksFor(b)})();
 const keys={};
@@ -1072,9 +1074,10 @@ function discover(type){const first=!G.found[type];G.found[type]=(G.found[type]|
 let forageState=null;
 function nearest(list,px,pz,maxd,f=()=>true){let best=null,bd=maxd;for(const o of list){if(!f(o))continue;const d=Math.hypot(o.x-px,o.z-pz)-(o.r||0);if(d<bd){bd=d;best=o}}return best}
 function currentActions(){
-  const acts=[];if(pig.air)return acts;
+  const acts=[];if(pig.air||G.raft)return acts;
   const m=mouthPos();
   for(const b of Z.barns)for(const h of b.holes)if(Math.hypot(h.ex-pig.pos.x,h.ez-pig.pos.z)<.45)acts.push({k:'E',label:'Squeeze into the barn',do:()=>enterInside(b,h)});
+  if(Z.raft&&Math.hypot(Z.raft.ex-pig.pos.x,Z.raft.ez-pig.pos.z)<.65)acts.push({k:'E',label:'Hop on the leaf raft',do:startRaft});
   if(Z.shop){const b=Z.shop,h=b.holes[0];if(Math.hypot(h.ex-pig.pos.x,h.ez-pig.pos.z)<.5){const open=shopOpen();
     acts.push(b.flapCD>0?{k:'E',label:`Duchess is watching the cat flap (${Math.ceil(b.flapCD)}s)`,disabled:true}:open?{k:'E',label:'Push through the cat flap',do:()=>enterInside(b,h)}:{k:'E',label:'Cat flap · locked while the shop is open (after 6 PM)',disabled:true})}}
   const gh=humans.find(h=>h.visible&&Math.hypot(h.obj.position.x-pig.pos.x,h.obj.position.z-pig.pos.z)<1.6);const gk=gh&&requestOf(gh);
@@ -1122,7 +1125,7 @@ function updateForage(dt){
   const f=forageState;if(!f)return;
   if(!keys.KeyF||Math.hypot(f.spot.x-pig.pos.x,f.spot.z-pig.pos.z)>f.spot.r+.45){forageState=null;$('forage').style.display='none';return}
   f.t+=dt;f.rustle-=dt;pig.foraging=.2;
-  if(f.rustle<=0){f.rustle=.14;SFX.rustle();const c={leafpile:[.75,.4,.1],bush:[.2,.45,.12],log:[.45,.32,.2],rock:[.5,.5,.45],bed:[.3,.2,.12],hay:[.8,.7,.35],prize:[1,.85,.3],drift:[.92,.96,1],bramble:[.25,.42,.12],stall:[.45,.72,.28],picnic:[.85,.3,.3],cress:[.7,.88,1],trough:[.8,.7,.35],apples:[.8,.2,.15],seedhead:[1,.8,.2],shopspill:[.5,.55,.25],shopbin:[.95,.75,.3]}[f.spot.type];emit(f.spot.x+R(-.15,.15),groundAt(f.spot.x,f.spot.z)+.08,f.spot.z+R(-.15,.15),5,{col:c,spread:.6,up:1.2,size:.018,life:.8,grav:3})}
+  if(f.rustle<=0){f.rustle=.14;SFX.rustle();const c={leafpile:[.75,.4,.1],bush:[.2,.45,.12],log:[.45,.32,.2],rock:[.5,.5,.45],bed:[.3,.2,.12],hay:[.8,.7,.35],prize:[1,.85,.3],drift:[.92,.96,1],bramble:[.25,.42,.12],stall:[.45,.72,.28],picnic:[.85,.3,.3],cress:[.7,.88,1],trough:[.8,.7,.35],apples:[.8,.2,.15],seedhead:[1,.8,.2],shopspill:[.5,.55,.25],shopbin:[.95,.75,.3],islandlog:[.55,.45,.35]}[f.spot.type];emit(f.spot.x+R(-.15,.15),groundAt(f.spot.x,f.spot.z)+.08,f.spot.z+R(-.15,.15),5,{col:c,spread:.6,up:1.2,size:.018,life:.8,grav:3})}
   $('forage').querySelector('i').style.width=(f.t/f.need*100)+'%';
   if(f.t>=f.need){forageState=null;$('forage').style.display='none';completeForage(f.spot)}
 }
@@ -1186,6 +1189,7 @@ function sniff(){if(G.sniffCD>0){toast(`Your nose needs a moment (${Math.ceil(G.
   for(const s of spots){if(!s.ready)continue;const d=Math.hypot(s.x-pig.pos.x,s.z-pig.pos.z);if(d<22){marker(s.x,heightAt(s.x,s.z)+.2,s.z,0xffd060);n++}}
   for(const tu of tunnels){const d=Math.hypot(tu.x-pig.pos.x,tu.z-pig.pos.z);if(d<32){marker(tu.ex,heightAt(tu.ex,tu.ez)+.35,tu.ez,tu.found?0x7fd0ff:0x9a7bff);if(!tu.found)t++}}
   let bh=0;for(const b of Z.barns)for(const h of b.holes)if(Math.hypot(h.ex-pig.pos.x,h.ez-pig.pos.z)<32){marker(h.ex,heightAt(h.ex,h.ez)+.3,h.ez,0xffb060);bh++}
+  if(Z.raft&&Math.hypot(Z.raft.ex-pig.pos.x,Z.raft.ez-pig.pos.z)<32){marker(Z.raft.ex,heightAt(Z.raft.ex,Z.raft.ez)+.3,Z.raft.ez,0x9fe88a);toast('👃 …and a big leaf down by the water. Looks like it would float!')}
   let sf=0;if(Z.shop){const h=Z.shop.holes[0];if(Math.hypot(h.ex-pig.pos.x,h.ez-pig.pos.z)<32){marker(h.ex,heightAt(h.ex,h.ez)+.3,h.ez,0xff9fd0);sf=1}}
   let w=0;for(const f of friends){if(f.state!=='wild'||f.zone!==Z.id)continue;const d=Math.hypot(f.pos.x-pig.pos.x,f.pos.z-pig.pos.z);if(d<30){marker(f.pos.x,f.pos.y+.3,f.pos.z,0xff9fd0);f.known=true;w++}}
   toast(`👃 Sniff sniff… ${n} forage spot${n===1?'':'s'} nearby${t?`, and <b>${t} hidden tunnel${t>1?'s':''}</b>`:''}${bh?`, and <b>a way into the barn</b> 🛖`:''}${sf?`, and <b>a cat flap</b> 🐾`:''}${w?`, and <b>${w} guinea pig${w>1?'s':''}</b> 🐹`:''}!`)}
@@ -1564,21 +1568,21 @@ function buildBarnInside(b){const s=b.scale,g=new THREE.Group(),B={kind:'barn',t
   B.lantern=new THREE.PointLight(0xffc888,1.5,8*s,1.2);B.lantern.position.set(-.6*s,(BARN.HW-.7)*s,1*s);g.add(B.lantern);
   B.bump=new THREE.Mesh(new THREE.SphereGeometry(.16,14,8,0,Math.PI*2,0,Math.PI/2),new THREE.MeshStandardMaterial({color:0xd9b860,roughness:1}));B.bump.visible=false;g.add(B.bump);
   b.inside=B}
-function insideHeight(x,z){const p=G.inside.pile;if(!p)return 0;const d=Math.hypot(x-p.x,z-p.z);return d<p.R?p.H*Math.pow(1-(d/p.R)**2,.8):0}
+function insideHeight(x,z){const B=G.inside;if(B.height)return B.height(x,z);const p=B.pile;if(!p)return 0;const d=Math.hypot(x-p.x,z-p.z);return d<p.R?p.H*Math.pow(1-(d/p.R)**2,.8):0}
 // herd members (and the cat) aren't stopped by the shop's tubes: the herd follows you through them, the cat steps over
 function insideCollide(P,pr,free){const B=G.inside;
   if(B.tubes&&!free)for(const t of B.tubes){const dx=t.bx-t.ax,dz=t.bz-t.az,k=clamp(((P.x-t.ax)*dx+(P.z-t.az)*dz)/(dx*dx+dz*dz),0,1),qx=t.ax+dx*k,qz=t.az+dz*k,ox=P.x-qx,oz=P.z-qz,d=Math.hypot(ox,oz),m=TUBE_R+pr;
     if(d<m&&d>1e-5){P.x=qx+ox/d*m;P.z=qz+oz/d*m}}
   for(const c of B.cols){const dx=P.x-c.x,dz=P.z-c.z,d=Math.hypot(dx,dz);if(d<c.r+pr&&d>1e-5){P.x=c.x+dx/d*(c.r+pr);P.z=c.z+dz/d*(c.r+pr)}}
   for(const b of B.boxes){const qx=clamp(P.x,b.cx-b.hx,b.cx+b.hx),qz=clamp(P.z,b.cz-b.hz,b.cz+b.hz),dx=P.x-qx,dz=P.z-qz,d=Math.hypot(dx,dz);if(d<pr&&d>1e-5){P.x=qx+dx/d*pr;P.z=qz+dz/d*pr}}
-  P.x=clamp(P.x,-B.hx,B.hx);P.z=clamp(P.z,-B.hz,B.hz)}
+  P.x=clamp(P.x,-B.hx,B.hx);P.z=clamp(P.z,-B.hz,B.hz);if(B.radius){const r=Math.hypot(P.x,P.z);if(r>B.radius){P.x*=B.radius/r;P.z*=B.radius/r}}}
 // hidden treats, fresh every day
 function hideTreats(B){B.day=G.day;B.found=0;B.treats=[];for(let i=0;i<4;i++){const a=Math.random()*Math.PI*2,r=Math.sqrt(Math.random())*B.pile.R*.8;B.treats.push({x:B.pile.x+Math.cos(a)*r,z:B.pile.z+Math.sin(a)*r,type:pick(HAYLOOT),got:false})}}
 // in through a hole (or a cat flap): the inside is its own scene; each kind (barn, shop) adds its own actions and update
-function enterInside(b,hole){G.acts=null;if(!b.inside)(b.kind==='shop'?buildShopInside:buildBarnInside)(b);const B=b.inside;iScene.clear();iScene.add(B.group);G.inside=B;G.insideHole=hole;B.from=b;G.hidden=true;forageState=null;$('forage').style.display='none';
+function enterInside(b,hole){G.acts=null;iScene.background=new THREE.Color(0x140c06);iScene.fog=null;if(!b.inside)({shop:buildShopInside,island:buildIslandInside}[b.kind]||buildBarnInside)(b);const B=b.inside;iScene.clear();iScene.add(B.group);G.inside=B;G.insideHole=hole;B.from=b;G.hidden=true;forageState=null;$('forage').style.display='none';
   SFX.rustle();flash('rgba(0,0,0,1)',1);swapScene(pig.obj,iScene);swapScene(pts,iScene);pig.blob.visible=false;pig.light.intensity=0;pig.air=false;pig.vy=0;
   const h=B.holes[Math.max(0,b.holes.indexOf(hole))];pig.pos.set(h.x,0,h.z);pig.vel.set(0,0,0);pig.heading=h.heading;G.camYaw=h.heading+Math.PI;W.trail.length=0;W.trail.push({x:pig.pos.x,z:pig.pos.z});
-  herd.forEach(f=>{swapScene(f.obj,iScene);f.blob.visible=false;f.pos.set(h.x,0,h.z);f.vel.set(0,0,0);f.air=false;f.vy=0});friends.forEach(f=>f.tag.style.display='none');snapCamera();
+  if(!B.noHerd)herd.forEach(f=>{swapScene(f.obj,iScene);f.blob.visible=false;f.pos.set(h.x,0,h.z);f.vel.set(0,0,0);f.air=false;f.vy=0});friends.forEach(f=>f.tag.style.display='none');snapCamera();
   B.onEnter(B)}
 function barnEnter(B){if(B.day!==G.day)hideTreats(B);
   if(!G.barns[Z.id]){G.barns[Z.id]=1;SFX.find('rare');callout('rare','🛖 The Barn',80);addScore(80,'','#7fd0ff')}
@@ -1619,7 +1623,7 @@ function sniffBarn(){const B=G.inside,left=B.treats.filter(t=>!t.got);for(const 
 function updateInside(dt,t){const B=G.inside;
   if(B.burrow)updateBurrow(dt,t);else if(B.tube)updateTube(dt,t);else updatePig(dt,t);
   const last=W.trail[0];if(!B.burrow&&Math.hypot(pig.pos.x-last.x,pig.pos.z-last.z)>.06){W.trail.unshift({x:pig.pos.x,z:pig.pos.z});if(W.trail.length>(HERD_MAX+1)*6+4)W.trail.pop()}
-  herd.forEach((f,i)=>{const tp=W.trail[Math.min(W.trail.length-1,(i+1)*6)],hx=tp.x-f.pos.x,hz=tp.z-f.pos.z,hl=Math.hypot(hx,hz);
+  if(!B.noHerd)herd.forEach((f,i)=>{const tp=W.trail[Math.min(W.trail.length-1,(i+1)*6)],hx=tp.x-f.pos.x,hz=tp.z-f.pos.z,hl=Math.hypot(hx,hz);
     if(hl>.07){f.heading+=angDiff(f.heading,Math.atan2(hx,hz))*Math.min(1,dt*8);const sp=Math.min(Math.min(3.8,hl*4+.4),hl/Math.max(dt,1e-3));f.vel.set(Math.sin(f.heading)*sp,0,Math.cos(f.heading)*sp)}else f.vel.multiplyScalar(Math.max(0,1-dt*10));
     f.pos.x+=f.vel.x*dt;f.pos.z+=f.vel.z*dt;for(const o of herd){if(o===f)continue;const ox=f.pos.x-o.pos.x,oz=f.pos.z-o.pos.z,od=Math.hypot(ox,oz);if(od<.18&&od>1e-4){f.pos.x+=ox/od*(.18-od)*.5;f.pos.z+=oz/od*(.18-od)*.5}}
     insideCollide(f.pos,.09,true);if(f.air||f.vy>0){f.vy-=9.8*dt;f.pos.y+=f.vy*dt;const gy=insideHeight(f.pos.x,f.pos.z);if(f.pos.y<=gy){f.pos.y=gy;f.vy=0;f.air=false}}else f.pos.y=insideHeight(f.pos.x,f.pos.z);
@@ -1810,6 +1814,112 @@ function sniffShop(B){let n=0;for(const tr of B.tubeTreats)if(!tr.got){marker(tr
   for(const sp of B.spots)if(sp.ready)marker(sp.x,.3,sp.z,0xffd060,B.group);
   toast(n?`👃 Sniff sniff… <b>${n} treat${n>1?'s':''}</b> tucked in the tubes, and food on the floor!`:'👃 Pellets, hay and… cat. No treats left in the tubes tonight.')}
 
+// ============================================================ the leaf raft (Willow Creek) and Willow Island
+// A big leaf lies on the bank at the top of the creek. Hop on and the current carries you downstream to the east: steer
+// between the stepping stones at the fords (rapids!), round the snags, scoop the treats floating by. Three bumps and you
+// tip off into the shallows; make it to the end and the creek carries you round the bend to Willow Island.
+const RAFT={from:-60,to:64,speed:1.7,lat:1.35,r:.12,stone:.15};
+let creekCurve=null,creekLen=0;
+function creekPath(){if(creekCurve)return;creekCurve=new THREE.CatmullRomCurve3(CREEK.map(([x,z])=>new THREE.Vector3(x,0,z)),false,'centripetal');creekLen=creekCurve.getLength()}
+// a point on the creek: position, flow direction, and n (to your right as you ride downstream)
+function creekAt(s){const u=clamp(s/creekLen,0,1),p=creekCurve.getPointAt(u),t=creekCurve.getTangentAt(u);return {x:p.x,z:p.z,tx:t.x,tz:t.z,nx:-t.z,nz:t.x}}
+function sAtX(x){let lo=0,hi=creekLen;for(let i=0;i<40;i++){const m=(lo+hi)/2;if(creekCurve.getPointAt(m/creekLen).x<x)lo=m;else hi=m}return lo}
+function setupRaft(z){creekPath();const s0=sAtX(RAFT.from),c=creekAt(s0);let side=0,bank=0;
+  for(const sd of [1,-1]){for(let l=1.5;l<6;l+=.1){const x=c.x+c.nx*l*sd,zz=c.z+c.nz*l*sd;if(!wet(x,zz,0)){if(freeAt(x+c.nx*sd*.6,zz+c.nz*sd*.6,.3)){side=sd;bank=l}break}}if(side)break}
+  if(!side){side=1;bank=3.4}
+  const leaf=M.LeafRaft.clone(true),lat=(bank-.4)*side,head=Math.atan2(c.tx,c.tz);leaf.position.set(c.x+c.nx*lat,-.115,c.z+c.nz*lat);leaf.rotation.y=head;z.group.add(leaf);
+  const el=(bank+.45)*side,ex=c.x+c.nx*el,ez=c.z+c.nz*el,out=Math.atan2(-c.nx*side,-c.nz*side);
+  // a little sign beside it
+  const sx=ex+c.tx*.9,sz=ez+c.tz*.9,post=new THREE.Mesh(new THREE.CylinderGeometry(.025,.03,.6,8),new THREE.MeshStandardMaterial({color:0x7a5534,roughness:.9}));post.position.set(sx,heightAt(sx,sz)+.3,sz);z.group.add(post);
+  const tex=canvasTex(512,180,(g,w,h)=>{g.fillStyle='#7a9a3a';g.fillRect(0,0,w,h);g.strokeStyle='#4a6a1e';g.lineWidth=10;g.strokeRect(5,5,w-10,h-10);g.fillStyle='#fff8e0';g.font='600 58px Fredoka, sans-serif';g.textAlign='center';g.textBaseline='middle';g.fillText('🍃 Leaf rides!',w/2,h*.42);g.font='500 34px Fredoka, sans-serif';g.fillText('down to the willow →',w/2,h*.76)});
+  const board=new THREE.Mesh(new THREE.BoxGeometry(.62,.22,.03),new THREE.MeshStandardMaterial({map:tex,roughness:.8}));board.position.set(sx,heightAt(sx,sz)+.55,sz);board.rotation.y=out;board.castShadow=true;z.group.add(board);addCollider(sx,sz,.05);
+  // the stepping stones at the fords (as laid in the creek's props) and three snags reaching out from the banks
+  const obs=[];for(const [fx,fz] of FORDS)for(let t=-3.2;t<=3.2;t+=.8)obs.push({x:fx+t*.35,z:fz+t,r:RAFT.stone,kind:'stone'});
+  const send=sAtX(RAFT.to),snags=[];[[.27,1],[.55,-1],[.83,1]].forEach(([k,sd])=>{const sc=creekAt(s0+(send-s0)*k),a={x:sc.x+sc.nx*.45*sd,z:sc.z+sc.nz*.45*sd},b={x:sc.x+sc.nx*2.2*sd,z:sc.z+sc.nz*2.2*sd};
+    const log=M.Log.clone(true);log.scale.setScalar(.62);log.position.set((a.x+b.x)/2,-.11,(a.z+b.z)/2);log.rotation.y=Math.atan2(sc.nx,sc.nz);z.group.add(log);snags.push({ax:a.x,az:a.z,bx:b.x,bz:b.z,r:.13})});
+  z.raft={s0,send,leaf,leafLat:lat,ex,ez,out,obs,snags,island:{kind:'island',scale:1,holes:[{ex,ez,out}]}}}
+function startRaft(){const RF=Z.raft;G.acts=null;forageState=null;$('forage').style.display='none';if(hawk.state!=='away'){hawk.state='away';hawk.t=R(30,60);hawk.obj.visible=false}
+  const F=G.raft={s:RF.s0+.5,lat:clamp(RF.leafLat,-RAFT.lat,RAFT.lat),vl:0,speed:.5,bal:3,got:0,bumps:0,inv:0,duckCD:0,yaw:0,splashT:0,treats:[]};G.hidden=true;RF.leaf.visible=false;
+  F.obj=M.LeafRaft.clone(true);ZG.add(F.obj);
+  for(let i=0;i<14;i++){const s=RF.s0+8+(RF.send-RF.s0-16)*(i+Math.random()*.6)/14,lat=(Math.random()*2-1)*1.05,c=creekAt(s),type=pick({dandelion:24,clover:24,watercress:20,strawberry:14,pepper:8,goldDandelion:2,clover4:2});
+    const o=itemModel(type);o.position.set(c.x+c.nx*lat,-.1,c.z+c.nz*lat);ZG.add(o);F.treats.push({x:o.position.x,z:o.position.z,type,obj:o,got:false})}
+  SFX.whoosh();emit(pig.pos.x,-.1,pig.pos.z,20,{col:[.8,.9,1],spread:.6,up:1,size:.015,life:.6});
+  if(!G.raftTip){G.raftTip=true;toast(`🍃 <b>Whee!</b> The current carries you downstream. Steer left and right${G.input==='touch'?' with the joystick':''}, push forward to paddle, back to slow down. Thread the stepping stones at the rapids, dodge the snags, scoop up the treats. Three bumps and you're in the water!`,'gold',10)}}
+function raftBump(F,awayLat,what){if(F.inv>0)return;F.inv=1;F.bal--;F.bumps++;F.speed*=.25;F.vl=Math.sign(awayLat||1)*1.6;SFX.hurt();emit(pig.pos.x,-.08,pig.pos.z,24,{col:[.85,.93,1],spread:.8,up:1.3,size:.016,life:.7});
+  floaty(what,'#9ad8ff');if(F.bal<=0)raftCapsize()}
+function updateRaft(dt,t){const RF=Z.raft,F=G.raft;F.inv=Math.max(0,F.inv-dt);F.duckCD=Math.max(0,F.duckCD-dt);
+  let ix=0,iz=0;if(keys.KeyW||keys.ArrowUp)iz+=1;if(keys.KeyS||keys.ArrowDown)iz-=1;if(keys.KeyA||keys.ArrowLeft)ix-=1;if(keys.KeyD||keys.ArrowRight)ix+=1;
+  if(joy.active){ix=joy.x;iz=-joy.y}else if(pad.on){ix=pad.x;iz=-pad.y}if(G.steerRaft){ix=G.steerRaft[0];iz=G.steerRaft[1]}
+  let c=creekAt(F.s);const px=c.x+c.nx*F.lat,pz=c.z+c.nz*F.lat,rapids=FORDS.some(([fx,fz])=>Math.hypot(fx-px,fz-pz)<4.5);
+  F.speed=lerp(F.speed,RAFT.speed*(rapids?1.35:1)+iz*.75,Math.min(1,dt*1.5));F.vl=lerp(F.vl,ix*1.5,Math.min(1,dt*4));
+  F.s+=F.speed*dt;F.lat+=F.vl*dt;if(Math.abs(F.lat)>RAFT.lat){F.lat=Math.sign(F.lat)*RAFT.lat;F.vl*=-.3;F.speed*=.97;if(Math.random()<.2)SFX.rustle()}
+  c=creekAt(F.s);const x=c.x+c.nx*F.lat,z=c.z+c.nz*F.lat;
+  for(const o of RF.obs){const dx=x-o.x,dz=z-o.z;if(Math.abs(dx)<1&&Math.abs(dz)<1&&Math.hypot(dx,dz)<o.r+RAFT.r){const along=dx*c.nx+dz*c.nz;F.lat+=Math.sign(along||1)*.12;raftBump(F,along,'bonk!');break}}
+  for(const sn of RF.snags){const ax=sn.bx-sn.ax,az=sn.bz-sn.az,k=clamp(((x-sn.ax)*ax+(z-sn.az)*az)/(ax*ax+az*az),0,1),qx=sn.ax+ax*k,qz=sn.az+az*k;
+    if(Math.hypot(x-qx,z-qz)<sn.r+RAFT.r){const away=-((sn.ax-c.x)*c.nx+(sn.az-c.z)*c.nz);F.s-=.15;raftBump(F,away,'snag!');break}}
+  if(G.raft!==F)return;   // tipped off
+  for(const d of Z.critters)if(d.kind==='Duck'&&F.duckCD<=0&&Math.hypot(d.x-x,d.z-z)<.4){F.duckCD=1.5;SFX.quack();F.vl+=Math.sign((x-d.x)*c.nx+(z-d.z)*c.nz||1)*2;floaty('quack!','#fff3a0')}
+  for(const tr of F.treats){if(tr.got)continue;tr.obj.position.y=-.1+Math.sin(t*2.5+tr.x)*.012;tr.obj.rotation.y+=dt*.6;
+    if(Math.hypot(tr.x-x,tr.z-z)<.34){tr.got=true;tr.obj.removeFromParent();F.got++;discover(tr.type);applyFood(tr.type);SFX.pop()}}
+  if(rapids){F.splashT-=dt;if(F.splashT<=0){F.splashT=.12;const o=RF.obs[Math.floor(Math.random()*RF.obs.length)];if(Math.hypot(o.x-x,o.z-z)<6)emit(o.x+R(-.2,.2),-.1,o.z+R(-.2,.2),3,{col:[.9,.96,1],spread:.4,up:.8,size:.014,life:.5})}}
+  // the pig and the leaf
+  F.yaw=Math.atan2(c.tx,c.tz);const head=F.yaw-F.vl*.18,bob=Math.sin(t*3)*.008+(rapids?Math.sin(t*11)*.006:0);
+  F.obj.position.set(x,-.115+bob,z);F.obj.rotation.set(Math.sin(t*2.1)*.03,head,-F.vl*.12+(F.inv>0?Math.sin(t*30)*.12:0),'YXZ');
+  pig.pos.set(x,-.09+bob,z);pig.vel.set(0,0,0);pig.heading=head;pig.obj.position.copy(pig.pos);pig.obj.rotation.set(0,head,-F.vl*.08,'YXZ');pig.blob.visible=false;U.player.value.copy(pig.pos);
+  animatePigLegs(dt,0,false);
+  if(F.s>=RF.send)raftFinish()}
+function raftEnd(F){for(const tr of F.treats)tr.obj.removeFromParent();F.obj.removeFromParent();Z.raft.leaf.visible=true;G.raft=null;G.hidden=false;pig.blob.visible=true;G.acts=null}
+function raftCapsize(){const F=G.raft,R=Z.raft,c=creekAt(F.s),sd=Math.sign(F.lat||1);raftEnd(F);SFX.whoosh();setTimeout(()=>SFX.hurt(),100);
+  let bx=c.x+c.nx*3.6*sd,bz=c.z+c.nz*3.6*sd;for(let l=1.5;l<7;l+=.1){const x=c.x+c.nx*l*sd,z=c.z+c.nz*l*sd;if(!wet(x,z,.02)&&freeAt(x,z,.15)){bx=x;bz=z;break}}
+  emit(pig.pos.x,-.1,pig.pos.z,40,{col:[.85,.93,1],spread:1,up:1.6,size:.02,life:.9});pig.pos.set(bx,heightAt(bx,bz),bz);pig.heading=Math.atan2(c.nx*sd,c.nz*sd);G.camYaw=pig.heading+Math.PI;regroupHerd();snapCamera();
+  G.energy=Math.max(0,G.energy-10);toast(`💦 <b>Splash!</b> You tumble off the leaf and scramble ashore, soggy but fine.${F.got?` You scooped up ${F.got} treat${F.got>1?'s':''} on the way.`:''} The leaf drifts back to the top of the creek.`,'bad',6)}
+function raftFinish(){const F=G.raft,R=Z.raft,clean=F.bumps===0;raftEnd(F);G.rafts=(G.rafts||0)+1;
+  addScore(150,'raft ride!','#9ad8ff');if(clean){G.cleanRaft=(G.cleanRaft||0)+1;addScore(150,'no bumps!','#ffd23f')}
+  toast(`🍃 <b>What a ride!</b>${clean?' Not a single bump!':''} The creek carries you round the bend to a hidden island…`,'gold',5);enterInside(R.island,R.island.holes[0])}
+// ---- Willow Island: an islet round the bend, a giant weeping willow with a root hollow to nap in, driftwood and watercress
+function islandHeight(x,z){const r=Math.hypot(x,z);return r<6?.34*Math.pow(1-(r/6)**2,.8)+.01:Math.max(-.4,.01-(r-6)*.28)}
+function buildIslandInside(b){const g=new THREE.Group(),B={kind:'island',title:'🌿 Willow Island',noHerd:true,onEnter:islandEnter,onExit:()=>{},actions:islandActions,update:islandUpdate,sniff:sniffIsland,
+    group:g,s:1,hx:9,hz:9,ceil:30,loftX:Infinity,cols:[],boxes:[],radius:6.05,height:islandHeight,waterY:0,spots:[]};
+  // the island: a mound, sand round its rim, grass on top; water out to the horizon
+  const rings=26,segs=72,pos=[],col=[],idx=[];for(let i=0;i<=rings;i++){const r=i/rings*8;for(let j=0;j<=segs;j++){const a=j/segs*Math.PI*2,x=Math.cos(a)*r,z=Math.sin(a)*r,h=islandHeight(x,z),n=fbm(x*.6,z*.6,2)*.5+.5;pos.push(x,h,z);
+    const sand=1-smooth(.08,.16,h),gr=mixc([.36,.56,.18],[.46,.64,.22],n),sd=mixc([.86,.78,.56],[.92,.86,.66],n);const c=mixc(gr,sd,sand);col.push(c[0]*1.1,c[1]*1.1,c[2]*1.1)}}
+  for(let i=0;i<rings;i++)for(let j=0;j<segs;j++){const a=i*(segs+1)+j,b2=a+segs+1;idx.push(a,b2,a+1,a+1,b2,b2+1)}
+  const geo=new THREE.BufferGeometry();geo.setAttribute('position',new THREE.Float32BufferAttribute(pos,3));geo.setAttribute('color',new THREE.Float32BufferAttribute(col,3));geo.setIndex(idx);geo.computeVertexNormals();
+  g.add(new THREE.Mesh(geo,new THREE.MeshStandardMaterial({vertexColors:true,roughness:.95,map:detailTex,side:THREE.DoubleSide})));
+  const water=new THREE.Mesh(new THREE.CircleGeometry(80,48),waterMat);water.rotation.x=-Math.PI/2;g.add(water);
+  // the willow, its root hollow facing the beach where you land
+  const wl=M.Willow.clone(true);wl.position.set(-.5,0,-1.3);g.add(wl);B.cols.push({x:-.5,z:-1.3,r:.6});B.hollow={x:-.5,z:-1.3+.85};
+  for(const m of [wl])m.traverse(o=>{if(o.isMesh&&o.material.name==='Leaves')windify(o.material,{amp:.05,hScale:.5})});
+  // grass, flowers, cattails round the shore, a couple of bushes, driftwood and two watercress beds
+  const rng=mulberry32(909),put=(name,n,test,sc)=>{const mats=[];for(let k=0;k<n*20&&mats.length<n;k++){const a=rng()*Math.PI*2,r=Math.sqrt(rng())*7,x=Math.cos(a)*r,z=Math.sin(a)*r;if(!test(x,z,r))continue;
+    mats.push(mat4(x,islandHeight(x,z)-.01,z,rng()*6,sc[0]+rng()*(sc[1]-sc[0])))}iSet(name,mats,g)};
+  put('Grass',700,(x,z,r)=>r<5.4&&Math.hypot(x+.5,z+1.3)>.7,[.8,1.3]);put('LushGrass',60,(x,z,r)=>r<5&&Math.hypot(x+.5,z+1.3)>1,[.9,1.2]);
+  put('FlowerWhite',26,(x,z,r)=>r<5,[.7,.9]);put('FlowerPurple',20,(x,z,r)=>r<5,[.7,.9]);put('Cattail',60,(x,z,r)=>r>5.9&&r<6.9&&Math.abs(Math.atan2(x,z))>.5,[.8,1.2]);
+  for(const [x,z] of [[2.6,-1.6],[-3.2,1.4]]){const o=M.Bush.clone(true);o.position.set(x,islandHeight(x,z)-.05,z);o.scale.setScalar(1.1);g.add(o)}
+  {const x=2.9,z=1.9,o=M.Log.clone(true);o.position.set(x,islandHeight(x,z)-.03,z);o.rotation.y=.9;g.add(o);B.cols.push({x:x+Math.sin(.9)*.55,z:z+Math.cos(.9)*.55,r:.2},{x:x-Math.sin(.9)*.55,z:z-Math.cos(.9)*.55,r:.2});
+    B.spots.push({type:'islandlog',x:x+Math.cos(.9)*.42,z:z-Math.sin(.9)*.42,r:.4,ready:true,cd:0})}
+  for(const [a,r] of [[2.3,6.1],[-2.2,6.1]]){const x=Math.sin(a)*r,z=Math.cos(a)*r,o=M.CressBed.clone(true);o.position.set(x*1.04,-.004,z*1.04);g.add(o);B.spots.push({type:'cress',x:x*.97,z:z*.97,r:.45,ready:true,cd:0})}
+  // the leaf, beached where you land
+  const leaf=M.LeafRaft.clone(true);leaf.position.set(0,-.02,6.15);leaf.rotation.y=Math.PI;g.add(leaf);B.leafAt={x:0,z:5.75};
+  B.sun=new THREE.DirectionalLight(0xfff0d8,2);g.add(B.sun);g.add(B.sun.target);B.hemi=new THREE.HemisphereLight(0xcfe6ff,0x6a5c3a,1);g.add(B.hemi);
+  B.holes=[{x:0,z:5.4,heading:Math.PI,i:0}];
+  b.inside=B}
+function iSet(name,mats,group){if(!mats.length)return;for(const p of bake(name)){const im=new THREE.InstancedMesh(p.geo,p.mat,mats.length);mats.forEach((m,j)=>im.setMatrixAt(j,m));im.computeBoundingSphere();group.add(im)}}
+function islandEnter(B){if(!G.island){G.island=1;SFX.find('epic');callout('epic','🌿 Willow Island',200);addScore(200,'new place!','#c98bff');
+    toast('🌿 <b>Willow Island.</b> A hidden islet round the bend of the creek, with a giant weeping willow. Curl up in its roots for a nap, forage the driftwood and the watercress, then ride the leaf back.','gold',9)}
+  else toast('🌿 Back on Willow Island')}
+function islandActions(B){const acts=[];
+  if(Math.hypot(B.leafAt.x-pig.pos.x,B.leafAt.z-pig.pos.z)<.6)acts.push({k:'E',label:'Ride the leaf back up the creek',do:()=>{toast('🍃 You paddle the leaf back up the creek to where you started.');exitInside()}});
+  if(Math.hypot(B.hollow.x-pig.pos.x,B.hollow.z-pig.pos.z)<.6)acts.push({k:'E',label:'Curl up in the willow roots for a nap',do:()=>{restInTunnel();toast('🌿 The willow rustles you to sleep. So cosy.','good')}});
+  for(const sp of B.spots){if(Math.hypot(sp.x-pig.pos.x,sp.z-pig.pos.z)<sp.r+.28){acts.push(sp.ready?{k:'F',hold:true,label:`Forage ${SPOTNAME[sp.type]}`,spot:sp,do:()=>{if(!forageState)startForage(sp)}}:{k:'F',label:`${SPOTNAME[sp.type]} · picked over (${Math.ceil(sp.cd)}s)`,disabled:true});break}}
+  return acts}
+function islandUpdate(B,dt,t){for(const sp of B.spots)if(!sp.ready){sp.cd-=dt;if(sp.cd<=0)sp.ready=true}
+  // the island shares the sky: its light, colours and haze follow the time of day
+  B.sun.color.copy(sun.color);B.sun.intensity=sun.intensity*.85;B.sun.position.copy(skyMat.uniforms.sunDir.value).multiplyScalar(30);B.hemi.color.copy(hemi.color);B.hemi.intensity=hemi.intensity;
+  iScene.background=skyMat.uniforms.hor.value;if(!iScene.fog)iScene.fog=new THREE.Fog(0xcfe3ee,20,70);iScene.fog.color.copy(scene.fog.color)}
+function sniffIsland(B){for(const sp of B.spots)if(sp.ready)marker(sp.x,islandHeight(sp.x,sp.z)+.25,sp.z,0xffd060,B.group);marker(B.hollow.x,.45,B.hollow.z,0x7fd0ff,B.group);
+  toast('👃 Sniff sniff… driftwood, watercress, and the cosy hollow under the willow.')}
+
 // ---- requests: some humans have lost a little thing, and it turned up down in the warren. Bring it back for a thank-you
 const REQUESTS={
   marble:{who:'Maya',zone:'park',ask:'I lost my favourite blue marble down a hole in the woods. If you ever find it…',thanks:'My marble! You clever little thing!',gift:['strawberry','strawberry'],pts:200},
@@ -1845,7 +1955,7 @@ function inLog(l,x,z){const dx=x-l.x,dz=z-l.z;const c=Math.cos(l.rot),s=Math.sin
 const _hv=new THREE.Vector3();
 function updateHawk(dt,t){
   const h=hawk;const o=h.obj;
-  if(h.state==='away'){o.visible=false;if(!isNight()&&G.time>7&&!G.under)h.t-=dt;if(h.t<=0){h.state='circle';h.t=R(14,20);h.detect=0;h.a=rand()*6;o.visible=true;SFX.screech();toast('🦅 <b>A hawk is circling!</b> Hide under a bush, in a log — or freeze.','bad',4);if(herd.length){const f=herd[0];setTimeout(()=>{SFX.wheek();toast(`🐹 ${esc(f.name)} wheeks an alarm! More eyes in your herd means the hawk spots you slower.`,'',4)},900)}}return}
+  if(h.state==='away'){o.visible=false;if(!isNight()&&G.time>7&&!G.under&&!G.inside&&!G.raft)h.t-=dt;if(h.t<=0){h.state='circle';h.t=R(14,20);h.detect=0;h.a=rand()*6;o.visible=true;SFX.screech();toast('🦅 <b>A hawk is circling!</b> Hide under a bush, in a log — or freeze.','bad',4);if(herd.length){const f=herd[0];setTimeout(()=>{SFX.wheek();toast(`🐹 ${esc(f.name)} wheeks an alarm! More eyes in your herd means the hawk spots you slower.`,'',4)},900)}}return}
   if(h.state==='circle'){
     h.a+=dt*.45;const cx=pig.pos.x+Math.cos(h.a)*13,cz=pig.pos.z+Math.sin(h.a)*13,cy=heightAt(pig.pos.x,pig.pos.z)+20;
     _hv.set(cx,cy,cz);h.vel.subVectors(_hv,o.position);o.position.lerp(_hv,Math.min(1,dt*1.5));
@@ -2010,6 +2120,7 @@ function updateFriends(dt,t){
         if(f.act==='walk'){tx=f.target.x;tz=f.target.z;speed=.65}else if(f.act==='nibble')f.eating=.3;
         if(d<2.2&&f.act!=='walk')face=Math.atan2(dx,dz); // curious
       }
+    }else if(f.state==='herd'&&G.raft){f.act='nibble';f.eating=.3;   // waiting on the bank while you ride
     }else if(f.state==='herd'){
       const i=herd.indexOf(f);const tp=trail[Math.min(trail.length-1,(i+1)*6)]||pig.pos;
       if(d>12){f.pos.set(tp.x,heightAt(tp.x,tp.z),tp.z)}
@@ -2146,13 +2257,14 @@ G.camYaw=Math.PI*0;G.camPitch=.2;G.camDist=.95;G.drag=false;G.lastDrag=0;
 const camPos=new THREE.Vector3(),camTgt=new THREE.Vector3();
 function updateCamera(dt){
   const tgt=_v.set(pig.pos.x,pig.pos.y+.09,pig.pos.z);camTgt.lerp(tgt,Math.min(1,dt*10));
-  const d=G.gnaw?.5:G.under?Math.min(G.camDist,.8):G.camDist;let p=G.gnaw?.16:G.under?Math.min(G.camPitch,.5):G.camPitch;
-  const yaw=G.gnaw?pig.heading+2.1:G.camYaw;const want=new THREE.Vector3();const aim=(p,d)=>want.set(camTgt.x+Math.sin(yaw)*Math.cos(p)*d,camTgt.y+Math.sin(p)*d,camTgt.z+Math.cos(yaw)*Math.cos(p)*d);
+  const d=G.raft?2:G.gnaw?.5:G.under?Math.min(G.camDist,.8):G.camDist;let p=G.raft?.36:G.gnaw?.16:G.under?Math.min(G.camPitch,.5):G.camPitch;
+  const yaw=G.gnaw?pig.heading+2.1:G.raft?G.raft.yaw+Math.PI:G.camYaw;const want=new THREE.Vector3();const aim=(p,d)=>want.set(camTgt.x+Math.sin(yaw)*Math.cos(p)*d,camTgt.y+Math.sin(p)*d,camTgt.z+Math.cos(yaw)*Math.cos(p)*d);
   if(G.under){// pull in until the line from the pig stays inside the cave; against a wall, look down from higher up instead
     const reach=p=>{aim(p,d);for(let s=1;s<=12;s++){const q=s/12;if(wSdf(lerp(camTgt.x,want.x,q),lerp(camTgt.y,want.y,q),lerp(camTgt.z,want.z,q),false)>-.1)return (s-1)/12}return 1};
     let best=p,bk=reach(p);for(const q of [.7,.95,1.2]){if(bk>=.6||q<=p)continue;const k=reach(q);if(k>bk+.1){bk=k;best=q}}
     aim(best,d*Math.max(.15,bk))}
-  else if(G.inside){const B=G.inside;if(B.tube)aim(.6,.75);else aim(p,Math.min(d,2.6));want.x=clamp(want.x,-B.hx-.05,B.hx+.05);want.z=clamp(want.z,-B.hz-.05,B.hz+.05);want.y=clamp(want.y,insideHeight(want.x,want.z)+.08,want.x>B.loftX-.15?B.loftY-.15:B.ceil-.25)}
+  else if(G.inside){const B=G.inside;if(B.tube)aim(.6,.75);else aim(p,Math.min(d,B.radius?4:2.6));if(B.waterY!==undefined)want.y=Math.max(want.y,B.waterY+.12);want.x=clamp(want.x,-B.hx-.05,B.hx+.05);want.z=clamp(want.z,-B.hz-.05,B.hz+.05);want.y=clamp(want.y,insideHeight(want.x,want.z)+.08,want.x>B.loftX-.15?B.loftY-.15:B.ceil-.25)}
+  else if(G.raft){const c=creekAt(G.raft.s-2.1);want.set(c.x+c.nx*G.raft.lat*.6,-.12+.78,c.z+c.nz*G.raft.lat*.6)}   // behind you along the creek's curve, over the water
   else{aim(p,d);const gy=heightAt(want.x,want.z)+.07;if(want.y<gy)want.y=gy}
   camPos.lerp(want,Math.min(1,dt*8));if(G.under&&wSdf(camPos.x,camPos.y,camPos.z,false)>-.05)camPos.copy(want);camera.position.copy(camPos);camera.lookAt(camTgt);
 }
@@ -2229,6 +2341,8 @@ const GOALS=[
   {id:'barnyard',icon:'🐐',name:'Barnyard Hello',desc:'Say hello to a goat, a sheep and a duck',test:()=>!!(G.met.Goat&&G.met.Sheep&&G.met.Duck),pts:150},
   {id:'rank3',icon:'⭐',name:'Master Forager',desc:'Forage 25 times',test:()=>G.forages>=25,bonus:150},
   {id:'maze',icon:'🌻',name:'Maze Runner',desc:'Forage the prize in the middle of the sunflower maze',test:()=>G.mazePrize>=1,pts:200},
+  {id:'raft',icon:'🍃',name:'Raft Rider',desc:'Ride the leaf raft down Willow Creek to Willow Island',test:()=>G.island>=1,pts:250},
+  {id:'cleanraft',icon:'🌊',name:'Not a Splash',desc:'Ride the whole creek on the leaf without a single bump',test:()=>G.cleanRaft>=1,pts:250},
   {id:'shop',icon:'🐾',name:'After Hours',desc:'Sneak into the pet shop at night and make friends with Butterscotch',test:()=>G.pals.includes(friends.findIndex(f=>f.shopPig)),pts:300},
   {id:'gnaw',icon:'🦷',name:'Tidy Teeth',desc:'Gnaw a twig down without a single miss',test:()=>G.cleanGnaws>=1,pts:150},
   {id:'hay',icon:'🌾',name:'Hay Diver',desc:"Squeeze into a barn, burrow into its hay and find 3 hidden treats",test:()=>G.hayFinds>=3,pts:200},
@@ -2267,6 +2381,7 @@ function updateHUD(dt){
   $('herdline').innerHTML=`🐹 Herd <b>${herd.length}/${HERD_MAX}</b>${herd.length?' · '+herd.map(f=>esc(f.name)).join(', '):' · befriend piggies with C'}`;
   $('rank').innerHTML=`Forager rank: <b>${RANKS[rankIdx()][1]}</b> · ${G.forages} forages · 🕳 ${tunnels.filter(t=>t.found).length}/${tunnels.length}`;
   // danger
+  const rh=$('raftHud');if(G.raft){const F=G.raft,R=Z.raft;rh.style.display='block';rh.querySelector('.l').innerHTML=`🍃 Leaf raft · ${'❤️'.repeat(F.bal)}${'🤍'.repeat(3-F.bal)} · 🌼 ${F.got}`;rh.querySelector('i').style.width=clamp((F.s-R.s0)/(R.send-R.s0)*100,0,100)+'%'}else rh.style.display='none';
   const dg=$('danger');
   if(G.inside&&G.inside.cat){const c=G.inside.cat;if(c.state==='sleep'){dg.style.display=c.noise>.04?'block':'none';dg.querySelector('.l').textContent='🐈 Duchess is asleep. Tiptoe…';dg.querySelector('i').style.width=Math.min(100,c.noise*100)+'%'}
     else{dg.style.display='block';dg.querySelector('.l').textContent=c.state==='return'?'🐈 Duchess is going back to sleep…':G.inside.tube?'😼 Duchess is looking for you… stay in the tubes!':'😼 Duchess is awake! Hide in a tube!';dg.querySelector('i').style.width='100%'}}
@@ -2338,6 +2453,7 @@ function placeStatus(z){const items=[],nf=(G.zfound[z.id]||[]).length,nb=z===PAR
   for(const k of ZONE_CRITTERS[z.id]||[])items.push({icon:CRITTER_ICON[k],label:`Said hello to a ${k.toLowerCase()}`,done:!!G.met[k]});
   if(z.id==='farm'||z.id==='zoo')items.push({icon:'🛖',label:'Squeezed into the barn',done:!!G.barns[z.id]});
   if(z.id==='town')items.push({icon:'🐾',label:'Snuck into the pet shop',done:!!G.shop});
+  if(z.id==='creek')items.push({icon:'🍃',label:'Rode the leaf raft to Willow Island',done:!!G.island});
   return {items,done:items.every(i=>i.done)}}
 function placesHTML(){const done=PLACE_ORDER.filter(id=>G.placesDone[id]).length;
   return `<h2 style="margin:18px 0 4px;font-size:20px">🗺 Places · ${Object.keys(G.visited).length}/9 visited · ${done}/9 complete</h2><p style="font-size:13px;margin:0 0 8px">Finish everything in a place for a bonus. They're laid out as they lie on the map.</p><div class="pgrid">`+
@@ -2354,10 +2470,10 @@ function gameOver(){G.over=true;const best=Math.max(G.best,G.score);lsSet('wheek
 // Three slots in localStorage. The world is seeded (the same every game), so a save only keeps what changed:
 // the stats, what's been found, the herd (by friend index) and the warren's explored passages.
 const SLOTS=3,slotKey=i=>'wheek-slot-'+i;
-const SAVE_G=['hp','full','vitc','energy','happy','score','day','time','forages','pets','found','curios','nightsSurvived','eaten','luckT','warrenTip','zfound','visited','met','pals','placesDone','goals','bestStreak','hawkDodged','foxEscapes','mazePrize','heard','given','barns','hayFinds','teethT','gnaws','cleanGnaws','shop','fullHerd'];
+const SAVE_G=['hp','full','vitc','energy','happy','score','day','time','forages','pets','found','curios','nightsSurvived','eaten','luckT','warrenTip','zfound','visited','met','pals','placesDone','goals','bestStreak','hawkDodged','foxEscapes','mazePrize','heard','given','barns','hayFinds','teethT','gnaws','cleanGnaws','shop','fullHerd','island','rafts','cleanRaft'];
 function snapshot(){const g={};for(const k of SAVE_G)g[k]=G[k];const ix=(a,f)=>a.flatMap((x,i)=>f(x)?[i]:[]);
   return {v:1,saved:Date.now(),name:G.name,breed:G.breed,coat:G.coat,G:g,
-    zone:Z.id,pig:G.inside?{x:+G.insideHole.ex.toFixed(2),z:+G.insideHole.ez.toFixed(2),h:+G.insideHole.out.toFixed(2)}:{x:+pig.pos.x.toFixed(2),z:+pig.pos.z.toFixed(2),h:+pig.heading.toFixed(2)},under:G.under?PARK.tunnels.indexOf(W.from):-1,herd:herd.map(f=>friends.indexOf(f)),names:friends.map(f=>f.name),known:ix(friends,f=>f.known),
+    zone:Z.id,pig:G.raft?{x:+Z.raft.ex.toFixed(2),z:+Z.raft.ez.toFixed(2),h:+Z.raft.out.toFixed(2)}:G.inside?{x:+G.insideHole.ex.toFixed(2),z:+G.insideHole.ez.toFixed(2),h:+G.insideHole.out.toFixed(2)}:{x:+pig.pos.x.toFixed(2),z:+pig.pos.z.toFixed(2),h:+pig.heading.toFixed(2)},under:G.under?PARK.tunnels.indexOf(W.from):-1,herd:herd.map(f=>friends.indexOf(f)),names:friends.map(f=>f.name),known:ix(friends,f=>f.known),
     warren:{edges:W.edges.map(e=>e.pts.map(p=>p.seen?1:0).join('')),seen:ix(W.nodes,n=>n.seen),heard:ix(W.nodes,n=>n.heard),got:ix(W.curios,c=>c.got),routes:W.routes||0}}}
 function saveGame(quiet){if(!G.slot||!G.started||G.over)return;lsSet(slotKey(G.slot),snapshot());if(!quiet)toast(`💾 Saved to slot ${G.slot}`,'good')}
 function restore(s){
@@ -2509,7 +2625,7 @@ function loop(){
     if(G.inTunnel&&travel){updateTravel(dt);updateParticles(dt);renderer.render(tScene,tCam);return}
     if(G.under){updateWarren(dt,t);updateSurvival(dt);updateHawk(dt,t);updateFoxes(dt,t);updateDay(dt)}
     else if(G.inside){updateInside(dt,t);const hold=keys.KeyE?(G.acts||[]).find(a=>a.k==='E'&&a.hold):null;if(hold)holdEat(dt,hold);if(G.inside)updateForage(dt);updateReveals(dt);updateSurvival(dt);updateDay(dt)}else{
-    updatePig(dt,t);
+    if(G.raft)updateRaft(dt,t);else updatePig(dt,t);
     const hold=(keys.KeyE)&&!G.inTunnel?(G.acts||[]).find(a=>a.k==='E'&&a.hold):null;if(hold)holdEat(dt,hold);
     updateForage(dt);updateGnaw(dt);updateSurvival(dt);updateHumans(dt);updateFriends(dt,t);updateHawk(dt,t);updateFoxes(dt,t);updateDay(dt);updateReveals(dt);updateDrops(dt);
     if(Z.critters.length)updateCritters(dt,t);if(Z.cars.length)updateCars(dt)}
@@ -2548,5 +2664,5 @@ function loop(){
   $('setBtn').onclick=openSettings;$('setBtn2').onclick=openSettings;$('setClose').onclick=closeSettings;applyQuality();
   $('resumeBtn').onclick=()=>togglePause(false);$('saveBtn').onclick=()=>saveGame();$('quitBtn').onclick=()=>{saveGame(true);location.reload()};$('jclose').onclick=closeJournal;$('againBtn').onclick=()=>location.reload();
   $('retryBtn').onclick=()=>{try{sessionStorage.setItem('wheek-continue',G.slot)}catch(e){}location.reload()};
-  window.__game={G,W,WS,ZONE,PARK,EDGE,ITEMS,offerSwap,insideCollide,TUBE_NODES,startGnaw,gnawHit,enterBarn:enterInside,exitBarn:exitInside,enterInside,exitInside,enterTube:n=>enterTube(n),catNoise:n=>catNoise(n),startBurrow,popOut,insideHeight,revealItem,setInput,SET,sun,music:()=>({now:musicNow&&musicNow.k,gain:musicGain&&musicGain.gain.value,tracks:Object.fromEntries(Object.entries(MUSIC).map(([k,m])=>[k,m.buf?{dur:+m.buf.duration.toFixed(4),start:m.start,len:m.len}:null]))}),wSdf,neighbour,freeAt,Z:()=>Z,visit:(id,x=0,z=0,h=0)=>arriveZone(ZONE[id],0,{x,z,h}),enterWarren,exitWarren,pig,friends,herd,joinHerd,keys,applyLook,humans,tunnels,spots,hawk,foxes,heightAt,renderer,scene,camera};
+  window.__game={G,W,WS,ZONE,PARK,EDGE,ITEMS,startRaft,creekAt,offerSwap,insideCollide,TUBE_NODES,startGnaw,gnawHit,enterBarn:enterInside,exitBarn:exitInside,enterInside,exitInside,enterTube:n=>enterTube(n),catNoise:n=>catNoise(n),startBurrow,popOut,insideHeight,revealItem,setInput,SET,sun,music:()=>({now:musicNow&&musicNow.k,gain:musicGain&&musicGain.gain.value,tracks:Object.fromEntries(Object.entries(MUSIC).map(([k,m])=>[k,m.buf?{dur:+m.buf.duration.toFixed(4),start:m.start,len:m.len}:null]))}),wSdf,neighbour,freeAt,Z:()=>Z,visit:(id,x=0,z=0,h=0)=>arriveZone(ZONE[id],0,{x,z,h}),enterWarren,exitWarren,pig,friends,herd,joinHerd,keys,applyLook,humans,tunnels,spots,hawk,foxes,heightAt,renderer,scene,camera};
 })().catch(e=>{console.error(e);$('loading').textContent='Failed to load: '+e.message});

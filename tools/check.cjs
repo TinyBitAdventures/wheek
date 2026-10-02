@@ -1,6 +1,6 @@
 // World checks: loads the game in a tiny headless window and tests the world's logic through window.__game.
 // Usage: PW=/path/to/node_modules/playwright node tools/check.cjs [check ...]
-//   checks: reach warren night chaos eat treats goals music gnaw barn shop swap saves touch pad memory (default: all). URL defaults to the local dev site.
+//   checks: reach warren night chaos eat treats goals music gnaw barn shop swap raft saves touch pad memory (default: all). URL defaults to the local dev site.
 // Prints a report and exits 1 if anything failed.
 const { chromium } = require(process.env.PW || 'playwright');
 const URL = process.env.URL || 'https://wheek.localhost/';
@@ -55,6 +55,7 @@ const frames = (page, n) => page.evaluate(n => new Promise(r => { let k = 0; (fu
       for(const b of Z.barns||[])for(const h of b.holes)chk('barn hole',h.ex,h.ez,.3);
       for(const t of Z.twigs||[])chk('twig',t.x,t.z,.45);
       if(Z.shop)chk('pet shop cat flap',Z.shop.holes[0].ex,Z.shop.holes[0].ez,.3);
+      if(Z.raft)chk('leaf raft',Z.raft.ex,Z.raft.ez,.3);
       for(const c of Z.critters)if(c.kind==='Duck')chk('duck pond',c.area.x,c.area.z,c.area.r+2.4);else chk(c.kind,c.x,c.z,1.4);
       out.counts=[Z.tunnels.length,Z.spots.length,Z.pickSets.reduce((n,p)=>n+p.items.length,0),Z.humans.length,Z.critters.length,pigs.length].join('/');return out})()`);
     report(`reach ${id}`, !r.bad.length, `${r.arrivals} ways in · burrows/spots/plants/humans/animals/piggies ${r.counts}${r.bad.length ? ' · ' + r.bad.length + ' unreachable: ' + r.bad.slice(0, 6).join('; ') : ''}`);
@@ -275,6 +276,44 @@ const frames = (page, n) => page.evaluate(n => new Promise(r => { let k = 0; (fu
     const kept = await page.evaluate(() => { const g = window.__game; return { closed: !g.G.modal, herd: g.herd.length, out: !g.herd.includes(window.__nf2) } });
     report('herd swap', pr.herd === 6 && menu && swapped.closed && swapped.herd === 6 && swapped.inNew && swapped.oldOut && menu2 && kept.closed && kept.herd === 6 && kept.out,
       `full herd ${pr.herd} · swap menu ${menu} · ${pr.nf} in, one out home ${swapped.inNew && swapped.oldOut} · "not now" keeps the herd ${menu2 && kept.out && kept.herd === 6}`);
+  }
+
+  // 5i. the leaf raft: board it, ride downstream, scoop a treat, take a bump, tip off onto dry land; ride again to the
+  //     end and land on Willow Island; nap in the willow roots, forage the driftwood, ride back to the start
+  if (pick('raft')) {
+    const board = async () => { await page.evaluate(() => { const g = window.__game, R = g.Z().raft; g.pig.pos.set(R.ex, g.heightAt(R.ex, R.ez), R.ez); g.G.acts = null });
+      await page.waitForFunction(() => { const g = window.__game, R = g.Z().raft; g.pig.pos.set(R.ex, g.heightAt(R.ex, R.ez), R.ez); return (g.G.acts || []).some(a => a.label.includes('leaf raft')) }, null, { timeout: 30000, polling: 200 });
+      await page.keyboard.press('KeyE'); await frames(page, 3) };
+    await page.evaluate(() => { const g = window.__game; g.G.time = 11; if (g.G.inside) g.exitBarn(); g.visit('creek', 0, 0, 0); g.G.hp = 100 });
+    await board();
+    const ride = await page.evaluate(async () => { const g = window.__game, F = g.G.raft; if (!F) return { boarded: false }; const s0 = F.s;
+      for (let k = 0; k < 20; k++) await new Promise(r => requestAnimationFrame(r));
+      const moved = F.s - s0; const c = g.creekAt(F.s + .5), tr = F.treats[0]; tr.x = c.x + c.nx * F.lat; tr.z = c.z + c.nz * F.lat; tr.obj.position.set(tr.x, -.1, tr.z); const got0 = F.got;
+      for (let k = 0; k < 20 && F.got === got0; k++) await new Promise(r => requestAnimationFrame(r));
+      const scooped = F.got > got0, bal0 = F.bal, c2 = g.creekAt(F.s + .4), o = { x: c2.x + c2.nx * F.lat, z: c2.z + c2.nz * F.lat, r: .2, kind: 'stone' }; g.Z().raft.obs.push(o);
+      for (let k = 0; k < 30 && F.bal === bal0; k++) await new Promise(r => requestAnimationFrame(r));
+      const bumped = F.bal < bal0; F.inv = 0; F.bal = 1; const c3 = g.creekAt(F.s + .4); o.x = c3.x + c3.nx * F.lat; o.z = c3.z + c3.nz * F.lat;
+      for (let k = 0; k < 30 && g.G.raft; k++) await new Promise(r => requestAnimationFrame(r));
+      g.Z().raft.obs.pop(); const Z = g.Z(), dry = Z.waterY - g.heightAt(g.pig.pos.x, g.pig.pos.z) < 0;
+      return { boarded: true, moved, scooped, bumped, tipped: !g.G.raft, dry } });
+    await board();
+    const island = await page.evaluate(async () => { const g = window.__game, F = g.G.raft; if (!F) return { boarded: false }; F.s = g.Z().raft.send - .3;
+      for (let k = 0; k < 30 && !g.G.inside; k++) await new Promise(r => requestAnimationFrame(r));
+      const B = g.G.inside; return { boarded: true, landed: !!B && B.kind === 'island', rafts: g.G.rafts } });
+    await page.evaluate(() => { const g = window.__game, B = g.G.inside; g.pig.pos.set(B.hollow.x, 0, B.hollow.z + .1); g.G.acts = null; window.__t0 = g.G.time });
+    await page.waitForFunction(() => { const g = window.__game, B = g.G.inside; g.pig.pos.set(B.hollow.x, 0, B.hollow.z + .1); return (g.G.acts || []).some(a => a.label.includes('willow roots')) }, null, { timeout: 30000, polling: 200 });
+    await page.keyboard.press('KeyE'); await frames(page, 3);
+    const napped = await page.evaluate(() => { const g = window.__game, d = (g.G.time - window.__t0 + 24) % 24; return d > 1.5 && d < 3 });
+    await page.evaluate(() => { const g = window.__game, sp = g.G.inside.spots[0]; window.__sp = sp; g.pig.pos.set(sp.x + .3, 0, sp.z); g.G.acts = null });
+    await page.keyboard.down('KeyF');
+    const foraged = await page.waitForFunction(() => { const g = window.__game, sp = window.__sp; if (sp.ready) { g.pig.pos.set(sp.x + .3, 0, sp.z); if (!document.getElementById('forage').style.display.includes('block')) document.dispatchEvent(new KeyboardEvent('keydown', { code: 'KeyF' })) } return !sp.ready }, null, { timeout: 120000, polling: 250 }).then(() => true, () => false);
+    await page.keyboard.up('KeyF');
+    await page.evaluate(() => { const g = window.__game, B = g.G.inside; g.pig.pos.set(B.leafAt.x, 0, B.leafAt.z); g.G.acts = null });
+    await page.waitForFunction(() => { const g = window.__game, B = g.G.inside; g.pig.pos.set(B.leafAt.x, 0, B.leafAt.z); return (g.G.acts || []).some(a => a.label.includes('Ride the leaf back')) }, null, { timeout: 30000, polling: 200 });
+    await page.keyboard.press('KeyE'); await frames(page, 3);
+    const back = await page.evaluate(() => { const g = window.__game, R = g.Z().raft; return { outside: !g.G.inside, atStart: Math.hypot(g.pig.pos.x - R.ex, g.pig.pos.z - R.ez) < .3, leaf: R.leaf.visible } });
+    report('leaf raft', ride.boarded && ride.moved > .5 && ride.scooped && ride.bumped && ride.tipped && ride.dry && island.landed && napped && foraged && back.outside && back.atStart && back.leaf,
+      `rode ${ride.moved?.toFixed(1)} m · scooped ${ride.scooped} · bump ${ride.bumped} · tipped off onto dry land ${ride.tipped && ride.dry} · reached Willow Island ${island.landed} · nap ${napped} · driftwood ${foraged} · back at the start ${back.atStart}`);
   }
 
   // 5e. the barns: in through a hole, munch the hay, burrow onto every hidden treat, pop out, out through the other hole

@@ -2591,6 +2591,96 @@ def build_pellets():
     paint(po, lambda p, n: mix((0.42, 0.52, 0.22), (0.6, 0.5, 0.25), noise.noise(p * 80) * 0.5 + 0.5))
     export("Pellets")
 
+# ================================================================ WILLOW CREEK: the leaf raft and Willow Island
+def build_leaf_raft():
+    """A big curled leaf to ride down the creek: 0.85 long, edges turned up like a boat, a stem at the back. Faces -Y (forward)."""
+    clear()
+    rt = root("LeafRaft")
+    L, Wd = 0.85, 0.46
+    bm = sphere_bm(1, 28, 14)
+    def f(v):
+        y = v.y
+        w = max(0.0, 1 - abs(y)) ** 0.75
+        x = v.x * Wd * 0.5 * w
+        z = v.z * 0.008 + (x / (Wd * 0.5)) ** 2 * 0.13 + 0.05 * max(0.0, -y) ** 3 + 0.015
+        return Vector((x, y * L * 0.5, z))
+    deform(bm, f)
+    lo = from_bm(bm, "RaftLeaf", material("Plant", rough=0.55, spec=0.4), parent=rt)
+    def col(p, n):
+        vein = abs(p.x) < 0.008 or abs(math.sin((p.y * 18 + abs(p.x) * 26))) < 0.08
+        c = mix((0.22, 0.5, 0.16), (0.36, 0.62, 0.2), noise.noise(p * 12) * 0.5 + 0.5)
+        return mix(c, (0.62, 0.8, 0.38), 0.6) if vein else c
+    paint(lo, col)
+    st = limb_bm((0, L * 0.48, 0.02), (0.01, L * 0.62, 0.06), 0.012, 0.008, 8)
+    so = from_bm(st, "RaftStem", material("Plant", rough=0.7), parent=rt)
+    paint(so, solid((0.32, 0.45, 0.18)))
+    export("LeafRaft")
+
+def build_willow():
+    """A giant weeping willow for the island: a thick leaning trunk with a root hollow at its foot (facing -Y), a crown,
+    and a curtain of hanging leafy strands down to about knee height."""
+    clear()
+    random.seed(107)
+    rt = root("Willow")
+    H = 3.0
+    tr = trunk_bm(H, 0.42, rings=22, seg=20, flare=1.1, top=0.55, bend=0.35)
+    br = []
+    tops = []
+    for i in range(6):
+        a = i / 6 * math.tau + random.random() * 0.5
+        s = Vector((0.2 * math.sin(2.1), 0, H * (0.75 + 0.05 * i)))
+        e = s + Vector((math.cos(a) * 1.6, math.sin(a) * 1.6, 1.0 + random.random() * 0.6))
+        br.append(limb_bm(s, e, 0.14, 0.06, 10))
+        tops.append(e)
+    roots = []
+    for i in range(7):
+        a = i / 7 * math.tau + 0.3
+        roots.append(limb_bm((math.cos(a) * 0.35, math.sin(a) * 0.35, 0.35), (math.cos(a) * 1.0, math.sin(a) * 1.0, -0.05), 0.12, 0.06, 8))
+    to = from_bm(merge_bms([tr] + br + roots), "Trunk", material("Bark", rough=0.95), parent=rt)
+    paint(to, lambda p, n: scl(bark_color(p, n), 0.95))
+    hol = sphere_bm(1, 16, 10)
+    deform(hol, lambda v: Vector((v.x * 0.24, min(v.y, 0.0) * 0.06 - 0.005, max(v.z, -0.2) * 0.3)) + Vector((0, -0.47, 0.25)))
+    ho = from_bm(hol, "RootHollow", material("HoleDark", rough=1.0), parent=rt)
+    paint(ho, solid((0.04, 0.03, 0.02)))
+    # the crown
+    blobs = []
+    centers = [Vector((0.2, 0, H + 1.6))] + [t + Vector((0, 0, 0.2)) for t in tops]
+    for i, c in enumerate(centers):
+        b = blob_bm(1.2 if i else 1.5, 3, 0.3, 1.3, seed=i * 3.1 + 5, squash=0.6)
+        xform(b, Matrix.Translation(c))
+        blobs.append(b)
+    # the weeping curtain: thin leafy ribbons hanging from round the crown
+    rib = bmesh.new()
+    for k in range(170):
+        a = random.random() * math.tau
+        if abs(math.atan2(math.sin(a + math.pi / 2), math.cos(a + math.pi / 2))) < 0.55:
+            continue   # a gap in the curtain in front of the root hollow
+        r = random.uniform(1.2, 2.6)
+        x0, y0 = math.cos(a) * r, math.sin(a) * r
+        z0 = H + 1.2 + random.uniform(-0.2, 0.6) - 0.15 * r
+        z1 = random.uniform(0.35, 0.9)
+        wv = random.uniform(0.07, 0.12)
+        segs = 7
+        nx, ny = -math.sin(a), math.cos(a)
+        prev = None
+        for i in range(segs + 1):
+            t = i / segs
+            z = z0 + (z1 - z0) * t
+            sway = 0.08 * math.sin(t * 3 + k)
+            cx, cy = x0 * (1 + 0.12 * t) + nx * sway, y0 * (1 + 0.12 * t) + ny * sway
+            w = wv * (1 - 0.5 * t)
+            va, vb = rib.verts.new((cx - nx * w, cy - ny * w, z)), rib.verts.new((cx + nx * w, cy + ny * w, z))
+            if prev:
+                rib.faces.new((prev[0], prev[1], vb, va))
+            prev = (va, vb)
+    me = bpy.data.meshes.new("tmp")
+    for b in blobs:
+        b.to_mesh(me); rib.from_mesh(me); b.free()
+    bpy.data.meshes.remove(me)
+    lo = from_bm(rib, "Leaves", material("Leaves", rough=0.85, spec=0.25), parent=rt)
+    paint(lo, leaf_color((0.2, 0.36, 0.1), (0.36, 0.52, 0.16)))
+    export("Willow")
+
 jobs = {
     "GuineaPig": build_guinea_pig, "Human": build_human, "Oak": lambda: build_oak("Oak", 1),
     "Oak2": lambda: build_oak("Oak2", 9), "Pine": build_pine, "Birch": build_birch, "Bush": build_bush,
@@ -2616,6 +2706,7 @@ jobs = {
     "AppleTree": build_apple_tree, "SunflowerHead": build_sunflower_head,
     "BarnInside": build_barn_inside, "HayPile": build_hay_pile, "BarnHole": build_barn_hole, "Twig": build_twig,
     "PetShopInside": build_petshop_inside, "CatFlap": build_cat_flap, "Cat": build_cat, "CatLoaf": build_cat_loaf, "Pellets": build_pellets,
+    "LeafRaft": build_leaf_raft, "Willow": build_willow,
 }
 for k, fn in jobs.items():
     if only and k not in only:
