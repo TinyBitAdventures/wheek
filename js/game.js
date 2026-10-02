@@ -1468,16 +1468,26 @@ function updateWarren(dt,t){
   W.lantern.position.set(pig.pos.x-Math.sin(pig.heading)*.15,pig.pos.y+.4,pig.pos.z-Math.cos(pig.heading)*.15);
 }
 function drawWarrenMap(g,s){const w=v=>s(v/WS),big=$('mapwrap').classList.contains('big');
-  g.fillStyle='#120b06';g.fillRect(0,0,340,340);g.globalAlpha=.16;g.drawImage(mapBg,0,0);g.globalAlpha=1;
+  g.fillStyle='#120b06';g.fillRect(0,0,340,340);g.globalAlpha=.16;g.drawImage(mapBg,0,0,340,340);g.globalAlpha=1;
   g.lineCap=g.lineJoin='round';
   for(const [lw,c] of [[10,'#5a3e22'],[5,'#d2a86e']]){g.strokeStyle=c;g.lineWidth=lw;g.beginPath();
     for(const e of W.edges)for(let k=0;k<e.pts.length-1;k++){const a=e.pts[k],b=e.pts[k+1];if(a.seen&&b.seen){g.moveTo(w(a.x),w(a.z));g.lineTo(w(b.x),w(b.z))}}g.stroke()}
-  g.textAlign='center';g.font='600 13px Fredoka, sans-serif';
+  g.textAlign='center';g.textBaseline='middle';g.font='600 13px Fredoka, sans-serif';const labels=[];
   for(const n of W.nodes){const x=w(n.x),z=w(n.z),r=n.r/WS/144*340;
-    if(!n.seen){if(n.heard){g.fillStyle='rgba(255,220,160,.55)';g.fillText('?',x,z+6)}continue}
+    if(!n.seen){if(n.heard){g.fillStyle='rgba(255,220,160,.55)';g.fillText('?',x,z)}continue}
     g.fillStyle=n.kind==='hall'?'#e0b880':'#d2a86e';g.beginPath();g.arc(x,z,r,0,7);g.fill();
     if(n.kind==='den'){g.strokeStyle='#ffe08a';g.lineWidth=2.5;g.beginPath();g.arc(x,z,r*.55,0,7);g.stroke()}
-    if(big&&n.kind!=='nook'){g.fillStyle='#fff3d8';g.strokeStyle='rgba(0,0,0,.6)';g.lineWidth=3;g.strokeText(n.name,x,z-r-4);g.fillText(n.name,x,z-r-4)}}
+    if(big&&n.kind!=='nook')labels.push({n,x,z,r})}
+  // names on the big map: chambers first, each tries above, below, then beside its spot until it fits
+  const placed=[],hit=(a,b)=>a.x0<b.x1&&a.x1>b.x0&&a.y0<b.y1&&a.y1>b.y0;
+  labels.sort((a,b)=>(a.n.kind==='hall'?0:1)-(b.n.kind==='hall'?0:1));
+  for(const L of labels){const hall=L.n.kind==='hall';g.font=hall?'600 10.5px Fredoka, sans-serif':'500 9px Fredoka, sans-serif';const tw=g.measureText(L.n.name).width,th=hall?11:9.5,gap=L.r+3;
+    let best=null;for(const [dx,dy] of [[0,-gap-th/2],[0,gap+th/2],[gap+tw/2,0],[-gap-tw/2,0],[gap*.7+tw/2,-gap*.7-th/2],[-gap*.7-tw/2,-gap*.7-th/2],[gap*.7+tw/2,gap*.7+th/2],[-gap*.7-tw/2,gap*.7+th/2],[0,-gap-th*1.6],[0,gap+th*1.6]]){
+      const cx=clamp(L.x+dx,tw/2+2,338-tw/2),cy=clamp(L.z+dy,th/2+2,338-th/2),box={x0:cx-tw/2-1,x1:cx+tw/2+1,y0:cy-th/2,y1:cy+th/2};
+      if(!placed.some(b=>hit(b,box))&&!labels.some(o=>o!==L&&Math.hypot(o.x-cx,o.z-cy)<o.r+1)){best={cx,cy,box};break}if(!best)best={cx,cy,box,over:true}}
+    if(best.over){const b=best;best={cx:clamp(L.x,tw/2+2,338-tw/2),cy:clamp(L.z-gap-th/2,th/2+2,338),box:b.box}}
+    placed.push(best.box);g.lineWidth=2.6;g.strokeStyle='rgba(0,0,0,.7)';g.fillStyle=hall?'#ffd88a':'#fff3d8';g.strokeText(L.n.name,best.cx,best.cy);g.fillText(L.n.name,best.cx,best.cy)}
+  g.textBaseline='alphabetic';
   for(const c of W.curios)if(!c.got&&c.node.seen){g.fillStyle=RARITY[CURIOS[c.k].rarity][0];g.beginPath();g.arc(w(c.x),w(c.z),3.5,0,7);g.fill()}
   herd.forEach(f=>{g.fillStyle='#ff9fd0';g.beginPath();g.arc(w(f.pos.x),w(f.pos.z),3,0,7);g.fill()});
   return w}
@@ -2090,16 +2100,19 @@ function updateHUD(dt){
 function edgeHint(){if(G.under||Math.hypot(pig.pos.x,pig.pos.z)<EDGE-6)return '';const nb=neighbour(Z,sectorAt(pig.pos.x,pig.pos.z));
   return nb?`<div class="pill info">➜ ${nb.icon} ${nb.name} this way · keep going to leave ${Z.name}</div>`:''}
 const mapC=$('map'),mctx=mapC.getContext('2d');let mapBg=null;
-function drawMapBg(){const c=document.createElement('canvas');c.width=c.height=340;const g=c.getContext('2d');const img=g.createImageData(340,340);
+const MAPBG=680;   // the map's terrain is drawn at twice the 340-unit map space, so the big map stays sharp
+function drawMapBg(){const c=document.createElement('canvas');c.width=c.height=MAPBG;const g=c.getContext('2d');const img=g.createImageData(MAPBG,MAPBG);
   const col=Z.mapColor||((x,z)=>Z.ground(x,z,heightAt(x,z)).map(v=>v*290));
-  for(let y=0;y<340;y++)for(let x=0;x<340;x++){const wx=(x/340*2-1)*72,wz=(y/340*2-1)*72;const i=(y*340+x)*4;const out=Math.hypot(wx,wz)>EDGE;
+  for(let y=0;y<MAPBG;y++)for(let x=0;x<MAPBG;x++){const wx=((x+.5)/MAPBG*2-1)*72,wz=((y+.5)/MAPBG*2-1)*72;const i=(y*MAPBG+x)*4;const out=Math.hypot(wx,wz)>EDGE;
     let [r,gg,b]=Z.waterY!==undefined&&heightAt(wx,wz)<Z.waterY?[60,125,170]:col(wx,wz);if(out){r*=.5;gg*=.5;b*=.5}img.data[i]=r;img.data[i+1]=gg;img.data[i+2]=b;img.data[i+3]=255}
-  g.putImageData(img,0,0);const s=v=>(v/72*.5+.5)*340;if(Z.home){g.fillStyle='#b5523b';g.fillRect(s(Z.home.x-3),s(Z.home.z-2.3),6/144*340,4.6/144*340)}
+  g.putImageData(img,0,0);g.scale(MAPBG/340,MAPBG/340);const s=v=>(v/72*.5+.5)*340;if(Z.home){g.fillStyle='#b5523b';g.fillRect(s(Z.home.x-3),s(Z.home.z-2.3),6/144*340,4.6/144*340)}
   if(Z.mapExtra)Z.mapExtra(g,s);mapBg=Z.mapBg=c}
-function drawMap(){if(!mapBg)drawMapBg();const g=mctx;const s=v=>(v/72*.5+.5)*340;
+function fitMap(){const css=mapC.clientWidth||170,px=Math.round(css*Math.min(devicePixelRatio||1,3));if(mapC.width!==px){mapC.width=mapC.height=px}
+  mctx.setTransform(px/340,0,0,px/340,0,0);mctx.imageSmoothingEnabled=true;mctx.imageSmoothingQuality='high'}
+function drawMap(){if(!mapBg)drawMapBg();fitMap();const g=mctx;const s=v=>(v/72*.5+.5)*340;
   if(G.under){const w=drawWarrenMap(g,s);drawArrow(g,w(pig.pos.x),w(pig.pos.z));return}
-  if(G.inside){g.drawImage(mapBg,0,0);const h=G.insideHole;drawArrow(g,s(h.ex),s(h.ez));return}
-  g.drawImage(mapBg,0,0);
+  if(G.inside){g.drawImage(mapBg,0,0,340,340);const h=G.insideHole;drawArrow(g,s(h.ex),s(h.ez));return}
+  g.drawImage(mapBg,0,0,340,340);
   // passages you have explored, faint under the woods
   g.setLineDash([5,6]);g.strokeStyle='rgba(50,30,12,.5)';g.lineWidth=3;g.beginPath();
   if(Z===PARK)for(const e of W.edges)for(let k=0;k<e.pts.length-1;k++){const a=e.pts[k],b=e.pts[k+1];if(a.seen&&b.seen){g.moveTo(s(a.x/WS),s(a.z/WS));g.lineTo(s(b.x/WS),s(b.z/WS))}}g.stroke();g.setLineDash([]);

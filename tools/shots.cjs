@@ -1,6 +1,6 @@
 // Screenshot tour: loads the game, picks a guinea pig, then poses a few scenes and saves a PNG of each.
 // Usage: PW=/path/to/node_modules/playwright node tools/shots.cjs [outdir] [scene ...]
-//   URL defaults to the local dev site, W/H to 1280x800. Prints draw calls, triangles and any console errors.
+//   URL defaults to the local dev site, W/H to 1280x800, DPR to 1 (2 for a retina screen). Prints draw calls, triangles and any console errors.
 const { chromium } = require(process.env.PW || 'playwright');
 const URL = process.env.URL || 'https://wheek.localhost/';
 const [out = 'shots', ...want] = process.argv.slice(2);
@@ -139,7 +139,7 @@ for (const [zone, type, dist] of [['peaks', 'drift', 2], ['deepwood', 'bramble',
 
 (async () => {
   const browser = await chromium.launch({ args: ['--use-angle=swiftshader', '--enable-unsafe-swiftshader', '--ignore-gpu-blocklist'] });
-  const page = await browser.newPage({ viewport: { width: W, height: H }, hasTouch: !!process.env.TOUCH, ignoreHTTPSErrors: true });
+  const page = await browser.newPage({ viewport: { width: W, height: H }, hasTouch: !!process.env.TOUCH, deviceScaleFactor: +(process.env.DPR || 1), ignoreHTTPSErrors: true });
   const errors = [];
   page.on('console', m => { if (m.type() === 'error') errors.push(m.text().slice(0, 300)); });
   page.on('pageerror', e => errors.push('PAGE ' + e.message));

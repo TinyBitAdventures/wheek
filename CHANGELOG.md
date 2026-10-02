@@ -29,6 +29,10 @@
 ### The journal
 - A Places page: the nine places laid out as they lie on the map, each with a checklist of burrows found, guinea pigs befriended, its signature treat and the animals to say hello to (and the warren's hidden chambers for the park). Finish everything in a place for a +300 bonus.
 
+### Sharper maps
+- The minimap and the big map (M) are drawn at your screen's real resolution, so they're crisp on high-density screens instead of blurry, and the terrain behind them is twice as detailed.
+- The warren map's names keep out of each other's way, and the hidden chambers are labelled in gold.
+
 ### Music and settings
 - Wheek! has music: three gentle loops made for it. "Clover Meadow" by day (marimba, folk guitar, upright bass), "Moonlit Burrow" at night (a music-box glockenspiel, harp and vibraphone) and "Under the Roots" down in the warren (kalimba, pizzicato strings, bongos). They cross-fade as night falls, as the sun comes up and as you crawl underground, and loop without a seam. The game goes quiet when its tab is hidden.
 - A settings panel (⚙️ on the title screen and in the pause menu): volume, music and sound effects sliders, High or Low graphics (Low turns off shadows, thins the fur and draws less of the world far away, for slower computers and phones), screen flashes on or off, and the touch controls on Auto, Always or Never. Settings are saved in your browser.
