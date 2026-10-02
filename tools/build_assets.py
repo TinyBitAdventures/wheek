@@ -2143,6 +2143,189 @@ def build_sunflower_head():
     paint(so, solid((0.3, 0.48, 0.15)))
     export("SunflowerHead")
 
+# ================================================================ THE BARN INSIDE (a guinea pig squeezes in through a hole) and gnawing twigs
+BARN_W, BARN_D, BARN_HW = 8.0, 6.0, 3.2   # the same box as build_barn
+
+def build_barn_inside():
+    """The barn from inside, at the Barn's own size: plank walls and floor, rafters, a loft with a ladder.
+    Holes at the foot of the back wall (x -2.2) and the east wall (y -1.0, Blender) let the daylight in; the game lines them up with BarnHole outside."""
+    clear()
+    random.seed(95)
+    rt = root("BarnInside")
+    W, D, Hw = BARN_W, BARN_D, BARN_HW
+    fl = from_bm(box_bm(W, D, 0.06, (0, 0, -0.03)), "BarnFloor", material("BarnFloor", rough=0.95), parent=rt, smooth_shade=False)
+    subdivide(fl, 14)
+    def floor(p, n):
+        straw = noise.noise(p * 9) > 0.35
+        c = mix((0.36, 0.27, 0.18), (0.44, 0.34, 0.22), noise.noise(p * 2) * 0.5 + 0.5)
+        return mix(c, (0.78, 0.66, 0.34), 0.7) if straw else c
+    paint(fl, floor)
+    # walls: upright planks with thin gaps (a dark backing behind them), each board its own shade
+    t = 0.06
+    back = [box_bm(W + 0.3, 0.02, Hw, (0, D / 2 + t + 0.02, Hw / 2)), box_bm(W + 0.3, 0.02, Hw, (0, -D / 2 - t - 0.02, Hw / 2)),
+            box_bm(0.02, D + 0.3, Hw, (W / 2 + t + 0.02, 0, Hw / 2)), box_bm(0.02, D + 0.3, Hw, (-W / 2 - t - 0.02, 0, Hw / 2))]
+    bko = from_bm(merge_bms(back), "BarnBacking", material("BarnBacking", rough=1.0), parent=rt, smooth_shade=False)
+    paint(bko, solid((0.06, 0.04, 0.03)))
+    planks, shade = [], []
+    PW = 0.25
+    for (axis, fixed, length) in (("x", D / 2 + t / 2, W), ("x", -D / 2 - t / 2, W), ("y", W / 2 + t / 2, D), ("y", -W / 2 - t / 2, D)):
+        n = int(length / PW)
+        for i in range(n):
+            c = -length / 2 + (i + 0.5) * length / n
+            w = length / n - 0.018
+            if axis == "x":
+                planks.append(box_bm(w, t, Hw, (c, fixed, Hw / 2)))
+            else:
+                planks.append(box_bm(t, w, Hw, (fixed, c, Hw / 2)))
+    wo = from_bm(merge_bms(planks), "BarnBoards", material("Wood", rough=0.85), parent=rt, smooth_shade=False)
+    def boards(p, n):
+        u = p.x if abs(p.y) > D / 2 - 0.01 else p.y
+        k = 0.82 + 0.2 * (noise.noise(Vector((math.floor(u / PW) * 1.7, 0.5, 0.3))) * 0.5 + 0.5)
+        return scl((0.46, 0.31, 0.19), k * (0.72 + 0.28 * smooth(0.0, 1.4, p.z)) * (0.92 + 0.08 * noise.noise(p * 7)))
+    paint(wo, boards)
+    # gables and the roof's underside
+    gb = bmesh.new()
+    inner = [(-W / 2, Hw), (-W / 2 + 1.2, Hw + 1.85), (0, Hw + 3.0), (W / 2 - 1.2, Hw + 1.85), (W / 2, Hw)]
+    for y in (-D / 2, D / 2):
+        vs = [gb.verts.new((x, y, z)) for x, z in inner]
+        gb.faces.new(list(reversed(vs)) if y > 0 else vs)
+    for (xa, za), (xb, zb) in zip(inner, inner[1:]):
+        gb.faces.new((gb.verts.new((xb, -D / 2, zb)), gb.verts.new((xa, -D / 2, za)), gb.verts.new((xa, D / 2, za)), gb.verts.new((xb, D / 2, zb))))
+    bmesh.ops.subdivide_edges(gb, edges=gb.edges, cuts=8, use_grid_fill=True)
+    go = from_bm(gb, "BarnRoofInside", material("Wood", rough=0.85), parent=rt, smooth_shade=False)
+    paint(go, lambda p, n: scl((0.34, 0.24, 0.15), 0.7 + 0.3 * (0.5 + 0.5 * math.sin(p.x * 25 + p.y * 3))))
+    # beams: tie beams, rafters, corner and middle posts, the loft and its ladder
+    bm_ = []
+    for y in (-D / 2 + 0.2, -1.0, 1.0, D / 2 - 0.2):
+        bm_.append(box_bm(W, 0.16, 0.18, (0, y, Hw)))
+        for (xa, za), (xb, zb) in zip(inner, inner[1:]):
+            b = limb_bm((xa * 0.97, y, za - 0.1), (xb * 0.97, y, zb - 0.1), 0.07, 0.07, 6, caps=False)
+            bm_.append(b)
+    for x in (-W / 2 + 0.15, W / 2 - 0.15):
+        for y in (-D / 2 + 0.15, D / 2 - 0.15):
+            bm_.append(box_bm(0.2, 0.2, Hw, (x, y, Hw / 2)))
+    for y in (-1.0, 1.0):
+        bm_.append(box_bm(0.18, 0.18, Hw, (1.4, y, Hw / 2)))
+    LX = 1.4   # the loft covers x 1.4 .. W/2 at 2.1 m
+    bm_.append(box_bm(W / 2 - LX, D, 0.1, ((W / 2 + LX) / 2, 0, 2.1)))
+    bm_.append(box_bm(0.08, D, 0.5, (LX, 0, 2.4)))
+    for side in (-0.25, 0.25):
+        bm_.append(limb_bm((LX - 0.75, 0.3 + side, 0), (LX - 0.05, 0.3 + side, 2.2), 0.03, 0.03, 6, caps=False))
+    for i in range(7):
+        z = 0.3 + i * 0.3
+        f = z / 2.2
+        x = LX - 0.75 + 0.7 * f
+        bm_.append(limb_bm((x, 0.05, z), (x, 0.55, z), 0.02, 0.02, 6, caps=False))
+    beo = from_bm(merge_bms(bm_), "BarnBeams", material("Bark", rough=0.9), parent=rt, smooth_shade=False)
+    paint(beo, lambda p, n: scl((0.3, 0.2, 0.12), 0.8 + 0.2 * noise.noise(p * 5)))
+    # hay up on the loft
+    lh = []
+    for i in range(10):
+        b = blob_bm(random.uniform(0.35, 0.6), 2, 0.4, 2.0, seed=i * 2.7, squash=0.45)
+        xform(b, Matrix.Translation((random.uniform(LX + 0.4, W / 2 - 0.4), random.uniform(-D / 2 + 0.5, D / 2 - 0.5), 2.2)))
+        lh.append(b)
+    lho = from_bm(merge_bms(lh), "LoftHay", material("Straw", rough=0.9), parent=rt)
+    paint(lho, lambda p, n: mix((0.72, 0.6, 0.28), (0.88, 0.78, 0.42), noise.noise(p * 12) * 0.5 + 0.5))
+    # the big doors from inside (front wall, -Y) with their brace
+    dr = [box_bm(2.8, 0.06, 2.8, (0, -D / 2 + 0.02, 1.4))]
+    for s in (1, -1):
+        b = box_bm(0.12, 0.06, 3.6, (0, 0, 0)); xform(b, Matrix.Translation((0, -D / 2 + 0.06, 1.4)) @ Matrix.Rotation(s * 0.78, 4, 'Y')); dr.append(b)
+    dro = from_bm(merge_bms(dr), "BarnDoorInside", material("Wood", rough=0.8), parent=rt, smooth_shade=False)
+    paint(dro, lambda p, n: scl((0.4, 0.27, 0.16), 0.8 + 0.2 * (0.5 + 0.5 * math.sin(p.x * 26))))
+    # a lantern on the middle tie beam (the game lights its glass)
+    ln = [limb_bm((-0.6, -1.0, Hw - 0.1), (-0.6, -1.0, Hw - 0.55), 0.008, 0.008, 4, caps=False), cone_bm(0.07, 0.04, 0.06, 8)]
+    xform(ln[1], Matrix.Translation((-0.6, -1.0, Hw - 0.55)))
+    lno = from_bm(merge_bms(ln), "LanternFrame", material("Iron", rough=0.5, metal=0.6), parent=rt)
+    paint(lno, solid((0.12, 0.12, 0.12)))
+    glass = cone_bm(0.065, 0.08, 0.16, 8); xform(glass, Matrix.Translation((-0.6, -1.0, Hw - 0.66)))
+    glo = from_bm(glass, "LanternGlass", material("Lamp", rough=0.2, emit=(1.0, 0.8, 0.45), emit_str=0.0), parent=rt)
+    paint(glo, solid((1.0, 0.92, 0.7)))
+    export("BarnInside")
+
+def build_hay_pile():
+    """A big heap of loose hay, 1.5 m across the middle and 0.9 m high: the game's pileHeight() follows this shape."""
+    clear()
+    random.seed(97)
+    rt = root("HayPile")
+    R, H = 1.5, 0.9
+    bm = bmesh.new()
+    bmesh.ops.create_grid(bm, x_segments=40, y_segments=40, size=R * 1.05, calc_uvs=True)
+    def f(v):
+        r = math.hypot(v.x, v.y) / R
+        h = H * max(0.0, 1 - r * r) ** 0.8 if r < 1 else -0.02
+        h += 0.05 * noise.noise(Vector((v.x, v.y, 0)) * 3) * (1 if r < 1 else 0)
+        return Vector((v.x, v.y, h))
+    deform(bm, f)
+    po = from_bm(bm, "Heap", material("Straw", rough=0.9), parent=rt)
+    paint(po, lambda p, n: mix((0.66, 0.54, 0.24), (0.9, 0.8, 0.44), noise.noise(p * 10) * 0.5 + 0.5))
+    st = []
+    for i in range(260):
+        a = random.random() * math.tau
+        rr = math.sqrt(random.random()) * R * 0.98
+        x, y = math.cos(a) * rr, math.sin(a) * rr
+        h = H * max(0.0, 1 - (rr / R) ** 2) ** 0.8
+        L = random.uniform(0.12, 0.26)
+        b = random.random() * math.tau
+        tilt = random.uniform(-0.4, 0.5)
+        st.append(limb_bm((x - math.cos(b) * L / 2, y - math.sin(b) * L / 2, h + 0.01), (x + math.cos(b) * L / 2, y + math.sin(b) * L / 2, h + 0.01 + tilt * L), 0.004, 0.003, 4, caps=False))
+    so = from_bm(merge_bms(st), "Straws", material("Straw", rough=0.8), parent=rt)
+    paint(so, lambda p, n: mix((0.78, 0.66, 0.3), (0.95, 0.86, 0.5), noise.noise(p * 40) * 0.5 + 0.5))
+    export("HayPile")
+
+def build_barn_hole():
+    """A guinea-pig-sized gap at the foot of a barn wall: a dark arch, splintered board ends round it, straw poking out.
+    Faces -Y (Blender), its back flush at y=0 against the wall."""
+    clear()
+    random.seed(99)
+    rt = root("BarnHole")
+    bm = bmesh.new()
+    c = bm.verts.new((0, -0.012, 0.0))
+    arc = [bm.verts.new((math.cos(a) * 0.2, -0.012, math.sin(a) * 0.24)) for a in [math.pi * i / 16 for i in range(17)]]
+    for i in range(16):
+        bm.faces.new((c, arc[i + 1], arc[i]))
+    ho = from_bm(bm, "HoleDark", material("HoleDark", rough=1.0), parent=rt, smooth_shade=False)
+    paint(ho, solid((0.03, 0.02, 0.015)))
+    sp = []
+    for i in range(7):
+        a = math.pi * (0.08 + 0.84 * i / 6)
+        x, z = math.cos(a) * 0.22, math.sin(a) * 0.26
+        L = random.uniform(0.05, 0.11)
+        b = box_bm(0.035, 0.03, L, (0, 0, 0))
+        xform(b, Matrix.Translation((x, -0.02, z)) @ Matrix.Rotation(-(a - math.pi / 2) + random.uniform(-0.3, 0.3), 4, 'Y') @ Matrix.Translation((0, 0, L / 2)))
+        sp.append(b)
+    spo = from_bm(merge_bms(sp), "Splinters", material("Wood", rough=0.8), parent=rt, smooth_shade=False)
+    paint(spo, lambda p, n: scl((0.62, 0.42, 0.26), 0.8 + 0.2 * noise.noise(p * 30)))
+    st = []
+    for i in range(14):
+        x = random.uniform(-0.16, 0.16)
+        st.append(limb_bm((x, -0.0, 0.01), (x + random.uniform(-0.08, 0.08), -random.uniform(0.06, 0.16), random.uniform(0.0, 0.05)), 0.004, 0.003, 4, caps=False))
+    sto = from_bm(merge_bms(st), "HoleStraw", material("Straw", rough=0.8), parent=rt)
+    paint(sto, lambda p, n: mix((0.78, 0.66, 0.3), (0.95, 0.86, 0.5), noise.noise(p * 40) * 0.5 + 0.5))
+    export("BarnHole")
+
+def build_twig():
+    """A fallen twig to gnaw: a short branch with two side shoots and a couple of leaves, lying on the ground along X."""
+    clear()
+    random.seed(101)
+    rt = root("Twig")
+    L = 0.34
+    br = [limb_bm((-L / 2, 0, 0.018), (L / 2, 0.01, 0.022), 0.016, 0.011, 10)]
+    for (t, a, l) in ((-0.05, 0.7, 0.11), (0.08, -0.8, 0.09)):
+        br.append(limb_bm((t, 0, 0.02), (t + math.cos(a) * l * 0.6, math.sin(a) * l, 0.03), 0.007, 0.004, 6))
+    bo = from_bm(merge_bms(br), "TwigBark", material("Bark", rough=0.9), parent=rt)
+    def bark(p, n):
+        ends = abs(p.x) > L / 2 - 0.01
+        return (0.86, 0.74, 0.52) if ends else scl((0.36, 0.25, 0.16), 0.8 + 0.25 * noise.noise(p * 60))
+    paint(bo, bark)
+    lv = []
+    for (x, y, a) in ((0.03, 0.09, 1.9), (0.13, -0.07, -1.2)):
+        lb = leaf_bm(0.05, 0.026, curl=0.3)
+        xform(lb, Matrix.Translation((x, y, 0.03)) @ Matrix.Rotation(a, 4, 'Z') @ Euler((0.2, 0, 0)).to_matrix().to_4x4())
+        lv.append(lb)
+    lo = from_bm(merge_bms(lv), "TwigLeaves", material("Plant", rough=0.7), parent=rt)
+    paint(lo, solid((0.3, 0.5, 0.16)))
+    export("Twig")
+
 jobs = {
     "GuineaPig": build_guinea_pig, "Human": build_human, "Oak": lambda: build_oak("Oak", 1),
     "Oak2": lambda: build_oak("Oak2", 9), "Pine": build_pine, "Birch": build_birch, "Bush": build_bush,
@@ -2166,6 +2349,7 @@ jobs = {
     "Corn": build_corn, "Apple": build_apple, "Seeds": build_seeds, "Snowdrift": build_snowdrift, "Bramble": build_bramble,
     "MarketStall": build_market_stall, "Basket": build_basket, "CressBed": build_cress_bed, "Trough": build_trough,
     "AppleTree": build_apple_tree, "SunflowerHead": build_sunflower_head,
+    "BarnInside": build_barn_inside, "HayPile": build_hay_pile, "BarnHole": build_barn_hole, "Twig": build_twig,
 }
 for k, fn in jobs.items():
     if only and k not in only:

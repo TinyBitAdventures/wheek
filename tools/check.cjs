@@ -1,6 +1,6 @@
 // World checks: loads the game in a tiny headless window and tests the world's logic through window.__game.
 // Usage: PW=/path/to/node_modules/playwright node tools/check.cjs [check ...]
-//   checks: reach warren night chaos eat treats goals music saves touch pad memory (default: all). URL defaults to the local dev site.
+//   checks: reach warren night chaos eat treats goals music barn saves touch pad memory (default: all). URL defaults to the local dev site.
 // Prints a report and exits 1 if anything failed.
 const { chromium } = require(process.env.PW || 'playwright');
 const URL = process.env.URL || 'https://wheek.localhost/';
@@ -52,6 +52,7 @@ const frames = (page, n) => page.evaluate(n => new Promise(r => { let k = 0; (fu
       for(const ps of Z.pickSets)for(const it of ps.items)if(it.respawn!==Infinity)chk(ps.type,it.x,it.z,.35);
       for(const h of Z.humans)chk('human '+h.name,h.obj.position.x,h.obj.position.z,.85);
       const pigs=g.friends.filter(f=>f.origin===Z.id&&f.state==='wild');for(const f of pigs)chk('guinea pig '+f.name,f.home.x,f.home.z,.6);
+      for(const b of Z.barns||[])for(const h of b.holes)chk('barn hole',h.ex,h.ez,.3);
       for(const c of Z.critters)if(c.kind==='Duck')chk('duck pond',c.area.x,c.area.z,c.area.r+2.4);else chk(c.kind,c.x,c.z,1.4);
       out.counts=[Z.tunnels.length,Z.spots.length,Z.pickSets.reduce((n,p)=>n+p.items.length,0),Z.humans.length,Z.critters.length,pigs.length].join('/');return out})()`);
     report(`reach ${id}`, !r.bad.length, `${r.arrivals} ways in · burrows/spots/plants/humans/animals/piggies ${r.counts}${r.bad.length ? ' · ' + r.bad.length + ' unreachable: ' + r.bad.slice(0, 6).join('; ') : ''}`);
@@ -99,8 +100,8 @@ const frames = (page, n) => page.evaluate(n => new Promise(r => { let k = 0; (fu
   }
 
   // 4. random mashing in every zone (and down in the warren): no errors, nothing becomes NaN
-  if (pick('chaos')) for (const id of [...zones, 'warren']) {
-    await page.evaluate(id => { const g = window.__game; if (id === 'warren') { g.visit('park', 0, 0, 0); g.enterWarren(g.PARK.tunnels[0], true) } else g.visit(id, 0, 0, 0); g.G.hp = 100; g.G.energy = 100 }, id);
+  if (pick('chaos')) for (const id of [...zones, 'warren', 'barn']) {
+    await page.evaluate(id => { const g = window.__game; if (id === 'warren') { g.visit('park', 0, 0, 0); g.enterWarren(g.PARK.tunnels[0], true) } else if (id === 'barn') { g.visit('farm', 0, 0, 0); const b = g.Z().barns[0]; g.enterBarn(b, b.holes[0]); const p = g.G.inside.pile; g.pig.pos.set(p.x + p.R, 0, p.z) } else g.visit(id, 0, 0, 0); g.G.hp = 100; g.G.energy = 100 }, id);
     const before = errors.length;
     for (let k = 0; k < 12; k++) {
       const keys = ['KeyW', 'KeyA', 'KeyD', 'KeyS', 'ShiftLeft'].filter(() => Math.random() < .5);
@@ -110,7 +111,7 @@ const frames = (page, n) => page.evaluate(n => new Promise(r => { let k = 0; (fu
       for (const kk of keys) await page.keyboard.up(kk);
     }
     const r = await page.evaluate(() => { const g = window.__game, ok = v => Number.isFinite(v); document.querySelectorAll('.overlay:not(.hidden)').forEach(o => { if (o.id === 'tunnelMenu') document.querySelector('#tmList .btn.alt:last-child')?.click() });
-      const out = { finite: ok(g.pig.pos.x) && ok(g.pig.pos.y) && ok(g.pig.pos.z) && ok(g.G.hp) && ok(g.G.score), zone: g.G.under ? 'warren' : g.Z().id }; if (g.G.under) g.exitWarren(g.W.from.node); g.G.modal = false; g.G.paused = false; return out });
+      const out = { finite: ok(g.pig.pos.x) && ok(g.pig.pos.y) && ok(g.pig.pos.z) && ok(g.G.hp) && ok(g.G.score), zone: g.G.under ? 'warren' : g.G.inside ? 'barn' : g.Z().id }; if (g.G.under) g.exitWarren(g.W.from.node); if (g.G.inside) g.exitBarn(); g.G.modal = false; g.G.paused = false; return out });
     report(`chaos ${id}`, r.finite && errors.length === before, `${r.finite ? '' : 'NaN! '}${errors.slice(before).join(' | ')}`);
   }
 
@@ -181,6 +182,29 @@ const frames = (page, n) => page.evaluate(n => new Promise(r => { let k = 0; (fu
     const high = await page.evaluate(() => ({ shadow: window.__game.sun.castShadow, paused: window.__game.G.paused }));
     report('settings apply and are saved', low.pr === 1 && !low.shadow && low.gain === 0 && stored.quality === 'low' && stored.music === 0 && high.shadow && !high.paused,
       `low: pixel ratio ${low.pr}, shadows ${low.shadow}, music gain ${low.gain} · saved ${JSON.stringify(stored)} · back to high: shadows ${high.shadow}`);
+  }
+
+  // 5e. the barns: in through a hole, munch the hay, burrow onto every hidden treat, pop out, out through the other hole
+  if (pick('barn')) for (const id of ['farm', 'zoo']) {
+    const r0 = await page.evaluate(id => { const g = window.__game, G = g.G; G.time = 11; g.visit(id, 0, 0, 0); const b = g.Z().barns[0], h = b.holes[0]; g.pig.pos.set(h.ex, g.heightAt(h.ex, h.ez), h.ez); window.__barn = b; return { holes: b.holes.length } }, id);
+    const offered = await page.waitForFunction(() => { const g = window.__game, h = window.__barn.holes[0]; g.pig.pos.set(h.ex, g.heightAt(h.ex, h.ez), h.ez); return (g.G.acts || []).some(a => a.label.includes('into the barn')) }, null, { timeout: 60000, polling: 250 }).then(() => true, () => false);
+    await page.keyboard.press('KeyE'); await frames(page, 4);
+    const inside = await page.evaluate(() => { const g = window.__game, B = g.G.inside; if (!B) return null; const p = B.pile; g.pig.pos.set(p.x + p.R + .2, 0, p.z); window.__full = g.G.full = 40; return { treats: B.treats.length } });
+    const saved = await page.evaluate(() => { const g = window.__game; document.getElementById('saveBtn').click(); const sv = JSON.parse(localStorage.getItem('wheek-slot-' + g.G.slot) || 'null'), h = g.G.insideHole; return !!sv && Math.abs(sv.pig.x - h.ex) < .05 && Math.abs(sv.pig.z - h.ez) < .05 });
+    await page.waitForFunction(() => { const g = window.__game, p = g.G.inside.pile; g.pig.pos.set(p.x + p.R + .2, 0, p.z); return (g.G.acts || []).some(a => a.label === 'Munch the hay') }, null, { timeout: 30000, polling: 200 });
+    await page.keyboard.down('KeyE'); await frames(page, 30); await page.keyboard.up('KeyE');
+    const munched = await page.evaluate(() => window.__game.G.full > window.__full);
+    await page.keyboard.press('KeyF'); await frames(page, 3);
+    const burrowed = await page.evaluate(async () => { const g = window.__game, B = g.G.inside; if (!B.burrow) return { ok: false };
+      for (const t of B.treats) { B.burrow.x = t.x; B.burrow.z = t.z; await new Promise(r => requestAnimationFrame(() => requestAnimationFrame(r))) }
+      return { ok: true, found: B.found, hidden: !g.pig.obj.visible } });
+    await page.keyboard.press('Space'); await frames(page, 3);
+    const out = await page.evaluate(() => { const g = window.__game, B = g.G.inside; const h = B.holes[1]; g.pig.pos.set(h.x, 0, h.z); return { popped: !B.burrow && g.pig.obj.visible } });
+    await page.waitForFunction(() => { const g = window.__game, h = g.G.inside.holes[1]; g.pig.pos.set(h.x, 0, h.z); return (g.G.acts || []).some(a => a.label.includes('back outside')) }, null, { timeout: 30000, polling: 200 });
+    await page.keyboard.press('KeyE'); await frames(page, 4);
+    const left = await page.evaluate(() => { const g = window.__game, h = window.__barn.holes[1]; return { outside: !g.G.inside, at: Math.hypot(g.pig.pos.x - h.ex, g.pig.pos.z - h.ez) < .2 } });
+    report(`barn ${id}`, saved && offered && inside && munched && burrowed.ok && burrowed.found === inside.treats && burrowed.hidden && out.popped && left.outside && left.at,
+      `${r0.holes} holes · in ${offered && !!inside} · a save inside lands outside the hole ${saved} · munched ${munched} · burrowed ${burrowed.ok}, found ${burrowed.found}/${inside && inside.treats} · popped out ${out.popped} · out the other hole ${left.outside && left.at}`);
   }
 
   // 6. saves: continue a game saved before zones existed, and one saved in a zone

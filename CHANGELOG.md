@@ -8,6 +8,11 @@
 - The humans in Downtown, Sandy Cove, Critter Corner and on the farm sometimes toss you their zone's treat.
 - The Deep Wood's brambles are thorny cover: the hawk can't reach you in one.
 
+### The barn
+- The red barns at Sunny Acres Farm and Critter Corner have guinea-pig-sized holes at the foot of their walls (sniff to find them). Squeeze in to find a cosy barn: plank walls, rafters, a hay loft, sunbeams through the gaps, and a big hay pile.
+- Hold to munch the hay, or burrow into it and scurry about underneath as a wriggling bump in the straw. Four treats are hidden in the pile each day: find them all, then pop out in a shower of straw. Your herd comes in with you, and the hawk and foxes can't follow.
+- New goal: Hay Diver. The farm and Critter Corner's place checklists include getting into the barn.
+
 ### Guinea pigs everywhere
 - 12 more wild guinea pigs live out in the zones, one or two in each: Snowball on the peaks, Thistle and Fennel in the Deep Wood, Pretzel downtown, Sandy on the beach, Pebble and Willow by the creek, Cocoa at the petting zoo, Barley and Turnip on the farm, and Marigold and Honey in the sunflowers. That's 21 to meet, and your herd still holds six, so pick your favourites.
 - A guinea pig who scatters in fright in another zone now stays in that zone, and wild guinea pigs never wander into deep water.
@@ -30,6 +35,7 @@
 - Gamepads work everywhere, menus included: left stick to scurry, right stick to look, Ⓐ eat and enter, Ⓧ forage, Ⓨ chat, Ⓑ popcorn, RB sniff, LB wheek, RT scurry, Back for the map, d-pad up for the journal and Start to pause. The prompts and tips show whichever buttons you're using.
 
 ### Models
+- The barn's inside, a hay pile and the holes in the barn walls, built in Blender like everything else.
 - 16 new Blender-built models: rose hips, raspberry leaves, romaine, a watermelon slice, watercress, a corn husk, an apple slice and sunflower seeds, plus a snowdrift, a bramble, a market stall, a picnic basket, a watercress bed, a feed trough, an apple tree and a fallen sunflower head.
 
 ## v0.2.0 (2026-09-29)

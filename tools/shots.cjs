@@ -98,6 +98,24 @@ scenes.touchui = async page => {
   await camera(page, 'window.__game.pig.heading+Math.PI+.4', 1.2, .3);
   await page.waitForFunction(() => document.querySelectorAll('#prompt .pill').length > 0, null, { timeout: 30000, polling: 250 });
 };
+// The farm barn: a hole at the foot of its back wall, then inside by the hay pile, then burrowing in the hay.
+scenes.barnhole = async page => {
+  await setup(page, `document.getElementById('mapwrap').classList.remove('big');G.time=10;g.visit('farm',0,0,0);const h=g.Z().barns[0].holes[0];const sx=Math.cos(h.out)*.55,sz=-Math.sin(h.out)*.55;pig.pos.set(h.ex+sx,0,h.ez+sz);pig.heading=h.out+Math.PI*.75`);
+  await page.waitForTimeout(800);
+  await camera(page, 'window.__game.pig.heading+Math.PI*1.25+.2', 1.7, .2);
+};
+scenes.barn = async page => {
+  await setup(page, `G.time=10;if(!G.inside&&g.Z().id!=='farm')g.visit('farm',0,0,0);const b=g.Z().barns[0];if(!G.inside)g.enterBarn(b,b.holes[0]);const p=G.inside.pile;pig.pos.set(p.x+p.R+.45,0,p.z+1.3);pig.heading=Math.atan2(p.x-pig.pos.x,p.z-pig.pos.z)`);
+  await page.waitForTimeout(500);
+  await setup(page, `G.camYaw=pig.heading+Math.PI+.25;G.camDist=2.6;G.camPitch=.32;G.lastDrag=performance.now()+1e6`);
+  await page.waitForTimeout(2500);
+};
+scenes.burrow = async page => {
+  await setup(page, `const B=G.inside;const p=B.pile;pig.pos.set(p.x+p.R*.4,0,p.z);g.startBurrow();B.burrow.x=p.x+p.R*.3;B.burrow.z=p.z-.2`);
+  await page.keyboard.down('KeyA'); await page.waitForTimeout(1500); await page.keyboard.up('KeyA');
+  await setup(page, `G.camYaw=pig.heading+Math.PI+.4;G.camDist=1.5;G.camPitch=.45;G.lastDrag=performance.now()+1e6`);
+  await page.waitForTimeout(1500);
+};
 // A guinea pig who lives out on the beach, chatting.
 scenes.zonepig = async page => {
   await setup(page, `document.getElementById('mapwrap').classList.remove('big');G.time=10.5;g.visit('beach',0,0,0);const f=g.friends.find(f=>f.origin==='beach');pig.pos.set(f.pos.x+.7,0,f.pos.z+.3);pig.heading=Math.atan2(f.pos.x-pig.pos.x,f.pos.z-pig.pos.z)`);
