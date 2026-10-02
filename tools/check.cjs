@@ -1,6 +1,6 @@
 // World checks: loads the game in a tiny headless window and tests the world's logic through window.__game.
 // Usage: PW=/path/to/node_modules/playwright node tools/check.cjs [check ...]
-//   checks: reach warren night chaos eat treats goals music gnaw barn saves touch pad memory (default: all). URL defaults to the local dev site.
+//   checks: reach warren night chaos eat treats goals music gnaw barn shop saves touch pad memory (default: all). URL defaults to the local dev site.
 // Prints a report and exits 1 if anything failed.
 const { chromium } = require(process.env.PW || 'playwright');
 const URL = process.env.URL || 'https://wheek.localhost/';
@@ -54,6 +54,7 @@ const frames = (page, n) => page.evaluate(n => new Promise(r => { let k = 0; (fu
       const pigs=g.friends.filter(f=>f.origin===Z.id&&f.state==='wild');for(const f of pigs)chk('guinea pig '+f.name,f.home.x,f.home.z,.6);
       for(const b of Z.barns||[])for(const h of b.holes)chk('barn hole',h.ex,h.ez,.3);
       for(const t of Z.twigs||[])chk('twig',t.x,t.z,.45);
+      if(Z.shop)chk('pet shop cat flap',Z.shop.holes[0].ex,Z.shop.holes[0].ez,.3);
       for(const c of Z.critters)if(c.kind==='Duck')chk('duck pond',c.area.x,c.area.z,c.area.r+2.4);else chk(c.kind,c.x,c.z,1.4);
       out.counts=[Z.tunnels.length,Z.spots.length,Z.pickSets.reduce((n,p)=>n+p.items.length,0),Z.humans.length,Z.critters.length,pigs.length].join('/');return out})()`);
     report(`reach ${id}`, !r.bad.length, `${r.arrivals} ways in · burrows/spots/plants/humans/animals/piggies ${r.counts}${r.bad.length ? ' · ' + r.bad.length + ' unreachable: ' + r.bad.slice(0, 6).join('; ') : ''}`);
@@ -101,8 +102,9 @@ const frames = (page, n) => page.evaluate(n => new Promise(r => { let k = 0; (fu
   }
 
   // 4. random mashing in every zone (and down in the warren): no errors, nothing becomes NaN
-  if (pick('chaos')) for (const id of [...zones, 'warren', 'barn']) {
-    await page.evaluate(id => { const g = window.__game; if (id === 'warren') { g.visit('park', 0, 0, 0); g.enterWarren(g.PARK.tunnels[0], true) } else if (id === 'barn') { g.visit('farm', 0, 0, 0); const b = g.Z().barns[0]; g.enterBarn(b, b.holes[0]); const p = g.G.inside.pile; g.pig.pos.set(p.x + p.R, 0, p.z) } else g.visit(id, 0, 0, 0); g.G.hp = 100; g.G.energy = 100 }, id);
+  if (pick('chaos')) for (const id of [...zones, 'warren', 'barn', 'shop']) {
+    await page.evaluate(id => { const g = window.__game; if (id === 'warren') { g.visit('park', 0, 0, 0); g.enterWarren(g.PARK.tunnels[0], true) } else if (id === 'barn') { g.visit('farm', 0, 0, 0); const b = g.Z().barns[0]; g.enterBarn(b, b.holes[0]); const p = g.G.inside.pile; g.pig.pos.set(p.x + p.R, 0, p.z) }
+      else if (id === 'shop') { g.G.time = 22; g.visit('town', 0, 0, 0); const b = g.Z().shop; g.enterInside(b, b.holes[0]) } else g.visit(id, 0, 0, 0); g.G.hp = 100; g.G.energy = 100 }, id);
     const before = errors.length;
     for (let k = 0; k < 12; k++) {
       const keys = ['KeyW', 'KeyA', 'KeyD', 'KeyS', 'ShiftLeft'].filter(() => Math.random() < .5);
@@ -112,7 +114,7 @@ const frames = (page, n) => page.evaluate(n => new Promise(r => { let k = 0; (fu
       for (const kk of keys) await page.keyboard.up(kk);
     }
     const r = await page.evaluate(() => { const g = window.__game, ok = v => Number.isFinite(v); document.querySelectorAll('.overlay:not(.hidden)').forEach(o => { if (o.id === 'tunnelMenu') document.querySelector('#tmList .btn.alt:last-child')?.click() });
-      const out = { finite: ok(g.pig.pos.x) && ok(g.pig.pos.y) && ok(g.pig.pos.z) && ok(g.G.hp) && ok(g.G.score), zone: g.G.under ? 'warren' : g.G.inside ? 'barn' : g.Z().id }; if (g.G.under) g.exitWarren(g.W.from.node); if (g.G.inside) g.exitBarn(); g.G.modal = false; g.G.paused = false; return out });
+      const out = { finite: ok(g.pig.pos.x) && ok(g.pig.pos.y) && ok(g.pig.pos.z) && ok(g.G.hp) && ok(g.G.score), zone: g.G.under ? 'warren' : g.G.inside ? g.G.inside.kind : g.Z().id }; if (g.G.under) g.exitWarren(g.W.from.node); if (g.G.inside) g.exitBarn(); g.G.modal = false; g.G.paused = false; return out });
     report(`chaos ${id}`, r.finite && errors.length === before, `${r.finite ? '' : 'NaN! '}${errors.slice(before).join(' | ')}`);
   }
 
@@ -156,8 +158,9 @@ const frames = (page, n) => page.evaluate(n => new Promise(r => { let k = 0; (fu
     await page.evaluate(() => { const g = window.__game, G = g.G; G.time = 11; g.visit('farm', 0, 0, 0); G.curios.key = true; const h = g.Z().humans.find(h => h.name === 'Farmer Gus'); window.__gus = h; window.__drops = g.Z().drops.length; window.__heard = G.heard.key });
     const heard = await page.waitForFunction(() => { const g = window.__game, h = window.__gus, a = h.obj.rotation.y; g.pig.pos.set(h.obj.position.x + Math.sin(a) * .9, 0, h.obj.position.z + Math.cos(a) * .9); g.pig.pos.y = g.heightAt(g.pig.pos.x, g.pig.pos.z);
       return (g.G.acts || []).some(x => x.label.startsWith('Give')) }, null, { timeout: 60000, polling: 250 }).then(() => true, () => false);
+    await page.evaluate(() => { window.__toastLog = ''; new MutationObserver(() => { window.__toastLog += document.getElementById('toasts').textContent }).observe(document.getElementById('toasts'), { childList: true, subtree: true }) });
     await page.keyboard.press('KeyE'); await frames(page, 4);
-    const gave = await page.evaluate(() => { const g = window.__game; return { given: g.G.given.key, drops: g.Z().drops.length - window.__drops, toast: document.getElementById('toasts').textContent.includes('My key') } });
+    const gave = await page.evaluate(() => { const g = window.__game; return { given: g.G.given.key, drops: g.Z().drops.length - window.__drops, toast: window.__toastLog.includes('My key') } });
     report('request: Farmer Gus and the brass key', heard && gave.given === 'Farmer Gus' && gave.drops === 2 && gave.toast, `offered ${heard} · given to ${gave.given} · ${gave.drops} gifts · thanks ${gave.toast}`);
   }
 
@@ -203,6 +206,54 @@ const frames = (page, n) => page.evaluate(n => new Promise(r => { let k = 0; (fu
     const walked = await page.evaluate(() => ({ off: !window.__game.G.gnaw, back: window.__tw.ready && window.__tw.obj.visible }));
     report('gnaw', n >= 3 && offered && clean.started && clean.done && clean.teeth > 170 && clean.twigGone && clean.goal >= 1 && snap.done && snap.buffSame && snap.gone && walked.off && walked.back,
       `${n} park twigs · clean gnaw: teeth ${Math.round(clean.teeth || 0)}s, twig gone ${clean.twigGone} · 3 misses snap ${snap.done && snap.gone} · walking off puts it back ${walked.back}`);
+  }
+
+  // 5g. the pet shop: locked by day; at night in through the flap, everything reachable, a crawl through the tubes,
+  //     a rummage, Duchess wakes and boops you out; back in, befriend Butterscotch and leave with her
+  if (pick('shop')) {
+    const atFlap = () => page.evaluate(() => { const g = window.__game, h = g.Z().shop.holes[0]; g.pig.pos.set(h.ex, g.heightAt(h.ex, h.ez), h.ez); g.pig.heading = h.out + Math.PI; g.G.acts = null });
+    await page.evaluate(() => { const g = window.__game; g.G.time = 12; g.visit('town', 0, 0, 0) }); await atFlap();
+    const locked = await page.waitForFunction(() => { const g = window.__game, h = g.Z().shop.holes[0]; g.pig.pos.set(h.ex, g.heightAt(h.ex, h.ez), h.ez); return (g.G.acts || []).some(a => a.label.includes('locked')) }, null, { timeout: 30000, polling: 200 }).then(() => true, () => false);
+    await page.evaluate(() => { window.__game.G.time = 22 }); await atFlap();
+    await page.waitForFunction(() => { const g = window.__game, h = g.Z().shop.holes[0]; g.pig.pos.set(h.ex, g.heightAt(h.ex, h.ez), h.ez); return (g.G.acts || []).some(a => a.label.includes('cat flap') && a.do) }, null, { timeout: 30000, polling: 200 });
+    await page.keyboard.press('KeyE'); await frames(page, 3);
+    const reach = await page.evaluate(() => { const g = window.__game, B = g.G.inside; if (!B || B.kind !== 'shop') return { inside: false };
+      const res = .06, N = Math.ceil(6 / res), M = Math.ceil(5 / res), cx = i => -3 + (i + .5) * res, cz = j => -2.5 + (j + .5) * res, open = new Uint8Array(N * M), seen = new Uint8Array(N * M);
+      for (let j = 0; j < M; j++) for (let i = 0; i < N; i++) { const P = { x: cx(i), z: cz(j) }; g.insideCollide(P, .1); open[j * N + i] = Math.hypot(P.x - cx(i), P.z - cz(j)) < .005 ? 1 : 0 }
+      const h = B.holes[0], s0 = Math.floor((h.z + 2.5) / res) * N + Math.floor((h.x + 3) / res), q = [s0]; seen[s0] = 1;
+      while (q.length) { const k = q.pop(), i = k % N, j = (k - i) / N; for (const [a, b] of [[i + 1, j], [i - 1, j], [i, j + 1], [i, j - 1]]) { if (a < 0 || b < 0 || a >= N || b >= M) continue; const n = b * N + a; if (!seen[n] && open[n]) { seen[n] = 1; q.push(n) } } }
+      const near = (x, z, r) => { for (let j = 0; j < M; j++) for (let i = 0; i < N; i++) if (seen[j * N + i] && Math.hypot(cx(i) - x, cz(j) - z) < r) return true; return false };
+      const bad = []; for (const k of B.ends) { const [x, z] = g.TUBE_NODES[k]; if (!near(x, z, .35)) bad.push('tube end ' + k) }
+      for (const sp of B.spots) if (!near(sp.x, sp.z, sp.r + .27)) bad.push(sp.type); if (!near(-2.1, -1.8, 1.15)) bad.push('the pen');
+      return { inside: true, bad } });
+    // the tubes: in at A, junctions B, C, E, out at F
+    const tubes = await page.evaluate(async () => { const g = window.__game, B = g.G.inside, N = g.TUBE_NODES; g.enterTube('A'); const route = ['B', 'C', 'E', 'F']; let r = 0, steps = 0, before = B.tubeTreats.filter(t => t.got).length;
+      while (B.tube && steps++ < 400) { const [tx, tz] = N[route[Math.min(r, 3)]], dx = tx - g.pig.pos.x, dz = tz - g.pig.pos.z, d = Math.hypot(dx, dz); if (d < .08 && r < 3) r++; g.G.steer = [dx / (d || 1), dz / (d || 1)]; await new Promise(f => requestAnimationFrame(f)) }
+      g.G.steer = null; const [fx, fz] = N.F; return { out: !B.tube, atF: Math.hypot(g.pig.pos.x - fx, g.pig.pos.z - fz) < .5, treats: B.tubeTreats.filter(t => t.got).length - before, steps } });
+    // a rummage in the spilled pellets
+    await page.evaluate(() => { const g = window.__game, sp = g.G.inside.spots[0]; g.pig.pos.set(sp.x + .35, 0, sp.z); window.__sp = sp; g.G.acts = null });
+    await page.keyboard.down('KeyF');
+    const rummaged = await page.waitForFunction(() => { const g = window.__game, sp = window.__sp; if (sp.ready) { g.pig.pos.set(sp.x + .35, 0, sp.z); if (!document.getElementById('forage').style.display.includes('block')) document.dispatchEvent(new KeyboardEvent('keydown', { code: 'KeyF' })) } return !sp.ready }, null, { timeout: 120000, polling: 250 }).then(() => true, () => false);
+    await page.keyboard.up('KeyF');
+    // Duchess wakes, hunts you down and boops you out
+    // (the slow headless clock runs on: keep it night; and Duchess may have woken in the tubes already, so start her asleep)
+    await page.evaluate(() => { const g = window.__game, c = g.G.inside.cat; g.G.time = 22; g.G.hp = 100; c.state = 'sleep'; c.hop = null; c.loaf.visible = true; c.stand.visible = false; c.pos.set(2.05, .07, .72); c.noise = 0; g.catNoise(1.2) });
+    const booped = await page.waitForFunction(() => { const g = window.__game, B = g.G.inside; if (!B) return true; const c = B.cat; if (c.state === 'hunt' && !c.hop) g.pig.pos.set(c.pos.x + .2, 0, c.pos.z); return false }, null, { timeout: 120000, polling: 100 }).then(() => true, () => false);
+    const after = await page.evaluate(() => { const g = window.__game; return { out: !g.G.inside, cd: g.Z().shop.flapCD } });
+    // back in (Duchess forgives), and Butterscotch
+    await page.evaluate(() => { window.__game.Z().shop.flapCD = 0; window.__game.G.time = 22 }); await atFlap();
+    await page.waitForFunction(() => { const g = window.__game, h = g.Z().shop.holes[0]; g.pig.pos.set(h.ex, g.heightAt(h.ex, h.ez), h.ez); return (g.G.acts || []).some(a => a.label.includes('cat flap') && a.do) }, null, { timeout: 30000, polling: 200 });
+    await page.keyboard.press('KeyE'); await frames(page, 3);
+    await page.evaluate(() => { const g = window.__game, f = g.friends.find(f => f.shopPig); g.G.time = 22; g.G.inside.cat.noise = 0; while (g.herd.length >= 6) g.herd.pop(); f.friend = .97; g.pig.pos.set(-1.15, 0, -1.6); g.G.acts = null });
+    await page.keyboard.down('KeyC');
+    const joined = await page.waitForFunction(() => { const g = window.__game; g.pig.pos.set(-1.15, 0, -1.6); return g.herd.some(f => f.shopPig) }, null, { timeout: 60000, polling: 200 }).then(() => true, () => false);
+    await page.keyboard.up('KeyC');
+    await page.evaluate(() => { const g = window.__game, h = g.G.inside.holes[0]; g.pig.pos.set(h.x, 0, h.z); g.G.acts = null });
+    await page.waitForFunction(() => { const g = window.__game, h = g.G.inside.holes[0]; g.pig.pos.set(h.x, 0, h.z); return (g.G.acts || []).some(a => a.label.includes('back out')) }, null, { timeout: 30000, polling: 200 });
+    await page.keyboard.press('KeyE'); await frames(page, 3);
+    const home = await page.evaluate(() => { const g = window.__game, f = g.friends.find(f => f.shopPig); return { outside: !g.G.inside, withYou: g.herd.includes(f) && f.obj.parent === g.scene && f.zone === 'town' } });
+    report('pet shop', locked && reach.inside && !reach.bad.length && tubes.out && tubes.atF && rummaged && booped && after.out && after.cd > 30 && joined && home.outside && home.withYou,
+      `locked by day ${locked} · in at night ${reach.inside}${reach.bad && reach.bad.length ? ' · unreachable: ' + reach.bad.join(', ') : ''} · tubes A→F ${tubes.out && tubes.atF} (${tubes.treats} treats, ${tubes.steps} frames) · rummaged ${rummaged} · booped out ${booped && after.out} (flap ${Math.round(after.cd)}s) · Butterscotch joined ${joined} and came home ${home.withYou}`);
   }
 
   // 5e. the barns: in through a hole, munch the hay, burrow onto every hidden treat, pop out, out through the other hole

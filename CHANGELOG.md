@@ -8,6 +8,14 @@
 - The humans in Downtown, Sandy Cove, Critter Corner and on the farm sometimes toss you their zone's treat.
 - The Deep Wood's brambles are thorny cover: the hawk can't reach you in one.
 
+### The pet shop
+- One of Downtown's shops is a pet shop (look for its sign). After closing time, 6 PM to 7:30 AM, the cat flap in its back door lets a guinea pig in. Sniff to find it.
+- Inside, after hours: fish tanks glowing in the dark, shelves of supplies, guinea pig tubes all over the floor, and Duchess the shop cat asleep in her bed. Tiptoe: scurrying, rummaging, hopping and wheeking fill her noise meter, and if she wakes up she hunts you. Hide in the tubes and she loses you; if she catches you she boops you back out through the flap, and watches it for a while.
+- Crawl through the tube maze: pick a way at each junction and come out at the other ends. Treats are tucked inside the tubes every night.
+- Rummage in the spilled pellet bag and the treat bin for a new journal treat, Fortified Pellets (real guinea pig pellets are vitamin C enriched).
+- Butterscotch, a lonely golden Abyssinian, lives in the shop's pen. Chat with her through the glass and she hops right out to join your herd.
+- At 7:30 the shopkeeper comes to open up and you slip out. New goal: After Hours. Downtown's checklist includes sneaking into the pet shop.
+
 ### The barn
 - The red barns at Sunny Acres Farm and Critter Corner have guinea-pig-sized holes at the foot of their walls (sniff to find them). Squeeze in to find a cosy barn: plank walls, rafters, a hay loft, sunbeams through the gaps, and a big hay pile.
 - Hold to munch the hay, or burrow into it and scurry about underneath as a wriggling bump in the straw. Four treats are hidden in the pile each day: find them all, then pop out in a shower of straw. Your herd comes in with you, and the hawk and foxes can't follow.
@@ -45,6 +53,7 @@
 
 ### Models
 - The barn's inside, a hay pile, the holes in the barn walls and a fallen twig, built in Blender like everything else.
+- The pet shop's inside, its back door with the cat flap, Duchess (awake and curled up asleep) and a pile of pellets.
 - 16 new Blender-built models: rose hips, raspberry leaves, romaine, a watermelon slice, watercress, a corn husk, an apple slice and sunflower seeds, plus a snowdrift, a bramble, a market stall, a picnic basket, a watercress bed, a feed trough, an apple tree and a fallen sunflower head.
 
 ## v0.2.0 (2026-09-29)

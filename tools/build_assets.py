@@ -2329,6 +2329,268 @@ def build_twig():
     paint(lo, solid((0.3, 0.5, 0.16)))
     export("Twig")
 
+# ================================================================ THE PET SHOP (after hours, in through the cat flap)
+SHOP_W, SHOP_D, SHOP_H = 6.0, 5.0, 3.2   # the Shop's footprint; the front (window, door) is -Y, the back door +Y
+
+def build_petshop_inside():
+    """The pet shop from inside at the Shop's own size: checker tiles, mint walls, the window and glass door at the front,
+    a counter, shelves of supplies, an aquarium stand, the guinea pig pen, a treat bin, and the back door with its cat flap."""
+    clear()
+    random.seed(103)
+    rt = root("PetShopInside")
+    W, D, H = SHOP_W, SHOP_D, SHOP_H
+    tiles = []
+    NX, NY = 12, 10
+    for i in range(NX):
+        for j in range(NY):
+            tiles.append(box_bm(W / NX - 0.01, D / NY - 0.01, 0.04, (-W / 2 + (i + 0.5) * W / NX, -D / 2 + (j + 0.5) * D / NY, -0.02)))
+    to = from_bm(merge_bms(tiles), "ShopTiles", material("Tiles", rough=0.35, spec=0.6), parent=rt, smooth_shade=False)
+    paint(to, lambda p, n: (0.92, 0.9, 0.82) if (int(math.floor((p.x + W) / (W / NX))) + int(math.floor((p.y + D) / (D / NY)))) % 2 else (0.36, 0.62, 0.6))
+    # walls with a skirting board, the window and door cut out of the front
+    t = 0.08
+    wl = [box_bm(W, t, H, (0, D / 2 + t / 2, H / 2)), box_bm(t, D, H, (W / 2 + t / 2, 0, H / 2)), box_bm(t, D, H, (-W / 2 - t / 2, 0, H / 2))]
+    # front wall pieces round the window (x -2.65..0.85, z .5..2.45) and the door (x 1.4..2.4, z 0..2.2)
+    fy = -D / 2 - t / 2
+    wl += [box_bm(0.35, t, H, (-2.825, fy, H / 2)), box_bm(0.55, t, H, (1.125, fy, H / 2)), box_bm(0.6, t, H, (2.7, fy, H / 2)),
+           box_bm(3.5, t, 0.5, (-0.9, fy, 0.25)), box_bm(3.5, t, H - 2.45, (-0.9, fy, (H + 2.45) / 2)), box_bm(1.0, t, H - 2.2, (1.9, fy, (H + 2.2) / 2))]
+    wo = from_bm(merge_bms(wl), "ShopWalls", material("Plaster", rough=0.9), parent=rt, smooth_shade=False)
+    subdivide(wo, 6)
+    paint(wo, lambda p, n: (0.95, 0.93, 0.86) if p.z < 0.12 else scl((0.72, 0.88, 0.8), 0.92 + 0.08 * noise.noise(p * 3)))
+    ce = from_bm(box_bm(W, D, 0.06, (0, 0, H + 0.03)), "ShopCeiling", material("Plaster", rough=0.9), parent=rt, smooth_shade=False)
+    paint(ce, solid((0.95, 0.95, 0.92)))
+    glass = [box_bm(3.5, 0.03, 1.95, (-0.9, -D / 2, 1.475)), box_bm(1.0, 0.03, 2.2, (1.9, -D / 2, 1.1))]
+    go = from_bm(merge_bms(glass), "ShopWindows", material("Glass", rough=0.05, spec=1.0, emit=(0.5, 0.65, 0.9), emit_str=0.0), parent=rt, smooth_shade=False)
+    paint(go, solid((0.25, 0.32, 0.42)))
+    lights = [box_bm(1.2, 0.5, 0.04, (x, 0.3, H - 0.02)) for x in (-1.4, 1.4)]
+    lo = from_bm(merge_bms(lights), "ShopLights", material("Lamp", rough=0.2, emit=(1.0, 0.95, 0.85), emit_str=0.0), parent=rt, smooth_shade=False)
+    paint(lo, solid((0.98, 0.97, 0.92)))
+    # the counter at the front right, with the till and a bell
+    ct = [box_bm(2.2, 0.6, 0.96, (1.5, -1.5, 0.48)), box_bm(2.3, 0.7, 0.05, (1.5, -1.5, 0.985))]
+    cto = from_bm(merge_bms(ct), "Counter", material("Wood", rough=0.6), parent=rt, smooth_shade=False)
+    paint(cto, lambda p, n: (0.78, 0.6, 0.4) if p.z > 0.96 else scl((0.55, 0.36, 0.22), 0.85 + 0.15 * math.sin(p.x * 30)))
+    till = [box_bm(0.4, 0.32, 0.2, (2.15, -1.45, 1.11)), box_bm(0.36, 0.06, 0.16, (2.15, -1.55, 1.25))]
+    tlo = from_bm(merge_bms(till), "Till", material("Plastic", rough=0.4), parent=rt, smooth_shade=False)
+    paint(tlo, lambda p, n: (0.2, 0.22, 0.25) if p.z < 1.2 else (0.55, 0.8, 0.6))
+    # shelves on the left wall: uprights, four shelves, boxes and bags in bright colours
+    sh = []
+    for y in (-1.6, 0.2, 2.0):
+        sh.append(box_bm(0.4, 0.04, 2.3, (-2.8, y, 1.15)))
+    for z in (0.25, 0.85, 1.45, 2.05):
+        sh.append(box_bm(0.42, 3.64, 0.04, (-2.8, 0.2, z)))
+    sho = from_bm(merge_bms(sh), "Shelves", material("Wood", rough=0.6), parent=rt, smooth_shade=False)
+    paint(sho, solid((0.9, 0.88, 0.82)))
+    goods = []
+    for z in (0.27, 0.87, 1.47, 2.07):
+        y = -1.55
+        while y < 1.95:
+            w = random.uniform(0.18, 0.34)
+            if y + w > 1.95:
+                break
+            h = random.uniform(0.22, 0.45)
+            goods.append(rbox_bm(0.28, w - 0.02, h, (-2.78, y + w / 2, z + h / 2), e=0.25 if random.random() < 0.5 else 0.6, u=8, v=6))
+            y += w
+    gdo = from_bm(merge_bms(goods), "Goods", material("Plastic", rough=0.5), parent=rt, smooth_shade=False)
+    pal = [(0.9, 0.3, 0.3), (0.95, 0.75, 0.2), (0.3, 0.6, 0.9), (0.4, 0.75, 0.35), (0.85, 0.5, 0.75), (0.95, 0.55, 0.2), (0.6, 0.45, 0.85)]
+    paint(gdo, lambda p, n: pal[int((noise.noise(Vector((round(p.y * 4.3), round(p.z * 1.7), 0.5)) * 1.0) * 0.5 + 0.5) * 6.99)])
+    # a pellet bag tipped over on the floor by the shelves (the game forages it)
+    bag = rbox_bm(0.34, 0.24, 0.46, (0, 0, 0), e=0.6, u=16, v=10)
+    xform(bag, Matrix.Translation((-2.2, 0.55, 0.13)) @ Euler((math.pi / 2 - 0.1, 0, 0.6)).to_matrix().to_4x4())
+    bgo = from_bm(bag, "PelletBag", material("Plastic", rough=0.6), parent=rt)
+    paint(bgo, lambda p, n: (0.3, 0.6, 0.3) if noise.noise(p * 8) > -0.2 else (0.95, 0.9, 0.7))
+    pel = []
+    for i in range(60):
+        a = random.uniform(-1.2, 2.0)
+        r = random.uniform(0.05, 0.45)
+        c = limb_bm((0, 0, 0), (0.025, 0, 0), 0.008, 0.008, 5, caps=False)
+        xform(c, Matrix.Translation((-2.2 + math.cos(a) * r, 0.3 + math.sin(a) * r * 0.8, 0.008)) @ Matrix.Rotation(random.random() * math.tau, 4, 'Z'))
+        pel.append(c)
+    pelo = from_bm(merge_bms(pel), "Pellets", material("Veg", rough=0.8), parent=rt)
+    paint(pelo, lambda p, n: mix((0.42, 0.5, 0.22), (0.55, 0.45, 0.22), noise.noise(p * 50) * 0.5 + 0.5))
+    # the aquarium stand on the right wall: a cabinet, two tanks of glowing water, gravel and a few fish
+    aq = [box_bm(0.45, 2.5, 0.8, (2.75, -0.5 + 1.0, 0.4))]
+    aqo = from_bm(merge_bms(aq), "AquaStand", material("Wood", rough=0.6), parent=rt, smooth_shade=False)
+    paint(aqo, solid((0.25, 0.22, 0.24)))
+    tanks, gravel, fish = [], [], []
+    for y in (0.0, 1.05):
+        tanks.append(box_bm(0.4, 0.95, 0.55, (2.75, y + 0.5, 1.1)))
+        gravel.append(box_bm(0.38, 0.93, 0.06, (2.75, y + 0.5, 0.86)))
+        for k in range(4):
+            f = sphere_bm(1, 8, 6)
+            deform(f, lambda v: Vector((v.x * 0.012, v.y * 0.03, v.z * 0.016)))
+            xform(f, Matrix.Translation((2.7 + random.uniform(-0.08, 0.08), y + 0.5 + random.uniform(-0.35, 0.35), random.uniform(0.95, 1.3))))
+            fish.append(f)
+    wto = from_bm(merge_bms(tanks), "TankWater", material("Water", rough=0.05, spec=1.0, emit=(0.2, 0.7, 0.9), emit_str=0.0), parent=rt, smooth_shade=False)
+    paint(wto, solid((0.35, 0.65, 0.8)))
+    gro = from_bm(merge_bms(gravel), "Gravel", material("Stone", rough=0.9), parent=rt, smooth_shade=False)
+    paint(gro, lambda p, n: mix((0.8, 0.6, 0.4), (0.4, 0.5, 0.7), noise.noise(p * 40) * 0.5 + 0.5))
+    fio = from_bm(merge_bms(fish), "Fish", material("Veg", rough=0.3), parent=rt)
+    paint(fio, lambda p, n: (1.0, 0.55, 0.1) if noise.noise(p * 20) > 0 else (0.95, 0.85, 0.2))
+    # the guinea pig pen at the back left: low glass sides, wood shavings, a little wooden house, a bowl
+    PX0, PX1, PY0, PY1 = -2.8, -1.4, 1.3, 2.3
+    pg = [box_bm(PX1 - PX0, 0.02, 0.36, ((PX0 + PX1) / 2, PY0, 0.18)), box_bm(PX1 - PX0, 0.02, 0.36, ((PX0 + PX1) / 2, PY1, 0.18)),
+          box_bm(0.02, PY1 - PY0, 0.36, (PX0, (PY0 + PY1) / 2, 0.18)), box_bm(0.02, PY1 - PY0, 0.36, (PX1, (PY0 + PY1) / 2, 0.18))]
+    pgo = from_bm(merge_bms(pg), "PenGlass", material("PenGlass", rough=0.05, spec=1.0), parent=rt, smooth_shade=False)
+    paint(pgo, solid((0.8, 0.92, 0.95)))
+    bed = box_bm(PX1 - PX0 - 0.04, PY1 - PY0 - 0.04, 0.04, ((PX0 + PX1) / 2, (PY0 + PY1) / 2, 0.02))
+    beo = from_bm(bed, "Shavings", material("Straw", rough=0.95), parent=rt, smooth_shade=False)
+    subdivide(beo, 8)
+    paint(beo, lambda p, n: mix((0.85, 0.72, 0.5), (0.95, 0.86, 0.66), noise.noise(p * 30) * 0.5 + 0.5))
+    hs = [box_bm(0.34, 0.3, 0.02, (-2.5, 2.05, 0.04))]
+    for s_ in (1, -1):
+        r = box_bm(0.36, 0.32, 0.02, (0, 0, 0)); xform(r, Matrix.Translation((-2.5 + s_ * 0.09, 2.05, 0.15)) @ Matrix.Rotation(s_ * 0.9, 4, 'Y')); hs.append(r)
+    hso = from_bm(merge_bms(hs), "PenHouse", material("Wood", rough=0.7), parent=rt, smooth_shade=False)
+    paint(hso, lambda p, n: scl((0.7, 0.5, 0.3), 0.85 + 0.15 * math.sin(p.x * 60)))
+    bowl = cone_bm(0.07, 0.09, 0.04, 16); xform(bowl, Matrix.Translation((-1.7, 1.55, 0.06)))
+    bwo = from_bm(bowl, "PenBowl", material("Plastic", rough=0.4), parent=rt)
+    paint(bwo, solid((0.9, 0.35, 0.45)))
+    # the treat bin at the back right, lid open, and sacks beside it
+    bn = cone_bm(0.22, 0.26, 0.45, 18, caps=True); xform(bn, Matrix.Translation((2.35, 2.0, 0.225)))
+    lid = cone_bm(0.27, 0.27, 0.03, 18); xform(lid, Matrix.Translation((2.35, 2.32, 0.5)) @ Matrix.Rotation(1.1, 4, 'X'))
+    bno = from_bm(merge_bms([bn, lid]), "TreatBin", material("Plastic", rough=0.5), parent=rt)
+    paint(bno, solid((0.95, 0.75, 0.25)))
+    sk = []
+    for i, (x, y) in enumerate(((2.55, 1.3), (2.25, 1.05))):
+        b = blob_bm(0.24, 2, 0.15, 2.0, seed=i * 3.3, squash=1.3); xform(b, Matrix.Translation((x, y, 0.3))); sk.append(b)
+    sko = from_bm(merge_bms(sk), "Sacks", material("Cloth", rough=0.95), parent=rt)
+    paint(sko, lambda p, n: scl((0.78, 0.68, 0.48), 0.85 + 0.15 * noise.noise(p * 20)))
+    # the back door from inside, with the cat flap at its foot (x 1.2)
+    dr = [box_bm(1.1, 0.06, 2.1, (1.2, D / 2 - 0.02, 1.05))]
+    dro = from_bm(merge_bms(dr), "BackDoor", material("Wood", rough=0.7), parent=rt, smooth_shade=False)
+    paint(dro, lambda p, n: (0.2, 0.18, 0.15) if p.z < 0.3 and abs(p.x - 1.2) < 0.16 else scl((0.45, 0.32, 0.22), 0.85 + 0.15 * math.sin(p.z * 25)))
+    fl = box_bm(0.28, 0.02, 0.26, (1.2, D / 2 - 0.06, 0.15))
+    flo = from_bm(fl, "Flap", material("FlapPlastic", rough=0.4), parent=rt, smooth_shade=False)
+    paint(flo, solid((0.8, 0.82, 0.8)))
+    sign = box_bm(0.5, 0.02, 0.2, (1.2, D / 2 - 0.06, 2.35))
+    sio = from_bm(sign, "ExitSign", material("Lamp", rough=0.3, emit=(0.3, 1.0, 0.4), emit_str=0.0), parent=rt, smooth_shade=False)
+    paint(sio, solid((0.4, 0.95, 0.5)))
+    export("PetShopInside")
+
+def build_cat_flap():
+    """The pet shop's back door seen from outside, with a cat flap at its foot. Faces -Y; its back at y=0 against the wall."""
+    clear()
+    rt = root("CatFlap")
+    dr = box_bm(1.1, 0.06, 2.1, (0, -0.03, 1.05))
+    do = from_bm(dr, "BackDoorOut", material("Wood", rough=0.7), parent=rt, smooth_shade=False)
+    subdivide(do, 10)
+    paint(do, lambda p, n: (0.15, 0.13, 0.12) if p.z < 0.32 and abs(p.x) < 0.17 else scl((0.3, 0.42, 0.36), 0.85 + 0.15 * math.sin(p.z * 25)))
+    fr = [box_bm(0.36, 0.03, 0.04, (0, -0.07, 0.32)), box_bm(0.04, 0.03, 0.3, (-0.17, -0.07, 0.16)), box_bm(0.04, 0.03, 0.3, (0.17, -0.07, 0.16)),
+          box_bm(0.08, 0.04, 0.03, (0.35, -0.08, 1.0))]
+    fro = from_bm(merge_bms(fr), "FlapFrame", material("Plastic", rough=0.4), parent=rt, smooth_shade=False)
+    paint(fro, solid((0.85, 0.85, 0.82)))
+    fl = box_bm(0.3, 0.015, 0.28, (0, -0.075, 0.155))
+    flo = from_bm(fl, "Flap", material("FlapPlastic", rough=0.4), parent=rt, smooth_shade=False)
+    paint(flo, solid((0.75, 0.78, 0.76)))
+    export("CatFlap")
+
+def build_cat():
+    """Duchess the shop cat, standing: an orange tabby. Faces -Y like the fox, legs (LegFL..) and Tail pivot for the game."""
+    clear()
+    rt = root("Cat")
+    ORANGE, CREAM, PINK = (0.88, 0.55, 0.25), (0.98, 0.92, 0.82), (0.95, 0.6, 0.6)
+    def tabby(p, n):
+        if n.z < -0.5:
+            return CREAM
+        s = math.sin(p.y * 70 + 3 * noise.noise(p * 8)) > 0.35
+        return scl(ORANGE, 0.75 if s else 1.0)
+    b = sphere_bm(1, 26, 16)
+    deform(b, lambda v: Vector((v.x * 0.085 * (1 - 0.08 * v.y), v.y * 0.2, v.z * 0.09)) + Vector((0, 0, 0.27)))
+    bo = from_bm(b, "CatBody", material("CatFur", rough=0.9), parent=rt)
+    subsurf(bo, 1)
+    paint(bo, tabby)
+    hd = sphere_bm(1, 22, 14)
+    deform(hd, lambda v: Vector((v.x * 0.072, v.y * 0.065, v.z * 0.062)) + Vector((0, -0.24, 0.36)))
+    mz = sphere_bm(1, 14, 8)
+    deform(mz, lambda v: Vector((v.x * 0.035, v.y * 0.025, v.z * 0.025)) + Vector((0, -0.295, 0.34)))
+    ears = []
+    for sx in (1, -1):
+        e = cone_bm(0.03, 0.002, 0.055, 4)
+        deform(e, lambda v: Vector((v.x, v.y * 0.4, v.z)))
+        xform(e, Matrix.Translation((sx * 0.042, -0.235, 0.425)) @ Euler((0.0, sx * 0.3, 0)).to_matrix().to_4x4())
+        ears.append(e)
+    ho = from_bm(merge_bms([hd, mz] + ears), "CatHead", material("CatFur", rough=0.9), parent=rt)
+    paint(ho, lambda p, n: PINK if p.z > 0.43 and abs(p.x) > 0.03 and n.y < -0.3 else (CREAM if p.y < -0.28 and p.z < 0.35 else tabby(p, n)))
+    ey = [xform(sphere_bm(0.011, 10, 6), Matrix.Translation((sx * 0.03, -0.295, 0.375))) for sx in (1, -1)] + [xform(sphere_bm(0.008, 8, 5), Matrix.Translation((0, -0.32, 0.35)))]
+    eyo = from_bm(merge_bms(ey), "CatEyes", material("Eye", rough=0.05, spec=0.9), parent=rt)
+    paint(eyo, lambda p, n: PINK if p.y < -0.315 else (0.35, 0.75, 0.25))
+    wh = []
+    for sx in (1, -1):
+        for k in range(3):
+            wh.append(limb_bm((sx * 0.02, -0.31, 0.343 - k * 0.006), (sx * 0.1, -0.29, 0.355 - k * 0.012), 0.0012, 0.0008, 4, caps=False))
+    who = from_bm(merge_bms(wh), "CatWhiskers", material("Whisker", rough=0.5), parent=rt)
+    paint(who, solid((0.95, 0.95, 0.95)))
+    tl = []
+    for i in range(16):
+        t = i / 15
+        c = Vector((0, 0.18 + t * 0.12, 0.29 + t * 0.22 + 0.04 * math.sin(t * 4)))
+        tl.append(xform(sphere_bm(0.024 - 0.007 * t, 10, 7), Matrix.Translation(c)))
+    tlo = from_bm(merge_bms(tl), "Tail", material("CatFur", rough=0.9), parent=rt, origin=(0, 0.18, 0.29))
+    paint(tlo, lambda p, n: scl(ORANGE, 0.7 if math.sin(p.z * 60) > 0.3 else 1.0))
+    for nm, (x, y) in {"LegFL": (-0.045, -0.13), "LegFR": (0.045, -0.13), "LegBL": (-0.05, 0.14), "LegBR": (0.05, 0.14)}.items():
+        lg = limb_bm((x, y, 0.25), (x, y, 0.02), 0.022, 0.016, 10)
+        paw = sphere_bm(1, 10, 6)
+        deform(paw, lambda v: Vector((v.x * 0.02, v.y * 0.026, v.z * 0.013)))
+        xform(paw, Matrix.Translation((x, y - 0.008, 0.013)))
+        lo = from_bm(merge_bms([lg, paw]), nm, material("CatFur", rough=0.9), parent=rt, origin=(x, y, 0.25))
+        paint(lo, lambda p, n: CREAM if p.z < 0.06 else tabby(p, n))
+    export("Cat")
+
+def build_cat_loaf():
+    """Duchess asleep: curled up in a loaf, chin on her paws, tail wrapped round, eyes shut."""
+    clear()
+    rt = root("CatLoaf")
+    ORANGE, CREAM = (0.88, 0.55, 0.25), (0.98, 0.92, 0.82)
+    def tabby(p, n):
+        if n.z < -0.5:
+            return CREAM
+        s = math.sin(p.y * 70 + 3 * noise.noise(p * 8)) > 0.35
+        return scl(ORANGE, 0.75 if s else 1.0)
+    b = sphere_bm(1, 26, 16)
+    deform(b, lambda v: Vector((v.x * 0.11, v.y * 0.17, v.z * 0.075 * (1 if v.z > 0 else 0.6))) + Vector((0, 0.02, 0.07)))
+    bo = from_bm(b, "LoafBody", material("CatFur", rough=0.9), parent=rt)
+    subsurf(bo, 1)
+    paint(bo, tabby)
+    hd = sphere_bm(1, 20, 12)
+    deform(hd, lambda v: Vector((v.x * 0.07, v.y * 0.062, v.z * 0.055)) + Vector((0.01, -0.15, 0.085)))
+    ears = []
+    for sx in (1, -1):
+        e = cone_bm(0.028, 0.002, 0.045, 4)
+        deform(e, lambda v: Vector((v.x, v.y * 0.4, v.z)))
+        xform(e, Matrix.Translation((0.01 + sx * 0.04, -0.15, 0.14)) @ Euler((0.2, sx * 0.35, 0)).to_matrix().to_4x4())
+        ears.append(e)
+    pw = []
+    for sx in (1, -1):
+        q = sphere_bm(1, 10, 6); deform(q, lambda v: Vector((v.x * 0.024, v.y * 0.04, v.z * 0.018))); xform(q, Matrix.Translation((sx * 0.032, -0.175, 0.03))); pw.append(q)
+    ho = from_bm(merge_bms([hd] + ears + pw), "LoafHead", material("CatFur", rough=0.9), parent=rt)
+    paint(ho, lambda p, n: CREAM if p.z < 0.04 or (p.y < -0.19 and p.z < 0.08) else tabby(p, n))
+    lids = [limb_bm((0.01 + sx * 0.02, -0.205, 0.095), (0.01 + sx * 0.045, -0.2, 0.093), 0.003, 0.003, 4, caps=False) for sx in (1, -1)]
+    lio = from_bm(merge_bms(lids), "LoafEyes", material("Eye", rough=0.5), parent=rt)
+    paint(lio, solid((0.15, 0.1, 0.08)))
+    tl = []
+    for i in range(18):
+        a = -0.9 + i / 17 * 2.9
+        c = Vector((math.cos(a) * 0.125, math.sin(a) * 0.17 + 0.03, 0.03))
+        tl.append(xform(sphere_bm(0.026 - 0.008 * i / 17, 10, 7), Matrix.Translation(c)))
+    tlo = from_bm(merge_bms(tl), "LoafTail", material("CatFur", rough=0.9), parent=rt)
+    paint(tlo, lambda p, n: scl(ORANGE, 0.7 if math.sin(math.atan2(p.y, p.x) * 12) > 0.3 else 1.0))
+    export("CatLoaf")
+
+def build_pellets():
+    """A little pile of fortified guinea pig pellets."""
+    clear()
+    random.seed(105)
+    rt = root("Pellets")
+    pel = []
+    for i in range(26):
+        rr = math.sqrt(random.random()) * 0.035
+        a = random.random() * math.tau
+        z = 0.006 + (0.035 - rr) * 0.5 + random.random() * 0.004
+        c = limb_bm((0, 0, 0), (0.014, 0, 0), 0.0045, 0.0045, 6)
+        xform(c, Matrix.Translation((math.cos(a) * rr, math.sin(a) * rr, z)) @ Euler((random.uniform(-0.5, 0.5), random.uniform(-0.5, 0.5), random.random() * math.tau)).to_matrix().to_4x4())
+        pel.append(c)
+    po = from_bm(merge_bms(pel), "PelletPile", material("Veg", rough=0.8), parent=rt)
+    paint(po, lambda p, n: mix((0.42, 0.52, 0.22), (0.6, 0.5, 0.25), noise.noise(p * 80) * 0.5 + 0.5))
+    export("Pellets")
+
 jobs = {
     "GuineaPig": build_guinea_pig, "Human": build_human, "Oak": lambda: build_oak("Oak", 1),
     "Oak2": lambda: build_oak("Oak2", 9), "Pine": build_pine, "Birch": build_birch, "Bush": build_bush,
@@ -2353,6 +2615,7 @@ jobs = {
     "MarketStall": build_market_stall, "Basket": build_basket, "CressBed": build_cress_bed, "Trough": build_trough,
     "AppleTree": build_apple_tree, "SunflowerHead": build_sunflower_head,
     "BarnInside": build_barn_inside, "HayPile": build_hay_pile, "BarnHole": build_barn_hole, "Twig": build_twig,
+    "PetShopInside": build_petshop_inside, "CatFlap": build_cat_flap, "Cat": build_cat, "CatLoaf": build_cat_loaf, "Pellets": build_pellets,
 }
 for k, fn in jobs.items():
     if only and k not in only:

@@ -124,6 +124,43 @@ scenes.gnaw = async page => {
   await setup(page, `g.startGnaw(window.__tw);for(let k=0;k<2;k++){G.gnaw.pos=G.gnaw.c;G.gnaw.lock=0;g.gnawHit()}`);
   await page.waitForFunction(() => { const g = window.__game; return g.camera.position.distanceTo(g.pig.pos) < .75 }, null, { timeout: 120000, polling: 250 });
 };
+// The pet shop: its sign from the street at dusk, the cat flap round the back at night, inside, and crawling through a tube.
+scenes.shopfront = async page => {
+  await setup(page, `document.getElementById('mapwrap').classList.remove('big');G.time=18.6;if(G.inside)g.exitBarn();g.visit('town',0,0,0);const o=g.Z().shop.obj;pig.pos.set(o.position.x-.4,0,o.position.z+7.5);pig.heading=Math.PI`);
+  await camera(page, 'window.__game.pig.heading+Math.PI', 2.6, .1);
+};
+scenes.shoptop = async page => {
+  await setup(page, `G.time=22;if(g.Z().id!=='town')g.visit('town',0,0,0);const b=g.Z().shop;if(!G.inside)g.enterInside(b,b.holes[0]);G.inside.cat.noise=0;pig.pos.set(0,0,0);pig.heading=Math.PI`);
+  await page.waitForTimeout(500);
+  await setup(page, `G.camYaw=Math.PI;G.camDist=2.9;G.camPitch=1.25;G.lastDrag=performance.now()+1e6`);
+  await page.waitForFunction(() => { const g = window.__game; return g.camera.position.y > 2.3 }, null, { timeout: 120000, polling: 250 });
+};
+scenes.catflap = async page => {
+  await setup(page, `G.time=22;g.visit('town',0,0,0);const h=g.Z().shop.holes[0];pig.pos.set(h.ex+Math.sin(h.out)*.6,0,h.ez+Math.cos(h.out)*.6);pig.heading=h.out+Math.PI`);
+  await camera(page, 'window.__game.pig.heading+Math.PI+.3', 1.6, .25);
+};
+scenes.shop = async page => {
+  await setup(page, `G.time=22;if(g.Z().id!=='town')g.visit('town',0,0,0);const b=g.Z().shop;if(!G.inside)g.enterInside(b,b.holes[0]);G.inside.cat.noise=0;pig.pos.set(-.2,0,-1.45);pig.heading=.25`);
+  await page.waitForTimeout(500);
+  await setup(page, `G.camYaw=pig.heading+Math.PI;G.camDist=2.2;G.camPitch=.5;G.lastDrag=performance.now()+1e6`);
+  await page.waitForFunction(() => { const g = window.__game; return g.camera.position.distanceTo(g.pig.pos) < 2.6 }, null, { timeout: 120000, polling: 250 });
+};
+scenes.duchess = async page => {
+  await setup(page, `G.time=22;if(!G.inside||G.inside.kind!=='shop'){if(G.inside)g.exitBarn();g.visit('town',0,0,0);g.enterInside(g.Z().shop,g.Z().shop.holes[0])}const B=G.inside;B.tube=null;B.cat.noise=0;pig.pos.set(1.2,0,.2);pig.heading=.9`);
+  await page.waitForTimeout(800);
+  await setup(page, `G.camYaw=pig.heading+Math.PI-.3;G.camDist=1.6;G.camPitch=.42;G.lastDrag=performance.now()+1e6`);
+  await page.waitForFunction(() => { const g = window.__game; return g.camera.position.distanceTo(g.pig.pos) < 1.8 }, null, { timeout: 120000, polling: 250 });
+};
+scenes.tubes = async page => {
+  await setup(page, `G.time=22;if(!G.inside||G.inside.kind!=='shop'){if(G.inside)g.exitBarn();g.visit('town',0,0,0);g.enterInside(g.Z().shop,g.Z().shop.holes[0])}const B=G.inside;B.cat.noise=0;g.enterTube('G');B.tube.k=.55`);
+  await page.waitForFunction(() => { const g = window.__game; return g.camera.position.distanceTo(g.pig.pos) < .9 }, null, { timeout: 120000, polling: 250 });
+};
+scenes.butterscotch = async page => {
+  await setup(page, `G.time=22;if(!G.inside||G.inside.kind!=='shop'){if(G.inside)g.exitBarn();g.visit('town',0,0,0);g.enterInside(g.Z().shop,g.Z().shop.holes[0])}const B=G.inside;B.tube=null;B.cat.noise=0;pig.pos.set(-1.1,0,-1.5);pig.heading=-Math.PI/2-.4`);
+  await page.waitForTimeout(800);
+  await setup(page, `G.camYaw=pig.heading+Math.PI+.6;G.camDist=1.3;G.camPitch=.35;G.lastDrag=performance.now()+1e6`);
+  await page.waitForFunction(() => { const g = window.__game; return g.camera.position.distanceTo(g.pig.pos) < 1.5 }, null, { timeout: 120000, polling: 250 });
+};
 // A guinea pig who lives out on the beach, chatting.
 scenes.zonepig = async page => {
   await setup(page, `document.getElementById('mapwrap').classList.remove('big');G.time=10.5;g.visit('beach',0,0,0);const f=g.friends.find(f=>f.origin==='beach');pig.pos.set(f.pos.x+.7,0,f.pos.z+.3);pig.heading=Math.atan2(f.pos.x-pig.pos.x,f.pos.z-pig.pos.z)`);
