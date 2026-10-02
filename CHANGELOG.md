@@ -13,6 +13,11 @@
 - Hold to munch the hay, or burrow into it and scurry about underneath as a wriggling bump in the straw. Four treats are hidden in the pile each day: find them all, then pop out in a shower of straw. Your herd comes in with you, and the hawk and foxes can't follow.
 - New goal: Hay Diver. The farm and Critter Corner's place checklists include getting into the barn.
 
+### Gnawing
+- Guinea pig teeth never stop growing, so a good gnaw keeps them tidy. Fallen twigs lie at the foot of trees in every place (apple twigs under the farm's apple trees). Walk up and gnaw one: the camera comes round for a close-up and you chomp when the marker is in the green. The green shrinks and the marker speeds up with every bite.
+- Five good chomps trims your teeth: munching and foraging go faster for 3 minutes. A clean gnaw with no misses earns a bonus; three misses and the twig snaps. A new twig falls a few minutes later.
+- New goal: Tidy Teeth.
+
 ### Guinea pigs everywhere
 - 12 more wild guinea pigs live out in the zones, one or two in each: Snowball on the peaks, Thistle and Fennel in the Deep Wood, Pretzel downtown, Sandy on the beach, Pebble and Willow by the creek, Cocoa at the petting zoo, Barley and Turnip on the farm, and Marigold and Honey in the sunflowers. That's 21 to meet, and your herd still holds six, so pick your favourites.
 - A guinea pig who scatters in fright in another zone now stays in that zone, and wild guinea pigs never wander into deep water.
@@ -35,7 +40,7 @@
 - Gamepads work everywhere, menus included: left stick to scurry, right stick to look, Ⓐ eat and enter, Ⓧ forage, Ⓨ chat, Ⓑ popcorn, RB sniff, LB wheek, RT scurry, Back for the map, d-pad up for the journal and Start to pause. The prompts and tips show whichever buttons you're using.
 
 ### Models
-- The barn's inside, a hay pile and the holes in the barn walls, built in Blender like everything else.
+- The barn's inside, a hay pile, the holes in the barn walls and a fallen twig, built in Blender like everything else.
 - 16 new Blender-built models: rose hips, raspberry leaves, romaine, a watermelon slice, watercress, a corn husk, an apple slice and sunflower seeds, plus a snowdrift, a bramble, a market stall, a picnic basket, a watercress bed, a feed trough, an apple tree and a fallen sunflower head.
 
 ## v0.2.0 (2026-09-29)

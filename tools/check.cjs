@@ -1,6 +1,6 @@
 // World checks: loads the game in a tiny headless window and tests the world's logic through window.__game.
 // Usage: PW=/path/to/node_modules/playwright node tools/check.cjs [check ...]
-//   checks: reach warren night chaos eat treats goals music barn saves touch pad memory (default: all). URL defaults to the local dev site.
+//   checks: reach warren night chaos eat treats goals music gnaw barn saves touch pad memory (default: all). URL defaults to the local dev site.
 // Prints a report and exits 1 if anything failed.
 const { chromium } = require(process.env.PW || 'playwright');
 const URL = process.env.URL || 'https://wheek.localhost/';
@@ -53,6 +53,7 @@ const frames = (page, n) => page.evaluate(n => new Promise(r => { let k = 0; (fu
       for(const h of Z.humans)chk('human '+h.name,h.obj.position.x,h.obj.position.z,.85);
       const pigs=g.friends.filter(f=>f.origin===Z.id&&f.state==='wild');for(const f of pigs)chk('guinea pig '+f.name,f.home.x,f.home.z,.6);
       for(const b of Z.barns||[])for(const h of b.holes)chk('barn hole',h.ex,h.ez,.3);
+      for(const t of Z.twigs||[])chk('twig',t.x,t.z,.45);
       for(const c of Z.critters)if(c.kind==='Duck')chk('duck pond',c.area.x,c.area.z,c.area.r+2.4);else chk(c.kind,c.x,c.z,1.4);
       out.counts=[Z.tunnels.length,Z.spots.length,Z.pickSets.reduce((n,p)=>n+p.items.length,0),Z.humans.length,Z.critters.length,pigs.length].join('/');return out})()`);
     report(`reach ${id}`, !r.bad.length, `${r.arrivals} ways in · burrows/spots/plants/humans/animals/piggies ${r.counts}${r.bad.length ? ' · ' + r.bad.length + ' unreachable: ' + r.bad.slice(0, 6).join('; ') : ''}`);
@@ -182,6 +183,26 @@ const frames = (page, n) => page.evaluate(n => new Promise(r => { let k = 0; (fu
     const high = await page.evaluate(() => ({ shadow: window.__game.sun.castShadow, paused: window.__game.G.paused }));
     report('settings apply and are saved', low.pr === 1 && !low.shadow && low.gain === 0 && stored.quality === 'low' && stored.music === 0 && high.shadow && !high.paused,
       `low: pixel ratio ${low.pr}, shadows ${low.shadow}, music gain ${low.gain} · saved ${JSON.stringify(stored)} · back to high: shadows ${high.shadow}`);
+  }
+
+  // 5f. gnawing: a clean gnaw trims your teeth, three misses snap the twig, walking off puts it back
+  if (pick('gnaw')) {
+    const goTo = async i => { await page.evaluate(i => { const g = window.__game, Z = g.Z(), t = Z.twigs[i]; window.__tw = t; g.G.acts = null }, i);
+      return page.waitForFunction(() => { const g = window.__game, t = window.__tw; const a = [0, 1, 2, 3, 4, 5, 6, 7].map(k => k * Math.PI / 4).find(a => g.freeAt(t.x + Math.sin(a) * .2, t.z + Math.cos(a) * .2, .12)) ?? 0;
+        g.pig.pos.set(t.x + Math.sin(a) * .2, g.heightAt(t.x, t.z), t.z + Math.cos(a) * .2); g.pig.heading = a + Math.PI; return (g.G.acts || []).some(a => a.label.startsWith('Gnaw the')) }, null, { timeout: 60000, polling: 200 }).then(() => true, () => false) };
+    await page.evaluate(() => { const g = window.__game; g.G.time = 11; g.visit('park', 0, 0, 0); g.G.teethT = 0 });
+    const n = await page.evaluate(() => window.__game.Z().twigs.length);
+    const offered = await goTo(0); await page.keyboard.press('KeyE'); await frames(page, 2);
+    const clean = await page.evaluate(async () => { const g = window.__game, G = g.G; if (!G.gnaw) return { started: false };
+      for (let k = 0; k < 5 && G.gnaw; k++) { G.gnaw.pos = G.gnaw.c; G.gnaw.lock = 0; g.gnawHit() }
+      return { started: true, done: !G.gnaw, teeth: G.teethT, twigGone: !window.__tw.ready && !window.__tw.obj.visible, goal: G.cleanGnaws } });
+    const o1 = await goTo(1); await page.keyboard.press('KeyE'); await frames(page, 2);
+    const snap = await page.evaluate(() => { const g = window.__game, G = g.G, before = G.teethT; if (!G.gnaw) return { done: false, started: false }; for (let k = 0; k < 3 && G.gnaw; k++) { G.gnaw.pos = G.gnaw.c > .5 ? 0 : 1; G.gnaw.lock = 0; g.gnawHit() } return { done: !G.gnaw, buffSame: G.teethT <= before, gone: !window.__tw.ready } });
+    await goTo(2); await page.keyboard.press('KeyE'); await frames(page, 2);
+    await page.keyboard.down('KeyW'); await frames(page, 3); await page.keyboard.up('KeyW');
+    const walked = await page.evaluate(() => ({ off: !window.__game.G.gnaw, back: window.__tw.ready && window.__tw.obj.visible }));
+    report('gnaw', n >= 3 && offered && clean.started && clean.done && clean.teeth > 170 && clean.twigGone && clean.goal >= 1 && snap.done && snap.buffSame && snap.gone && walked.off && walked.back,
+      `${n} park twigs · clean gnaw: teeth ${Math.round(clean.teeth || 0)}s, twig gone ${clean.twigGone} · 3 misses snap ${snap.done && snap.gone} · walking off puts it back ${walked.back}`);
   }
 
   // 5e. the barns: in through a hole, munch the hay, burrow onto every hidden treat, pop out, out through the other hole

@@ -47,6 +47,11 @@ kbd{display:inline-block;min-width:20px;text-align:center;padding:0 5px;margin-r
 #herdline b{color:#ff9fd0;font-weight:600}
 .ntag{position:fixed;z-index:5;pointer-events:none;transform:translate(-50%,-100%);background:var(--panel);border:1px solid var(--edge);border-radius:10px;padding:2px 8px;font-size:12px;white-space:nowrap;display:none}
 .ntag i{font-style:normal;color:#ff9fd0}
+#gnaw{bottom:120px;left:50%;transform:translateX(-50%);width:300px;display:none;text-align:center;font-size:13px}
+#gnaw .bar{position:relative;height:18px;background:rgba(0,0,0,.45);border-radius:9px;border:1px solid var(--edge);margin:6px 0;overflow:hidden}
+#gnaw .z{position:absolute;top:0;bottom:0;background:linear-gradient(90deg,#4caf50,#9fe88a,#4caf50);opacity:.85}
+#gnaw .m{position:absolute;top:-2px;bottom:-2px;width:4px;margin-left:-2px;background:#fff;box-shadow:0 0 6px #fff;border-radius:2px}
+#gnaw .k{font-size:15px;letter-spacing:2px}
 #forage{bottom:110px;left:50%;transform:translateX(-50%);width:260px;display:none;text-align:center;font-size:13px}
 #forage .t{height:12px;background:rgba(0,0,0,.4);border-radius:8px;overflow:hidden;border:1px solid var(--edge);margin-top:4px}
 #forage .t i{display:block;height:100%;width:0;background:linear-gradient(90deg,#e6a23c,#ffd23f)}
@@ -205,6 +210,7 @@ body.pad .btn:focus,body.pad .breed:focus,body.pad .coat:focus{outline:3px solid
 <div id="mapwrap" class="hud hidden"><canvas id="map" width="340" height="340"></canvas></div>
 <div id="danger" class="hud"><div class="l"></div><div class="m"><i></i></div></div>
 <div id="befriend" class="hud"><div class="l"></div><div class="t"><i></i></div></div>
+<div id="gnaw" class="hud"><div class="l">🦷 Gnawing… chomp in the green!</div><div class="bar"><div class="z"></div><div class="m"></div></div><div class="k"></div></div>
 <div id="forage" class="hud"><div class="l"></div><div class="t"><i></i></div></div>
 <div id="prompt" class="hud"></div>
 <div id="toasts" class="hud"></div>

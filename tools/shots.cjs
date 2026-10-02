@@ -116,6 +116,14 @@ scenes.burrow = async page => {
   await setup(page, `G.camYaw=pig.heading+Math.PI+.4;G.camDist=1.5;G.camPitch=.45;G.lastDrag=performance.now()+1e6`);
   await page.waitForTimeout(1500);
 };
+// Gnawing a twig at the foot of a meadow tree: the close-up and the timing bar, two chomps in.
+scenes.gnaw = async page => {
+  await setup(page, `document.getElementById('mapwrap').classList.remove('big');G.time=15;if(G.inside)g.exitBarn();g.visit('park',0,0,0);const t=g.Z().twigs.slice().sort((a,b)=>Math.hypot(a.x,a.z)-Math.hypot(b.x,b.z))[0];window.__tw=t;
+    const a=[0,1,2,3,4,5,6,7].map(k=>k*Math.PI/4).find(a=>g.freeAt(t.x+Math.sin(a)*.2,t.z+Math.cos(a)*.2,.12))??0;pig.pos.set(t.x+Math.sin(a)*.2,0,t.z+Math.cos(a)*.2);pig.heading=a+Math.PI`);
+  await page.waitForTimeout(1500);
+  await setup(page, `g.startGnaw(window.__tw);for(let k=0;k<2;k++){G.gnaw.pos=G.gnaw.c;G.gnaw.lock=0;g.gnawHit()}`);
+  await page.waitForFunction(() => { const g = window.__game; return g.camera.position.distanceTo(g.pig.pos) < .75 }, null, { timeout: 120000, polling: 250 });
+};
 // A guinea pig who lives out on the beach, chatting.
 scenes.zonepig = async page => {
   await setup(page, `document.getElementById('mapwrap').classList.remove('big');G.time=10.5;g.visit('beach',0,0,0);const f=g.friends.find(f=>f.origin==='beach');pig.pos.set(f.pos.x+.7,0,f.pos.z+.3);pig.heading=Math.atan2(f.pos.x-pig.pos.x,f.pos.z-pig.pos.z)`);

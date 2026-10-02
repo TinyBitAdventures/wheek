@@ -206,7 +206,7 @@ function useZone(z){Z=z;({colliders,boxes,trees,bushes,logs,tunnels,spots,patche
   G.leafpiles=z.leafpiles;G.lpSet=z.lpSet;G.bushSet=z.bushSet;G.lushSet=z.lushSet;G.glass=z.glass;mapBg=z.mapBg}
 function buildZone(z){
   Object.assign(z,{colliders:[],boxes:[],trees:[],bushes:[],logs:[],tunnels:[],spots:[],patches:[],humans:[],pickSets:[],drops:[],chunks:[],group:new THREE.Group(),
-    hgrid:new Float32Array((SEG+1)*(SEG+1)),leafpiles:[],lpSet:null,bushSet:null,lushSet:null,glass:null,mapBg:null,lamps:[],windows:[],critters:[],cars:[],cover:[],barns:[]});
+    hgrid:new Float32Array((SEG+1)*(SEG+1)),leafpiles:[],lpSet:null,bushSet:null,lushSet:null,glass:null,mapBg:null,lamps:[],windows:[],critters:[],cars:[],cover:[],barns:[],twigs:[]});
   useZone(z);
   for(let iz=0;iz<=SEG;iz++)for(let ix=0;ix<=SEG;ix++)z.hgrid[iz*(SEG+1)+ix]=z.height(-HALF+ix*CELL,-HALF+iz*CELL);
   const prev=rand;if(z.seed)rand=mulberry32(z.seed);   // the park keeps the world's own sequence: its layout predates zones
@@ -214,6 +214,7 @@ function buildZone(z){
   for(const i of G.zfound[z.id]||[])if(z.tunnels[i])z.tunnels[i].found=true;
   if(z!==PARK)placeZoneFriends(z);
   for(const b of z.barns)setupBarn(b);
+  placeTwigs(z);
   // a plant that ended up inside a rock or trunk can never be eaten: leave it out (without touching the seeded layout)
   for(const ps of z.pickSets)for(const it of ps.items)if(z.colliders.some(c=>Math.hypot(c.x-it.x,c.z-it.z)<c.r)||insideBox(it.x,it.z)){it.alive=false;it.respawn=Infinity;ps.set.setMatrix(it.i,ZERO)}
   Object.assign(z,{leafpiles:G.leafpiles,lpSet:G.lpSet,bushSet:G.bushSet,lushSet:G.lushSet,glass:G.glass});z.built=true}
@@ -293,7 +294,7 @@ const RANKS=[[0,'Nibbler'],[4,'Sniffer'],[12,'Rummager'],[25,'Master Forager'],[
 const G={started:false,paused:false,over:false,modal:false,inTunnel:false,
   hp:100,full:80,vitc:75,energy:100,happy:50,score:0,best:lsGet('wheek-best',0),
   day:1,time:7.0,combo:0,comboT:0,forages:0,pets:0,petStreak:0,lastPetHuman:null,petStreakT:0,
-  found:{},curios:{},tunnels:0,zfound:{},visited:{park:1},met:{},pals:[],placesDone:{},goals:{},bestStreak:0,hawkDodged:0,foxEscapes:0,mazePrize:0,heard:{},given:{},barns:{},hayFinds:0,luckT:0,giftT:40,huddle:false,wheekT:0,sniffCD:0,popcornCD:0,cause:'',nightsSurvived:0,eaten:0};
+  found:{},curios:{},tunnels:0,zfound:{},visited:{park:1},met:{},pals:[],placesDone:{},goals:{},bestStreak:0,hawkDodged:0,foxEscapes:0,mazePrize:0,heard:{},given:{},barns:{},hayFinds:0,teethT:0,gnaws:0,cleanGnaws:0,luckT:0,giftT:40,huddle:false,wheekT:0,sniffCD:0,popcornCD:0,cause:'',nightsSurvived:0,eaten:0};
 const pig={pos:new THREE.Vector3(2.5,0,-1.5),vel:new THREE.Vector3(),heading:Math.PI,vy:0,air:false,phase:0,obj:null,parts:{},eating:0,foraging:0,knock:0,popSpin:0,fur:[]};
 (()=>{const s=lsGet('wheek-pig',null);const b=s&&BREEDS[s.breed]?s.breed:'american';G.breed=b;G.coat=s&&BREEDS[b].coats.includes(s.coat)?s.coat:BREEDS[b].coats[0];G.name=(s&&s.name)||PIG_NAMES[Math.floor(Math.random()*PIG_NAMES.length)];G.perk=perksFor(b)})();
 const keys={};
@@ -1070,6 +1071,8 @@ function currentActions(){
   for(const b of Z.barns)for(const h of b.holes)if(Math.hypot(h.ex-pig.pos.x,h.ez-pig.pos.z)<.45)acts.push({k:'E',label:'Squeeze into the barn',do:()=>enterBarn(b,h)});
   const gh=humans.find(h=>h.visible&&Math.hypot(h.obj.position.x-pig.pos.x,h.obj.position.z-pig.pos.z)<1.6);const gk=gh&&requestOf(gh);
   if(gk&&G.curios[gk])acts.push({k:'E',label:`Give ${CURIOS[gk].icon} ${CURIOS[gk].name} to ${gh.name}`,do:()=>giveCurio(gh,gk)});
+  if(G.gnaw)return [{k:'E',label:'Chomp!',do:gnawHit}];
+  const tw=nearTwig();if(tw)acts.push(tw.ready?{k:'E',label:`Gnaw the ${tw.apple?'apple twig':'twig'}`,do:()=>startGnaw(tw)}:{k:'E',label:'Gnawed twig · a new one falls soon',disabled:true});
   const tun=tunnels.find(t=>Math.hypot(t.ex-pig.pos.x,t.ez-pig.pos.z)<.45);if(tun)acts.push({k:'E',label:`Enter tunnel · ${tun.name}`,do:()=>openTunnel(tun)});
   let bestP=null,bd=.22;for(const ps of pickSets)for(const it of ps.items){if(!it.alive)continue;const d=Math.hypot(it.x-m.x,it.z-m.z);if(d<bd){bd=d;bestP={ps,it}}}
   for(const d of drops){if(!d.landed)continue;const dd=Math.hypot(d.x-m.x,d.z-m.z);if(dd<.25&&dd<bd+.05){bd=dd;bestP={drop:d}}}
@@ -1095,15 +1098,16 @@ let eatTick=0;
 function holdEat(dt,act){
   eatTick-=dt;pig.eating=.3;
   if(eatTick>0)return;
-  if(act.hay){eatTick=.45;G.full=Math.min(100,G.full+3);G.energy=Math.min(100,G.energy+.4);SFX.chomp();addScore(3);G.eaten++;discover('hay');
+  const fast=G.teethT>0?.75:1;
+  if(act.hay){eatTick=.45*fast;G.full=Math.min(100,G.full+3);G.energy=Math.min(100,G.energy+.4);SFX.chomp();addScore(3);G.eaten++;discover('hay');
     const m=mouthPos();emit(m.x,m.y+.04,m.z,4,{col:[.85,.74,.36],spread:.25,up:.5,size:.01,life:.5})}
-  else if(act.patch){eatTick=.45;const p=act.patch;p.amount=Math.max(0,p.amount-.08);updatePatch(p);G.full=Math.min(100,G.full+3.2);G.vitc=Math.min(100,G.vitc+.4);SFX.chomp();addScore(4);G.eaten++;discover('grass');
+  else if(act.patch){eatTick=.45*fast;const p=act.patch;p.amount=Math.max(0,p.amount-.08);updatePatch(p);G.full=Math.min(100,G.full+3.2);G.vitc=Math.min(100,G.vitc+.4);SFX.chomp();addScore(4);G.eaten++;discover('grass');
     const m=mouthPos();emit(m.x,m.y+.04,m.z,4,{col:[.4,.75,.2],spread:.25,up:.5,size:.01,life:.5})}
-  else{eatTick=.7;G.full=Math.min(100,G.full+1.1);SFX.chomp();addScore(1);const m=mouthPos();emit(m.x,m.y+.03,m.z,3,{col:[.35,.6,.2],spread:.2,up:.4,size:.008,life:.4})}
+  else{eatTick=.7*fast;G.full=Math.min(100,G.full+1.1);SFX.chomp();addScore(1);const m=mouthPos();emit(m.x,m.y+.03,m.z,3,{col:[.35,.6,.2],spread:.2,up:.4,size:.008,life:.4})}
 }
 function updatePatch(p){const k=.25+.75*p.amount;p.mats.forEach((m,j)=>G.lushSet.setMatrix(p.idx[j],mat4(m.x,m.y,m.z,m.ry,m.s,0,0,m.s*k)))}
 
-function forageSpeed(){return (1+rankIdx()*.18)*G.perk.forage}
+function forageSpeed(){return (1+rankIdx()*.18)*G.perk.forage*(G.teethT>0?1.3:1)}
 function startForage(spot){if(spot.type==='bush'&&!spot.bush.berries){toast('This bush has been picked clean. Try again later.');spot.ready=false;spot.cd=30;return}
   forageState={spot,t:0,need:1.7/forageSpeed(),rustle:0};$('forage').style.display='block';$('forage').querySelector('.l').textContent='Foraging '+SPOTNAME[spot.type]+'…'}
 function updateForage(dt){
@@ -1599,6 +1603,43 @@ function updateInside(dt,t){const B=G.inside;
   for(const bm of B.beams)bm.material.opacity=.05+day*.2;for(const pl of B.pools)pl.material.opacity=.1+day*.35;B.sun.intensity=.2+day*1.6;B.sun.color.copy(sun.color);B.hemi.intensity=.55+day*1.05;B.fill.intensity=.15+day*.45;
   const nk=isNight()?1:0;B.lantern.intensity=.8+nk*2;if(B.lampMat)B.lampMat.emissiveIntensity=.8+nk*1.6}
 
+// ============================================================ gnawing: guinea pig teeth never stop growing, so they chew
+// Fallen twigs lie at the foot of trees (apple twigs under the apple trees). Gnaw one down in a little timing game:
+// press when the marker is in the green. Five good chomps trims your teeth: munching and foraging go faster for a while.
+const GNAW={need:5,misses:3,buff:180};
+function placeTwigs(z){const zr=mulberry32((z.seed||0)+404),cands=z.trees.filter(t=>t.r>.15),n=Math.min(z===PARK?12:10,Math.floor(cands.length/6));
+  for(let k=0,tries=0;k<n&&tries<n*30;tries++){const t=cands[Math.floor(zr()*cands.length)],a=zr()*Math.PI*2,d=t.r+.35+zr()*.3,x=t.x+Math.cos(a)*d,zz=t.z+Math.sin(a)*d;
+    if(Math.hypot(x,zz)>EDGE-3||!freeAt(x,zz,.2)||wet(x,zz,.1)||insideBox(x,zz,.4)||z.twigs.some(o=>Math.hypot(o.x-x,o.z-zz)<6)||z.spots.some(s=>Math.hypot(s.x-x,s.z-zz)<.8))continue;
+    const rot=zr()*Math.PI*2,o=M.Twig.clone(true),apple=t.kind==='Apple';if(apple)o.traverse(m=>{if(m.isMesh&&m.material.name==='Bark'){m.material=m.material.clone();m.material.color.multiply(new THREE.Color(1.15,.85,.75))}});
+    o.position.set(x,heightAt(x,zz)-.005,zz);o.rotation.y=rot;z.group.add(o);z.twigs.push({x,z:zz,rot,obj:o,ready:true,cd:0,apple});k++}}
+function nearTwig(){const m=mouthPos();return Z.twigs.find(t=>Math.hypot(t.x-m.x,t.z-m.z)<.32)}
+function startGnaw(tw){if(!tw.ready||G.gnaw)return;G.acts=null;forageState=null;$('forage').style.display='none';
+  G.gnaw={tw,pos:0,dir:1,speed:.8,c:.5,w:.26,hits:0,miss:0,perfect:0,lock:0};gnawZone();
+  const o=tw.obj,m=mouthPos();o.position.set(m.x+Math.sin(pig.heading)*.06,heightAt(m.x,m.z)+.035,m.z+Math.cos(pig.heading)*.06);o.rotation.set(0,pig.heading+Math.PI/2,.12);
+  $('gnaw').style.display='block';renderGnaw();SFX.sniff();
+  if(!G.gnawTip){G.gnawTip=true;toast(`🦷 Guinea pig teeth never stop growing, so a good gnaw keeps them tidy. ${G.input==='touch'?'Tap Chomp!':'Press '+kb('E')} when the marker is in the green!`,'',7)}}
+function gnawZone(){const g=G.gnaw;g.w=Math.max(.11,.26-.03*g.hits);g.c=g.w/2+.04+Math.random()*(1-g.w-.08)}
+function renderGnaw(){const g=G.gnaw,el=$('gnaw');el.querySelector('.z').style.left=((g.c-g.w/2)*100)+'%';el.querySelector('.z').style.width=(g.w*100)+'%';
+  el.querySelector('.k').innerHTML='🦷'.repeat(g.hits)+'<span style="opacity:.3">'+'🦷'.repeat(GNAW.need-g.hits)+'</span> '+(g.miss?'<span style="color:#ff8a7a">'+'✖'.repeat(g.miss)+'</span>':'')}
+function gnawHit(){const g=G.gnaw;if(!g||g.lock>0)return;g.lock=.18;const off=Math.abs(g.pos-g.c),m=mouthPos();
+  if(off<=g.w/2){g.hits++;const perfect=off<=g.w/6;if(perfect)g.perfect++;SFX.chomp();setTimeout(()=>SFX.chomp(),90);pig.eating=.45;
+    emit(m.x,m.y+.05,m.z,12,{col:g.tw.apple?[.82,.62,.5]:[.75,.6,.4],spread:.5,up:1.1,size:.012,life:.6,grav:3});floaty(perfect?'Perfect!':'Crunch!',perfect?'#ffd23f':'#fff');
+    g.tw.obj.scale.set(1-.15*g.hits,1,1);g.speed+=.18;if(g.hits>=GNAW.need)return endGnaw(true)}
+  else{g.miss++;tone('sine',180,120,.12,.2);floaty('miss','#ff8a7a');if(g.miss>=GNAW.misses)return endGnaw(false)}
+  gnawZone();renderGnaw()}
+function endGnaw(ok,quiet){const g=G.gnaw;G.gnaw=null;G.acts=null;$('gnaw').style.display='none';const tw=g.tw;tw.ready=false;tw.cd=R(150,240);tw.obj.visible=false;tw.obj.scale.set(1,1,1);
+  tw.obj.position.set(tw.x,heightAt(tw.x,tw.z)-.005,tw.z);tw.obj.rotation.set(0,tw.rot,0);if(quiet)return;
+  if(!ok){toast('💥 Snap! The twig broke. Your teeth are a little tidier anyway.','',4);addScore(15);return}
+  const clean=g.miss===0;G.teethT=GNAW.buff;G.gnaws=(G.gnaws||0)+1;G.happy=Math.min(100,G.happy+12);SFX.find(clean?'rare':'uncommon');
+  callout(clean?'rare':'uncommon','🦷 Teeth trimmed!',0);toast(`🦷 <b>Teeth trimmed!</b> Munching and foraging are faster for 3 minutes.${clean?' <b style="color:#ffd23f">Clean gnaw!</b> +100':''}`,'gold',5);
+  addScore(60+g.perfect*15,'gnawed!','#ffd23f');if(clean){G.cleanGnaws=(G.cleanGnaws||0)+1;addScore(100,'clean!','#ffd23f')}}
+function updateGnaw(dt){const g=G.gnaw;if(!g)return;g.lock=Math.max(0,g.lock-dt);
+  g.pos+=g.dir*g.speed*dt;if(g.pos>1){g.pos=1;g.dir=-1}if(g.pos<0){g.pos=0;g.dir=1}$('gnaw').querySelector('.m').style.left=(g.pos*100)+'%';
+  // walking off (or a hawk diving at you) ends it
+  const moving=keys.KeyW||keys.KeyA||keys.KeyS||keys.KeyD||keys.ArrowUp||keys.ArrowDown||keys.ArrowLeft||keys.ArrowRight||joy.active&&Math.hypot(joy.x,joy.y)>.4||pad.on;
+  if(moving||hawk.state==='dive'){endGnaw(false,true);toast('🦷 You left the twig for later.');tw_restore(g.tw)}}
+function tw_restore(tw){tw.ready=true;tw.cd=0;tw.obj.visible=true}
+
 // ---- requests: some humans have lost a little thing, and it turned up down in the warren. Bring it back for a thank-you
 const REQUESTS={
   marble:{who:'Maya',zone:'park',ask:'I lost my favourite blue marble down a hole in the woods. If you ever find it…',thanks:'My marble! You clever little thing!',gift:['strawberry','strawberry'],pts:200},
@@ -1843,6 +1884,7 @@ function updatePig(dt,t){
   // input
   let ix=0,iz=0;if(keys.KeyW||keys.ArrowUp)iz+=1;if(keys.KeyS||keys.ArrowDown)iz-=1;if(keys.KeyA||keys.ArrowLeft)ix-=1;if(keys.KeyD||keys.ArrowRight)ix+=1;
   if(joy.active){ix=joy.x;iz=-joy.y}else if(pad.on){ix=pad.x;iz=-pad.y}
+  if(G.gnaw){ix=iz=0}
   const busy=forageState||pig.eating>.25;
   let len=Math.hypot(ix,iz);if(len>1){ix/=len;iz/=len;len=1}
   const yaw=G.camYaw;const fx=-Math.sin(yaw),fz=-Math.cos(yaw),rx=Math.cos(yaw),rz=-Math.sin(yaw);
@@ -1896,7 +1938,7 @@ function leaveZone(nb){if(G.zoning)return;G.zoning=true;G.exitT=0;const from=Z,a
   G.modal=true;SFX.whoosh();forageState=null;$('forage').style.display='none';
   setTimeout(()=>{arriveZone(nb,a+Math.PI);G.modal=false;setTimeout(()=>{zc.classList.remove('on');G.zoning=false},900)},550)}
 // show a zone and put the pig in it: on the rim at angle ang (walking in), or at a saved spot
-function arriveZone(nb,ang,at){G.acts=null;   // the prompts belong to where you were
+function arriveZone(nb,ang,at){G.acts=null;if(G.gnaw){const tw=G.gnaw.tw;endGnaw(false,true);tw_restore(tw)}   // the prompts belong to where you were
   if(G.under)exitWarren(W.from.node);
   showZone(nb);let x=0,z=0;
   if(at){x=at.x;z=at.z}else for(let r=EDGE-2.5;r>6;r-=.5){x=Math.cos(ang)*r;z=Math.sin(ang)*r;if(freeAt(x,z,.3))break}
@@ -1914,8 +1956,8 @@ G.camYaw=Math.PI*0;G.camPitch=.2;G.camDist=.95;G.drag=false;G.lastDrag=0;
 const camPos=new THREE.Vector3(),camTgt=new THREE.Vector3();
 function updateCamera(dt){
   const tgt=_v.set(pig.pos.x,pig.pos.y+.09,pig.pos.z);camTgt.lerp(tgt,Math.min(1,dt*10));
-  const d=G.under?Math.min(G.camDist,.8):G.camDist;let p=G.under?Math.min(G.camPitch,.5):G.camPitch;
-  const want=new THREE.Vector3();const aim=(p,d)=>want.set(camTgt.x+Math.sin(G.camYaw)*Math.cos(p)*d,camTgt.y+Math.sin(p)*d,camTgt.z+Math.cos(G.camYaw)*Math.cos(p)*d);
+  const d=G.gnaw?.5:G.under?Math.min(G.camDist,.8):G.camDist;let p=G.gnaw?.16:G.under?Math.min(G.camPitch,.5):G.camPitch;
+  const yaw=G.gnaw?pig.heading+2.1:G.camYaw;const want=new THREE.Vector3();const aim=(p,d)=>want.set(camTgt.x+Math.sin(yaw)*Math.cos(p)*d,camTgt.y+Math.sin(p)*d,camTgt.z+Math.cos(yaw)*Math.cos(p)*d);
   if(G.under){// pull in until the line from the pig stays inside the cave; against a wall, look down from higher up instead
     const reach=p=>{aim(p,d);for(let s=1;s<=12;s++){const q=s/12;if(wSdf(lerp(camTgt.x,want.x,q),lerp(camTgt.y,want.y,q),lerp(camTgt.z,want.z,q),false)>-.1)return (s-1)/12}return 1};
     let best=p,bk=reach(p);for(const q of [.7,.95,1.2]){if(bk>=.6||q<=p)continue;const k=reach(q);if(k>bk+.1){bk=k;best=q}}
@@ -1973,6 +2015,8 @@ function updateSurvival(dt){
   G.luckT=Math.max(0,G.luckT-dt);G.wheekT=Math.max(0,G.wheekT-dt);G.sniffCD=Math.max(0,G.sniffCD-dt);G.popcornCD=Math.max(0,G.popcornCD-dt);G.wheekCD=Math.max(0,(G.wheekCD||0)-dt);
   // regrowth
   for(const s of spots){if(!s.ready){s.cd-=dt;if(s.cd<=0){s.ready=true;if(s.type==='leafpile')G.lpSet.setMatrix(s.lp.i,mat4(s.lp.x,heightAt(s.lp.x,s.lp.z)-.02,s.lp.z,s.lp.ry,s.lp.s))}}}
+  for(const t of Z.twigs){if(!t.ready&&!(G.gnaw&&G.gnaw.tw===t)){t.cd-=dt;if(t.cd<=0)tw_restore(t)}}
+  G.teethT=Math.max(0,(G.teethT||0)-dt);
   for(const b of bushes){if(!b.berries){b.cd-=dt;if(b.cd<=0){b.berries=true;G.bushSet.setMatrix(b.i,G.bushSet.mats[b.i],n=>n==='Berry')}}}
   for(const p of patches){if(p.amount<1){const before=p.amount;p.amount=Math.min(1,p.amount+dt*.012);if(Math.floor(before*20)!==Math.floor(p.amount*20))updatePatch(p)}}
   for(const ps of pickSets)for(const it of ps.items){if(!it.alive){it.respawn-=dt;if(it.respawn<=0&&Math.hypot(it.x-pig.pos.x,it.z-pig.pos.z)>4){it.alive=true;ps.set.setMatrix(it.i,mat4(it.x,it.y,it.z,it.ry,it.s))}}}
@@ -1994,6 +2038,7 @@ const GOALS=[
   {id:'barnyard',icon:'🐐',name:'Barnyard Hello',desc:'Say hello to a goat, a sheep and a duck',test:()=>!!(G.met.Goat&&G.met.Sheep&&G.met.Duck),pts:150},
   {id:'rank3',icon:'⭐',name:'Master Forager',desc:'Forage 25 times',test:()=>G.forages>=25,bonus:150},
   {id:'maze',icon:'🌻',name:'Maze Runner',desc:'Forage the prize in the middle of the sunflower maze',test:()=>G.mazePrize>=1,pts:200},
+  {id:'gnaw',icon:'🦷',name:'Tidy Teeth',desc:'Gnaw a twig down without a single miss',test:()=>G.cleanGnaws>=1,pts:150},
   {id:'hay',icon:'🌾',name:'Hay Diver',desc:"Squeeze into a barn, burrow into its hay and find 3 hidden treats",test:()=>G.hayFinds>=3,pts:200},
   {id:'requests3',icon:'🎁',name:'Good Neighbour',desc:'Bring 3 humans the lost things they ask about',test:()=>Object.keys(G.given).length>=3,pts:300},
   {id:'place1',icon:'🗺',name:'Know Your Patch',desc:'Finish everything in one place (see Places)',test:()=>Object.keys(G.placesDone).length>=1,bonus:300},
@@ -2023,7 +2068,7 @@ function updateHUD(dt){
   hudT-=dt;if(hudT>0)return;hudT=.1;
   for(const k in bars){const v=G[k];bars[k].querySelector('.f').style.width=v+'%';bars[k].querySelector('.n').textContent=Math.round(v);bars[k].classList.toggle('low',k!=='happy'&&v<20)}
   $('score').textContent=G.score.toLocaleString();
-  const parts=[`×<span>${mult().toFixed(2)}</span> happy bonus`];if(G.combo>1)parts.push(`<span>×${G.combo}</span> forage combo`);if(G.petStreak>1)parts.push(`<span>×${G.petStreak}</span> pet streak`);if(herd.length)parts.push(`<span>×${(1+herd.length*.06).toFixed(2)}</span> herd`);if(G.luckT>0)parts.push(`🍀 <span>${Math.ceil(G.luckT)}s</span>`);
+  const parts=[`×<span>${mult().toFixed(2)}</span> happy bonus`];if(G.combo>1)parts.push(`<span>×${G.combo}</span> forage combo`);if(G.petStreak>1)parts.push(`<span>×${G.petStreak}</span> pet streak`);if(herd.length)parts.push(`<span>×${(1+herd.length*.06).toFixed(2)}</span> herd`);if(G.luckT>0)parts.push(`🍀 <span>${Math.ceil(G.luckT)}s</span>`);if(G.teethT>0)parts.push(`🦷 <span>${Math.ceil(G.teethT)}s</span>`);
   $('mult').innerHTML=parts.join(' · ');
   const h=Math.floor(G.time),m=Math.floor((G.time-h)*60/15)*15;const hh=((h+11)%12)+1;
   $('clock').textContent=`${G.under?'🕳 The Warren':G.inside?'🛖 The Barn · '+Z.name:Z.icon+' '+Z.name} · Day ${G.day} · ${hh}:${String(m).padStart(2,'0')} ${h<12?'AM':'PM'} ${isNight()?'🌙':G.time>19?'🌇':G.time<7.5?'🌅':'☀️'}`;
@@ -2111,7 +2156,7 @@ function gameOver(){G.over=true;const best=Math.max(G.best,G.score);lsSet('wheek
 // Three slots in localStorage. The world is seeded (the same every game), so a save only keeps what changed:
 // the stats, what's been found, the herd (by friend index) and the warren's explored passages.
 const SLOTS=3,slotKey=i=>'wheek-slot-'+i;
-const SAVE_G=['hp','full','vitc','energy','happy','score','day','time','forages','pets','found','curios','nightsSurvived','eaten','luckT','warrenTip','zfound','visited','met','pals','placesDone','goals','bestStreak','hawkDodged','foxEscapes','mazePrize','heard','given','barns','hayFinds'];
+const SAVE_G=['hp','full','vitc','energy','happy','score','day','time','forages','pets','found','curios','nightsSurvived','eaten','luckT','warrenTip','zfound','visited','met','pals','placesDone','goals','bestStreak','hawkDodged','foxEscapes','mazePrize','heard','given','barns','hayFinds','teethT','gnaws','cleanGnaws'];
 function snapshot(){const g={};for(const k of SAVE_G)g[k]=G[k];const ix=(a,f)=>a.flatMap((x,i)=>f(x)?[i]:[]);
   return {v:1,saved:Date.now(),name:G.name,breed:G.breed,coat:G.coat,G:g,
     zone:Z.id,pig:G.inside?{x:+G.insideHole.ex.toFixed(2),z:+G.insideHole.ez.toFixed(2),h:+G.insideHole.out.toFixed(2)}:{x:+pig.pos.x.toFixed(2),z:+pig.pos.z.toFixed(2),h:+pig.heading.toFixed(2)},under:G.under?PARK.tunnels.indexOf(W.from):-1,herd:herd.map(f=>friends.indexOf(f)),names:friends.map(f=>f.name),known:ix(friends,f=>f.known),
@@ -2161,8 +2206,9 @@ function press(code,repeat=false){
   if(code==='KeyJ'){if($('journal').classList.contains('hidden'))openJournal();else closeJournal();return}
   if(G.modal||G.paused||G.over||G.inTunnel||repeat)return;
   if(G.inside&&G.inside.burrow&&(code==='Space'||code==='KeyF'||code==='KeyE')){popOut();return}
+  if(G.gnaw&&(code==='KeyE'||code==='Space')){gnawHit();return}
   if(code==='Space'){if(!pig.air){pig.vy=1.55;pig.air=true;SFX.jump();if(G.happy>70&&G.popcornCD<=0){G.popcornCD=3;addScore(15,'popcorn!','#ffb0e0');herdPopcorn();emit(pig.pos.x,pig.pos.y+.1,pig.pos.z,10,{col:[1,.8,.9],spread:.5,up:.8,size:.015,life:.6})}}}
-  if(code==='KeyE'){const a=(G.acts||currentActions()).find(a=>a.k==='E'&&!a.hold);if(a)a.do()}
+  if(code==='KeyE'){const a=(G.acts||currentActions()).find(a=>a.k==='E'&&!a.hold&&a.do&&!a.disabled);if(a)a.do()}
   if(code==='KeyM')$('mapwrap').classList.toggle('big');
   if(code==='KeyF'&&G.inside){const a=insideActions().find(a=>a.k==='F'&&a.do);if(a)a.do()}
   else if(code==='KeyF'&&!G.under){const a=currentActions().find(a=>a.k==='F'&&a.spot);if(a&&!forageState)startForage(a.spot)}
@@ -2266,7 +2312,7 @@ function loop(){
     else if(G.inside){updateInside(dt,t);const hold=keys.KeyE?(G.acts||[]).find(a=>a.k==='E'&&a.hold):null;if(hold)holdEat(dt,hold);updateSurvival(dt);updateDay(dt)}else{
     updatePig(dt,t);
     const hold=(keys.KeyE)&&!G.inTunnel?(G.acts||[]).find(a=>a.k==='E'&&a.hold):null;if(hold)holdEat(dt,hold);
-    updateForage(dt);updateSurvival(dt);updateHumans(dt);updateFriends(dt,t);updateHawk(dt,t);updateFoxes(dt,t);updateDay(dt);updateReveals(dt);updateDrops(dt);
+    updateForage(dt);updateGnaw(dt);updateSurvival(dt);updateHumans(dt);updateFriends(dt,t);updateHawk(dt,t);updateFoxes(dt,t);updateDay(dt);updateReveals(dt);updateDrops(dt);
     if(Z.critters.length)updateCritters(dt,t);if(Z.cars.length)updateCars(dt)}
   }else if(!G.started){ // title orbit / breed preview
     if(G.selecting)G.camYaw+=angDiff(G.camYaw,pig.heading+.5+Math.sin(t*.3)*.9)*Math.min(1,dt*2);else G.camYaw+=dt*.08;updateDay(0);updatePig(dt,t);updateFriends(dt,t);
@@ -2303,5 +2349,5 @@ function loop(){
   $('setBtn').onclick=openSettings;$('setBtn2').onclick=openSettings;$('setClose').onclick=closeSettings;applyQuality();
   $('resumeBtn').onclick=()=>togglePause(false);$('saveBtn').onclick=()=>saveGame();$('quitBtn').onclick=()=>{saveGame(true);location.reload()};$('jclose').onclick=closeJournal;$('againBtn').onclick=()=>location.reload();
   $('retryBtn').onclick=()=>{try{sessionStorage.setItem('wheek-continue',G.slot)}catch(e){}location.reload()};
-  window.__game={G,W,WS,ZONE,PARK,EDGE,ITEMS,enterBarn,exitBarn,startBurrow,popOut,insideHeight,revealItem,setInput,SET,sun,music:()=>({now:musicNow&&musicNow.k,gain:musicGain&&musicGain.gain.value,tracks:Object.fromEntries(Object.entries(MUSIC).map(([k,m])=>[k,m.buf?{dur:+m.buf.duration.toFixed(4),start:m.start,len:m.len}:null]))}),wSdf,neighbour,freeAt,Z:()=>Z,visit:(id,x=0,z=0,h=0)=>arriveZone(ZONE[id],0,{x,z,h}),enterWarren,exitWarren,pig,friends,herd,joinHerd,keys,applyLook,humans,tunnels,spots,hawk,foxes,heightAt,renderer,scene,camera};
+  window.__game={G,W,WS,ZONE,PARK,EDGE,ITEMS,startGnaw,gnawHit,enterBarn,exitBarn,startBurrow,popOut,insideHeight,revealItem,setInput,SET,sun,music:()=>({now:musicNow&&musicNow.k,gain:musicGain&&musicGain.gain.value,tracks:Object.fromEntries(Object.entries(MUSIC).map(([k,m])=>[k,m.buf?{dur:+m.buf.duration.toFixed(4),start:m.start,len:m.len}:null]))}),wSdf,neighbour,freeAt,Z:()=>Z,visit:(id,x=0,z=0,h=0)=>arriveZone(ZONE[id],0,{x,z,h}),enterWarren,exitWarren,pig,friends,herd,joinHerd,keys,applyLook,humans,tunnels,spots,hawk,foxes,heightAt,renderer,scene,camera};
 })().catch(e=>{console.error(e);$('loading').textContent='Failed to load: '+e.message});

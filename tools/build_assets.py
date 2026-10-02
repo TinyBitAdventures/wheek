@@ -2309,12 +2309,15 @@ def build_twig():
     random.seed(101)
     rt = root("Twig")
     L = 0.34
-    br = [limb_bm((-L / 2, 0, 0.018), (L / 2, 0.01, 0.022), 0.016, 0.011, 10)]
+    pts = [Vector((-L / 2 + L * i / 8, 0.01 * (i / 8) + 0.004 * math.sin(i * 1.3), 0.018 + 0.004 * i / 8)) for i in range(9)]
+    br = [limb_bm(pts[i], pts[i + 1], 0.016 - 0.0006 * i, 0.016 - 0.0006 * (i + 1), 10, caps=False) for i in range(8)]
+    for p_, r in ((pts[0], 0.016), (pts[-1], 0.0112)):
+        c = cone_bm(r, r, 0.004, 10); xform(c, Matrix.Translation(p_) @ Euler((0, math.pi / 2, 0)).to_matrix().to_4x4()); br.append(c)
     for (t, a, l) in ((-0.05, 0.7, 0.11), (0.08, -0.8, 0.09)):
         br.append(limb_bm((t, 0, 0.02), (t + math.cos(a) * l * 0.6, math.sin(a) * l, 0.03), 0.007, 0.004, 6))
     bo = from_bm(merge_bms(br), "TwigBark", material("Bark", rough=0.9), parent=rt)
     def bark(p, n):
-        ends = abs(p.x) > L / 2 - 0.01
+        ends = abs(p.x) > L / 2 - 0.0015
         return (0.86, 0.74, 0.52) if ends else scl((0.36, 0.25, 0.16), 0.8 + 0.25 * noise.noise(p * 60))
     paint(bo, bark)
     lv = []
