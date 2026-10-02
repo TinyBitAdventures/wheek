@@ -299,7 +299,7 @@ const RANKS=[[0,'Nibbler'],[4,'Sniffer'],[12,'Rummager'],[25,'Master Forager'],[
 const G={started:false,paused:false,over:false,modal:false,inTunnel:false,
   hp:100,full:80,vitc:75,energy:100,happy:50,score:0,best:lsGet('wheek-best',0),
   day:1,time:7.0,combo:0,comboT:0,forages:0,pets:0,petStreak:0,lastPetHuman:null,petStreakT:0,
-  found:{},curios:{},tunnels:0,zfound:{},visited:{park:1},met:{},pals:[],placesDone:{},goals:{},bestStreak:0,hawkDodged:0,foxEscapes:0,mazePrize:0,heard:{},given:{},barns:{},hayFinds:0,teethT:0,gnaws:0,cleanGnaws:0,shop:0,luckT:0,giftT:40,huddle:false,wheekT:0,sniffCD:0,popcornCD:0,cause:'',nightsSurvived:0,eaten:0};
+  found:{},curios:{},tunnels:0,zfound:{},visited:{park:1},met:{},pals:[],placesDone:{},goals:{},bestStreak:0,hawkDodged:0,foxEscapes:0,mazePrize:0,heard:{},given:{},barns:{},hayFinds:0,teethT:0,gnaws:0,cleanGnaws:0,shop:0,fullHerd:0,luckT:0,giftT:40,huddle:false,wheekT:0,sniffCD:0,popcornCD:0,cause:'',nightsSurvived:0,eaten:0};
 const pig={pos:new THREE.Vector3(2.5,0,-1.5),vel:new THREE.Vector3(),heading:Math.PI,vy:0,air:false,phase:0,obj:null,parts:{},eating:0,foraging:0,knock:0,popSpin:0,fur:[]};
 (()=>{const s=lsGet('wheek-pig',null);const b=s&&BREEDS[s.breed]?s.breed:'american';G.breed=b;G.coat=s&&BREEDS[b].coats.includes(s.coat)?s.coat:BREEDS[b].coats[0];G.name=(s&&s.name)||PIG_NAMES[Math.floor(Math.random()*PIG_NAMES.length)];G.perk=perksFor(b)})();
 const keys={};
@@ -1092,7 +1092,7 @@ function currentActions(){
   else{const s2=nearest(spots,pig.pos.x,pig.pos.z,.28,s=>!s.ready);if(s2)acts.push({k:'F',label:`${SPOTNAME[s2.type]} · picked over (${Math.ceil(s2.cd)}s)`,disabled:true})}
   if(!patch&&!bestP&&!tun&&forestness(pig.pos.x,pig.pos.z)<.6&&distToPath(pig.pos.x,pig.pos.z)>.6&&!insideBox(pig.pos.x,pig.pos.z,.8)&&!(Z.cfg&&Z.cfg.grass&&Z.cfg.grass(pig.pos.x,pig.pos.z)<4)&&!G.wade)acts.push({k:'E',hold:true,label:'Nibble grass',nibble:true});
   const wf=nearestWild(1.3);
-  if(wf){if(herd.length>=HERD_MAX)acts.push({k:'C',label:`${esc(wf.name)} would love to join, but your herd is full`,disabled:true});else acts.push({k:'C',hold:true,label:`Chat with ${esc(wf.name)}${wf.shy?' (shy)':''} · ${BREEDS[wf.look.breed].name}`})}
+  if(wf)acts.push({k:'C',hold:true,label:`Chat with ${esc(wf.name)}${wf.shy?' (shy)':''} · ${BREEDS[wf.look.breed].name}${herd.length>=HERD_MAX?' (herd full: swap someone)':''}`});
   const hum=humans.find(h=>h.visible&&Math.hypot(h.obj.position.x-pig.pos.x,h.obj.position.z-pig.pos.z)<6);
   if(hum&&hum.tossCD<=0)acts.push({k:'Q',label:`Wheek at ${hum.name} for a veggie`});
   return acts;
@@ -1734,7 +1734,7 @@ function shopExit(B){B.tube=null;const f=shopPig();if(f&&f.state==='wild'){swapS
 function shopActions(B){if(B.tube)return [];const acts=exitActs(B,'Push back out through the cat flap');
   for(const k of B.ends){const [x,z]=TUBE_NODES[k];if(Math.hypot(x-pig.pos.x,z-pig.pos.z)<.36){acts.push({k:'E',label:'Crawl into the tube',do:()=>enterTube(k)});break}}
   for(const sp of B.spots){if(Math.hypot(sp.x-pig.pos.x,sp.z-pig.pos.z)<sp.r+.28){acts.push(sp.ready?{k:'F',hold:true,label:`Rummage in the ${SPOTNAME[sp.type]}`,spot:sp,do:()=>{if(!forageState)startForage(sp)}}:{k:'F',label:`${SPOTNAME[sp.type]} · nothing left (${Math.ceil(sp.cd)}s)`,disabled:true});break}}
-  const f=shopPig();if(f&&f.state==='wild'&&Math.hypot(f.pos.x-pig.pos.x,f.pos.z-pig.pos.z)<1.2)acts.push(herd.length>=HERD_MAX?{k:'C',label:`${esc(f.name)} would love to come, but your herd is full`,disabled:true}:{k:'C',hold:true,label:`Chat with ${esc(f.name)} through the glass`});
+  const f=shopPig();if(f&&f.state==='wild'&&Math.hypot(f.pos.x-pig.pos.x,f.pos.z-pig.pos.z)<1.2)acts.push({k:'C',hold:true,label:`Chat with ${esc(f.name)} through the glass${herd.length>=HERD_MAX?' (herd full: swap someone)':''}`});
   return acts}
 // ---- the tubes: crawl along one, pick a way at each junction, come out at an end
 function enterTube(k){const B=G.inside,t=B.tubes.find(t=>t.a===k||t.b===k);B.tube={t,k:t.a===k?.02:.98};tone('triangle',380,300,.08,.08);G.acts=null}
@@ -1789,7 +1789,7 @@ function shopUpdate(B,dt,t){const c=B.cat,stand=c.stand;
   if(!shopOpen()&&G.time<12){toast('🔑 The shopkeeper is unlocking the front door! You slip out through the cat flap.','',5);exitInside()}}
 function catBoop(B){SFX.meow();setTimeout(()=>SFX.hurt(),150);G.hp=Math.max(0,G.hp-6);G.cause='was booped by the shop cat';hurtFx();toast('🐾 <b>Boop!</b> Duchess bats you out through the cat flap. She will watch it for a while.','bad',5);
   const b=B.from;exitInside();b.flapCD=45;catSleep(B)}
-function updateShopPig(B,f,dt,t){const near=Math.hypot(f.pos.x-pig.pos.x,f.pos.z-pig.pos.z),chat=keys.KeyC&&near<1.2&&!B.tube&&herd.length<HERD_MAX&&!pig.air;
+function updateShopPig(B,f,dt,t){const near=Math.hypot(f.pos.x-pig.pos.x,f.pos.z-pig.pos.z),chat=keys.KeyC&&near<1.2&&!B.tube&&!pig.air;
   f.actT-=dt;if(f.actT<=0){f.actT=R(2,5);f.target={x:R(-2.65,-1.55),z:R(-2.15,-1.45)}}
   const tx=near<2.5?clamp(pig.pos.x,-2.6,-1.6):f.target.x,tz=near<2.5?clamp(pig.pos.z,-2.2,-1.4):f.target.z,hx=tx-f.pos.x,hz=tz-f.pos.z,hl=Math.hypot(hx,hz),mv=hl>.08&&!chat;
   if(mv){f.heading+=angDiff(f.heading,Math.atan2(hx,hz))*Math.min(1,dt*6);f.pos.x+=Math.sin(f.heading)*.5*dt;f.pos.z+=Math.cos(f.heading)*.5*dt}
@@ -1798,13 +1798,14 @@ function updateShopPig(B,f,dt,t){const near=Math.hypot(f.pos.x-pig.pos.x,f.pos.z
   const bf=$('befriend');
   if(chat){f.friend+=dt/((f.shy?5.5:3.2)/G.perk.social*(1+herd.length*.12));f.chatT-=dt;if(f.chatT<=0){f.chatT=.5;SFX.chut();heart(f.pos.x,f.pos.y+.17,f.pos.z)}
     bf.style.display='block';bf.querySelector('.l').textContent=`Chatting with ${f.name}…`;bf.querySelector('i').style.width=(f.friend*100)+'%';
-    if(f.friend>=1){bf.style.display='none';f.zone=Z.id;swapScene(f.obj,iScene);joinHerd(f);f.pos.set(-1.25,0,clamp(pig.pos.z,-2.2,-1.4));f.vy=1.8;f.air=true;
-      toast(`🐹 <b>${esc(f.name)}</b> hops right over the glass! She's been waiting for a friend.`,'gold',6)}}
+    if(f.friend>=1){bf.style.display='none';if(herd.length>=HERD_MAX)offerSwap(f);else shopPigJoin(f)}}
   else bf.style.display='none';
   // her name over her head while you're close
   if(near<2.2){_fv.set(f.pos.x,f.pos.y+.24,f.pos.z).project(camera);if(_fv.z<1){f.tag.style.display='block';f.tag.style.left=((_fv.x*.5+.5)*innerWidth)+'px';f.tag.style.top=((-_fv.y*.5+.5)*innerHeight)+'px';
     const html=`${esc(f.name)} · shy <i>${'♥'.repeat(Math.floor(f.friend*5))}${'♡'.repeat(5-Math.floor(f.friend*5))}</i>`;if(f.tag._h!==html){f.tag.innerHTML=html;f.tag._h=html}}}else f.tag.style.display='none';
   if(!G.metButterscotch&&near<2){G.metButterscotch=true;toast(`🐹 A little golden guinea pig presses her nose to the glass. This is <b>${esc(f.name)}</b>, and she looks lonely. Hold ${kb('C','Chat')} to chat with her.`,'',7)}}
+function shopPigJoin(f){f.zone=Z.id;swapScene(f.obj,iScene);joinHerd(f);f.pos.set(-1.25,0,clamp(pig.pos.z,-2.2,-1.4));f.vy=1.8;f.air=true;
+  toast(`🐹 <b>${esc(f.name)}</b> hops right over the glass! She's been waiting for a friend.`,'gold',6)}
 function sniffShop(B){let n=0;for(const tr of B.tubeTreats)if(!tr.got){marker(tr.obj.position.x,.3,tr.obj.position.z,0xffd060,B.group);n++}
   for(const sp of B.spots)if(sp.ready)marker(sp.x,.3,sp.z,0xffd060,B.group);
   toast(n?`👃 Sniff sniff… <b>${n} treat${n>1?'s':''}</b> tucked in the tubes, and food on the floor!`:'👃 Pellets, hay and… cat. No treats left in the tubes tonight.')}
@@ -1938,13 +1939,28 @@ function placeZoneFriends(z){const zr=mulberry32(z.seed+202);
       f.home={x,z:zz};f.target={x,z:zz};f.pos.set(x,heightAt(x,zz),zz);break}}}
 function nearestWild(maxd){let best=null,bd=maxd;for(const f of friends){if(f.state!=='wild'||f.spookT>0||f.zone!==Z.id)continue;const d=Math.hypot(f.pos.x-pig.pos.x,f.pos.z-pig.pos.z);if(d<bd){bd=d;best=f}}return best}
 function joinHerd(f){
-  f.state='herd';f.friend=1;herd.push(f);f.tag.style.display='none';const fi=friends.indexOf(f);if(!G.pals.includes(fi))G.pals.push(fi);
+  f.state='herd';f.friend=1;herd.push(f);f.tag.style.display='none';const fi=friends.indexOf(f),first=!G.pals.includes(fi);if(first)G.pals.push(fi);
   SFX.wheek();setTimeout(()=>SFX.purr(),350);for(let i=0;i<6;i++)setTimeout(()=>heart(f.pos.x,f.pos.y+.16,f.pos.z),i*120);
-  G.happy=Math.min(100,G.happy+20);addScore(150,'new friend!','#ff9fd0');
-  toast(`🐹 <b>${esc(f.name)}</b> the ${BREEDS[f.look.breed].name} joined your herd! (${herd.length}/${HERD_MAX})`,'gold',5);
+  G.happy=Math.min(100,G.happy+20);if(first)addScore(150,'new friend!','#ff9fd0');
+  toast(first?`🐹 <b>${esc(f.name)}</b> the ${BREEDS[f.look.breed].name} joined your herd! (${herd.length}/${HERD_MAX})`:`🐹 <b>${esc(f.name)}</b> is back in your herd! (${herd.length}/${HERD_MAX})`,'gold',5);
   if(herd.length===1)setTimeout(()=>toast('💡 Your herd follows you everywhere. Stand still together to huddle for happiness &amp; energy.','',7),1800);
-  if(herd.length===HERD_MAX){toast('🏆 <b>A full herd!</b> Six best friends. +500','gold',6);addScore(500,'full herd!','#ffd23f');flash('rgba(255,160,210,.45)',.6)}
+  if(herd.length===HERD_MAX&&!G.fullHerd){G.fullHerd=1;toast('🏆 <b>A full herd!</b> Six best friends. +500','gold',6);addScore(500,'full herd!','#ffd23f');flash('rgba(255,160,210,.45)',.6)}
 }
+// ---- a full herd: someone heads home to make room for a new friend
+const homeZone=o=>o.shopPig?'petshop':o.origin;
+function offerSwap(f){G.modal=true;G.swapFor=f;f.friend=.9;$('befriend').style.display='none';
+  $('swapTitle').innerHTML=`🐹 <b>${esc(f.name)}</b> wants to join!`;
+  $('swapList').innerHTML=herd.map((o,i)=>{const z=ZONE[homeZone(o)]||ZONE.town;return `<button class="btn alt" data-i="${i}">👋 ${esc(o.name)}<span>${BREEDS[o.look.breed].name} ${COATS[o.look.coat].name} · heads home to ${z.icon} ${o.shopPig?'the pet shop':z.name}</span></button>`}).join('')+'<button class="btn" data-i="-1">Not now</button>';
+  $('swapList').querySelectorAll('button').forEach(b=>b.onclick=()=>{const i=+b.dataset.i;if(i<0)return closeSwap();const o=herd[i];closeSwap();farewell(o);if(f.shopPig&&G.inside&&G.inside.kind==='shop')shopPigJoin(f);else joinHerd(f)});
+  $('swapMenu').classList.remove('hidden')}
+function closeSwap(){G.modal=false;G.swapFor=null;$('swapMenu').classList.add('hidden')}
+function farewell(o){herd.splice(herd.indexOf(o),1);o.state='wild';o.friend=.6;o.spookT=0;o.tag.style.display='none';o.air=false;o.vy=0;
+  const hz=homeZone(o);o.zone=hz;swapScene(o.obj,scene);o.blob.visible=false;
+  if(hz==='petshop'&&G.inside&&G.inside.kind==='shop'){swapScene(o.obj,G.inside.group);o.obj.visible=true;o.pos.set(-2.1,0,-1.8)}
+  else if(hz===Z.id&&!G.inside&&!G.under){o.act='walk';o.target={x:o.home.x,z:o.home.z};o.actT=12;o.obj.visible=true}   // home's here: off she trots
+  else{o.obj.visible=false;o.pos.set(o.home.x,0,o.home.z)}
+  const z=ZONE[hz]||ZONE.town;SFX.chut();heart(pig.pos.x,pig.pos.y+.18,pig.pos.z);
+  toast(`👋 <b>${esc(o.name)}</b> gives you a nuzzle and heads home to ${hz==='petshop'?'the pet shop':z.icon+' '+z.name}. Visit any time.`,'',6)}
 function scatterFriend(f){
   herd.splice(herd.indexOf(f),1);f.state='scatter';f.t=4;f.friend=0;f.zone=Z.id;
   toast(`😱 <b>${esc(f.name)}</b> scattered in fright! Find them and befriend them again.`,'bad',5);
@@ -1972,7 +1988,7 @@ const _fv=new THREE.Vector3();
 function updateFriends(dt,t){
   const last=trail[0];if(!last||Math.hypot(pig.pos.x-last.x,pig.pos.z-last.z)>.06){trail.unshift({x:pig.pos.x,z:pig.pos.z});if(trail.length>(HERD_MAX+1)*6+4)trail.pop()}
   const pSpeed=Math.hypot(pig.vel.x,pig.vel.z),sprinting=pSpeed>2.2;
-  const ct=G.started&&keys.KeyC&&!pig.air&&herd.length<HERD_MAX?nearestWild(1.3):null;
+  const ct=G.started&&keys.KeyC&&!pig.air?nearestWild(1.3):null;
   const bf=$('befriend');
   if(ct){bf.style.display='block';bf.querySelector('.l').textContent=`Chatting with ${ct.name}…`;bf.querySelector('i').style.width=(ct.friend*100)+'%'}else bf.style.display='none';
   if(herd.length&&G.started&&!isNight()){G.giftT-=dt;if(G.giftT<=0){G.giftT=R(45,75);const f=herd[Math.floor(rand()*herd.length)];if(Math.hypot(f.pos.x-pig.pos.x,f.pos.z-pig.pos.z)<4)herdGift(f)}}
@@ -1987,7 +2003,7 @@ function updateFriends(dt,t){
       if(f.spookT>0){tx=f.pos.x-dx/d*2;tz=f.pos.z-dz/d*2;speed=2.3}
       else if(f===ct){face=Math.atan2(dx,dz);if(pSpeed<.3)pig.heading+=angDiff(pig.heading,Math.atan2(-dx,-dz))*Math.min(1,dt*6);f.friend+=dt/((f.shy?5.5:3.2)/G.perk.social*(1+herd.length*.12));f.chatT-=dt;
         if(f.chatT<=0){f.chatT=.5;SFX.chut();heart(f.pos.x,f.pos.y+.17,f.pos.z);if(rand()<.4){pig.eating=.2}}
-        if(f.friend>=1)joinHerd(f)}
+        if(f.friend>=1){if(herd.length>=HERD_MAX)offerSwap(f);else joinHerd(f)}}
       else{
         f.friend=Math.max(0,f.friend-dt*.03);f.actT-=dt;
         if(f.actT<=0){const r=rand();if(r<.45){f.act='nibble';f.actT=R(2,5)}else if(r<.92){f.act='walk';const a=rand()*6.28,rr=R(.4,2.4);f.target={x:f.home.x+Math.cos(a)*rr,z:f.home.z+Math.sin(a)*rr};f.actT=R(3,6)}else{f.act='idle';f.actT=R(1,2);if(!f.air&&!isNight()){f.vy=1.3;f.air=true}}}
@@ -2338,7 +2354,7 @@ function gameOver(){G.over=true;const best=Math.max(G.best,G.score);lsSet('wheek
 // Three slots in localStorage. The world is seeded (the same every game), so a save only keeps what changed:
 // the stats, what's been found, the herd (by friend index) and the warren's explored passages.
 const SLOTS=3,slotKey=i=>'wheek-slot-'+i;
-const SAVE_G=['hp','full','vitc','energy','happy','score','day','time','forages','pets','found','curios','nightsSurvived','eaten','luckT','warrenTip','zfound','visited','met','pals','placesDone','goals','bestStreak','hawkDodged','foxEscapes','mazePrize','heard','given','barns','hayFinds','teethT','gnaws','cleanGnaws','shop'];
+const SAVE_G=['hp','full','vitc','energy','happy','score','day','time','forages','pets','found','curios','nightsSurvived','eaten','luckT','warrenTip','zfound','visited','met','pals','placesDone','goals','bestStreak','hawkDodged','foxEscapes','mazePrize','heard','given','barns','hayFinds','teethT','gnaws','cleanGnaws','shop','fullHerd'];
 function snapshot(){const g={};for(const k of SAVE_G)g[k]=G[k];const ix=(a,f)=>a.flatMap((x,i)=>f(x)?[i]:[]);
   return {v:1,saved:Date.now(),name:G.name,breed:G.breed,coat:G.coat,G:g,
     zone:Z.id,pig:G.inside?{x:+G.insideHole.ex.toFixed(2),z:+G.insideHole.ez.toFixed(2),h:+G.insideHole.out.toFixed(2)}:{x:+pig.pos.x.toFixed(2),z:+pig.pos.z.toFixed(2),h:+pig.heading.toFixed(2)},under:G.under?PARK.tunnels.indexOf(W.from):-1,herd:herd.map(f=>friends.indexOf(f)),names:friends.map(f=>f.name),known:ix(friends,f=>f.known),
@@ -2361,6 +2377,7 @@ function restore(s){
   const zn=ZONE[s.zone]||PARK;if(zn!==PARK){arriveZone(zn,0,s.pig)}else pig.pos.set(s.pig.x,heightAt(s.pig.x,s.pig.z),s.pig.z);pig.heading=s.pig.h;
   if(zn===PARK&&PARK.tunnels[s.under]){enterWarren(PARK.tunnels[s.under],true);pig.pos.set(s.pig.x,0,s.pig.z);pig.heading=s.pig.h;W.trail=[{x:pig.pos.x,z:pig.pos.z}];herd.forEach(f=>f.pos.copy(pig.pos))}
   else regroupHerd();
+  if(herd.length>=HERD_MAX)G.fullHerd=1;   // saves before swapping already had their bonus
   if(!s.G.placesDone)checkPlaces(true);if(!s.G.goals)checkGoals(true);
   G.camYaw=pig.heading+Math.PI;snapCamera();updateDay(0)}
 function ago(t){const m=Math.round((Date.now()-t)/60000);return m<1?'just now':m<60?`${m} min ago`:m<1440?`${Math.round(m/60)} h ago`:`${Math.round(m/1440)} days ago`}
@@ -2398,7 +2415,7 @@ function press(code,repeat=false){
   if(code==='KeyQ')wheek();
 }
 function release(code){keys[code]=false}
-addEventListener('keydown',e=>{if(e.target&&e.target.tagName==='INPUT'&&e.target.type!=='range')return;if(e.code==='Escape'&&!$('settings').classList.contains('hidden')){closeSettings();return}if(G.started&&e.code==='Space')e.preventDefault();if(G.started)setInput('kb');press(e.code,e.repeat)});
+addEventListener('keydown',e=>{if(e.target&&e.target.tagName==='INPUT'&&e.target.type!=='range')return;if(e.code==='Escape'&&!$('settings').classList.contains('hidden')){closeSettings();return}if(e.code==='Escape'&&G.swapFor){closeSwap();return}if(G.started&&e.code==='Space')e.preventDefault();if(G.started)setInput('kb');press(e.code,e.repeat)});
 addEventListener('keyup',e=>release(e.code));
 // which buttons the prompts show: the keyboard's, a gamepad's, or none (on touch the prompts are buttons themselves)
 const PAD_GLYPH={E:'Ⓐ',F:'Ⓧ',C:'Ⓨ',Q:'LB',R:'RB','␣':'Ⓑ'};
@@ -2450,7 +2467,7 @@ const joy={active:false,id:null,x:0,y:0,ox:0,oy:0,
 // ---- gamepad: left stick moves, right stick looks, buttons as in renderHelp; in menus the d-pad or stick moves between buttons, Ⓐ picks, Ⓑ goes back
 const PADMAP={0:'KeyE',2:'KeyF',3:'KeyC',1:'Space',5:'KeyR',4:'KeyQ',7:'ShiftLeft',6:'ShiftLeft',9:'KeyP',8:'KeyM',12:'KeyJ'};
 const pad={x:0,y:0,on:false,prev:[],menu:false,navT:0};
-function topOverlay(){for(const id of ['settings','over','journal','tunnelMenu','pause','select','title']){const el=$(id);if(el&&!el.classList.contains('hidden'))return el}return null}
+function topOverlay(){for(const id of ['swapMenu','settings','over','journal','tunnelMenu','pause','select','title']){const el=$(id);if(el&&!el.classList.contains('hidden'))return el}return null}
 function padTargets(ov){return [...ov.querySelectorAll('button,input[type=range]')].filter(el=>!el.disabled&&el.offsetParent!==null&&!el.closest('.hidden'))}
 function pollPad(dt){const gp=[...(navigator.getGamepads?navigator.getGamepads():[])].find(g=>g&&g.connected);if(!gp){pad.on=false;return}
   const b=gp.buttons.map(x=>x.pressed||x.value>.5),dz=v=>Math.abs(v)<.2?0:v,lx=dz(gp.axes[0]||0),ly=dz(gp.axes[1]||0),rx=dz(gp.axes[2]||0),ry=dz(gp.axes[3]||0),edge=i=>b[i]&&!pad.prev[i];
@@ -2462,7 +2479,7 @@ function pollPad(dt){const gp=[...(navigator.getGamepads?navigator.getGamepads()
     if(dir&&list.length){pad.navT=.25;const el=document.activeElement;if(el&&el.type==='range'&&(edge(14)||edge(15))){el.value=+el.value+(edge(15)?1:-1)*(+el.step||.05);el.dispatchEvent(new Event('input'))}
       else{i=i<0?0:(i+dir+list.length)%list.length;list[i].focus();list[i].scrollIntoView({block:'nearest'})}}
     if(edge(0)){const el=i>=0?list[i]:list[0];if(el&&el.type!=='range')el.click()}
-    if(edge(1)||edge(9)&&ov.id==='pause'){if(ov.id==='settings')closeSettings();else if(ov.id==='journal')closeJournal();else if(ov.id==='tunnelMenu')closeTunnel();else if(ov.id==='pause')togglePause(false)}
+    if(edge(1)||edge(9)&&ov.id==='pause'){if(ov.id==='swapMenu')closeSwap();else if(ov.id==='settings')closeSettings();else if(ov.id==='journal')closeJournal();else if(ov.id==='tunnelMenu')closeTunnel();else if(ov.id==='pause')togglePause(false)}
   }else if(G.started){pad.menu=false;pad.x=lx;pad.y=ly;pad.on=!!(lx||ly);
     if(rx||ry){G.camYaw-=rx*dt*2.6;G.camPitch=clamp(G.camPitch+ry*dt*1.6,-.05,1.2);G.lastDrag=performance.now()}
     for(const [k,code] of Object.entries(PADMAP)){if(edge(k))press(code);else if(!b[k]&&pad.prev[k]&&!(code==='ShiftLeft'&&(b[6]||b[7])))release(code)}}
@@ -2531,5 +2548,5 @@ function loop(){
   $('setBtn').onclick=openSettings;$('setBtn2').onclick=openSettings;$('setClose').onclick=closeSettings;applyQuality();
   $('resumeBtn').onclick=()=>togglePause(false);$('saveBtn').onclick=()=>saveGame();$('quitBtn').onclick=()=>{saveGame(true);location.reload()};$('jclose').onclick=closeJournal;$('againBtn').onclick=()=>location.reload();
   $('retryBtn').onclick=()=>{try{sessionStorage.setItem('wheek-continue',G.slot)}catch(e){}location.reload()};
-  window.__game={G,W,WS,ZONE,PARK,EDGE,ITEMS,insideCollide,TUBE_NODES,startGnaw,gnawHit,enterBarn:enterInside,exitBarn:exitInside,enterInside,exitInside,enterTube:n=>enterTube(n),catNoise:n=>catNoise(n),startBurrow,popOut,insideHeight,revealItem,setInput,SET,sun,music:()=>({now:musicNow&&musicNow.k,gain:musicGain&&musicGain.gain.value,tracks:Object.fromEntries(Object.entries(MUSIC).map(([k,m])=>[k,m.buf?{dur:+m.buf.duration.toFixed(4),start:m.start,len:m.len}:null]))}),wSdf,neighbour,freeAt,Z:()=>Z,visit:(id,x=0,z=0,h=0)=>arriveZone(ZONE[id],0,{x,z,h}),enterWarren,exitWarren,pig,friends,herd,joinHerd,keys,applyLook,humans,tunnels,spots,hawk,foxes,heightAt,renderer,scene,camera};
+  window.__game={G,W,WS,ZONE,PARK,EDGE,ITEMS,offerSwap,insideCollide,TUBE_NODES,startGnaw,gnawHit,enterBarn:enterInside,exitBarn:exitInside,enterInside,exitInside,enterTube:n=>enterTube(n),catNoise:n=>catNoise(n),startBurrow,popOut,insideHeight,revealItem,setInput,SET,sun,music:()=>({now:musicNow&&musicNow.k,gain:musicGain&&musicGain.gain.value,tracks:Object.fromEntries(Object.entries(MUSIC).map(([k,m])=>[k,m.buf?{dur:+m.buf.duration.toFixed(4),start:m.start,len:m.len}:null]))}),wSdf,neighbour,freeAt,Z:()=>Z,visit:(id,x=0,z=0,h=0)=>arriveZone(ZONE[id],0,{x,z,h}),enterWarren,exitWarren,pig,friends,herd,joinHerd,keys,applyLook,humans,tunnels,spots,hawk,foxes,heightAt,renderer,scene,camera};
 })().catch(e=>{console.error(e);$('loading').textContent='Failed to load: '+e.message});

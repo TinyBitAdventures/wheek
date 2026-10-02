@@ -207,6 +207,11 @@ for (const [zone, type, dist] of [['peaks', 'drift', 2], ['deepwood', 'bramble',
   if (pick('journal')) { await page.keyboard.press('KeyJ'); await page.waitForTimeout(600); await shot('journal'); await page.keyboard.press('KeyJ'); }
   // The settings panel, from the pause menu.
   if (pick('settings')) { await page.keyboard.press('KeyP'); await page.click('#setBtn2'); await page.waitForTimeout(400); await shot('settings'); await page.click('#setClose'); await page.click('#resumeBtn'); }
+  // The swap menu, when a seventh guinea pig wants to join a full herd.
+  if (pick('swap')) {
+    await page.evaluate(() => { const g = window.__game; if (g.G.inside) g.exitBarn(); g.visit('park', 0, 0, 0); const wild = g.friends.filter(f => f.origin === 'park' && f.state === 'wild'); while (g.herd.length < 6 && wild.length > 1) g.joinHerd(wild.shift()); g.offerSwap(wild[0]) });
+    await page.waitForTimeout(600); await shot('swap'); await page.click('#swapList button[data-i="-1"]');
+  }
   // The journal's goals and requests, a few done, two requests heard (one curio in hand).
   if (pick('goals')) {
     await page.evaluate(() => { const { G } = window.__game; Object.assign(G.goals, { forage: 1, friend: 1, burrows3: 1, night1: 1 }); Object.assign(G.heard, { key: 1, marble: 1 }); G.curios.marble = true; G.given.coin = 'Grandpa Joe'; G.curios.coin = true });

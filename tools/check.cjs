@@ -1,6 +1,6 @@
 // World checks: loads the game in a tiny headless window and tests the world's logic through window.__game.
 // Usage: PW=/path/to/node_modules/playwright node tools/check.cjs [check ...]
-//   checks: reach warren night chaos eat treats goals music gnaw barn shop saves touch pad memory (default: all). URL defaults to the local dev site.
+//   checks: reach warren night chaos eat treats goals music gnaw barn shop swap saves touch pad memory (default: all). URL defaults to the local dev site.
 // Prints a report and exits 1 if anything failed.
 const { chromium } = require(process.env.PW || 'playwright');
 const URL = process.env.URL || 'https://wheek.localhost/';
@@ -254,6 +254,27 @@ const frames = (page, n) => page.evaluate(n => new Promise(r => { let k = 0; (fu
     const home = await page.evaluate(() => { const g = window.__game, f = g.friends.find(f => f.shopPig); return { outside: !g.G.inside, withYou: g.herd.includes(f) && f.obj.parent === g.scene && f.zone === 'town' } });
     report('pet shop', locked && reach.inside && !reach.bad.length && tubes.out && tubes.atF && rummaged && booped && after.out && after.cd > 30 && joined && home.outside && home.withYou,
       `locked by day ${locked} · in at night ${reach.inside}${reach.bad && reach.bad.length ? ' · unreachable: ' + reach.bad.join(', ') : ''} · tubes A→F ${tubes.out && tubes.atF} (${tubes.treats} treats, ${tubes.steps} frames) · rummaged ${rummaged} · booped out ${booped && after.out} (flap ${Math.round(after.cd)}s) · Butterscotch joined ${joined} and came home ${home.withYou}`);
+  }
+
+  // 5h. a full herd: befriending a seventh offers a swap; the one who leaves heads home, the newcomer joins; "not now" keeps everyone
+  if (pick('swap')) {
+    const pr = await page.evaluate(() => { const g = window.__game; g.G.time = 11; g.visit('park', 0, 0, 0); const wild = g.friends.filter(f => f.origin === 'park' && f.state === 'wild');
+      while (g.herd.length < 6 && wild.length > 2) g.joinHerd(wild.shift()); const nf = wild[0]; window.__nf = nf; window.__old = g.herd[1]; nf.friend = .97; nf.spookT = 0;
+      g.pig.pos.set(nf.pos.x + .5, g.heightAt(nf.pos.x + .5, nf.pos.z), nf.pos.z); return { herd: g.herd.length, nf: nf.name } });
+    await page.keyboard.down('KeyC');
+    const menu = await page.waitForFunction(() => { const g = window.__game, nf = window.__nf; if (!g.G.swapFor) { g.pig.pos.set(nf.pos.x + .5, g.heightAt(nf.pos.x + .5, nf.pos.z), nf.pos.z); nf.spookT = 0 } return !document.getElementById('swapMenu').classList.contains('hidden') }, null, { timeout: 60000, polling: 200 }).then(() => true, () => false);
+    await page.keyboard.up('KeyC');
+    if (menu) await page.click('#swapList button[data-i="1"]');
+    const swapped = await page.evaluate(() => { const g = window.__game, nf = window.__nf, old = window.__old; return { closed: document.getElementById('swapMenu').classList.contains('hidden') && !g.G.modal, herd: g.herd.length, inNew: g.herd.includes(nf), oldOut: !g.herd.includes(old) && old.state === 'wild' && old.zone === 'park' } });
+    // another one: "not now"
+    await page.evaluate(() => { const g = window.__game, nf = g.friends.find(f => f.origin === 'park' && f.state === 'wild' && f !== window.__old); window.__nf2 = nf; nf.friend = .97; nf.spookT = 0; g.pig.pos.set(nf.pos.x + .5, g.heightAt(nf.pos.x + .5, nf.pos.z), nf.pos.z) });
+    await page.keyboard.down('KeyC');
+    const menu2 = await page.waitForFunction(() => { const g = window.__game, nf = window.__nf2; if (!g.G.swapFor) { g.pig.pos.set(nf.pos.x + .5, g.heightAt(nf.pos.x + .5, nf.pos.z), nf.pos.z); nf.spookT = 0 } return !document.getElementById('swapMenu').classList.contains('hidden') }, null, { timeout: 60000, polling: 200 }).then(() => true, () => false);
+    await page.keyboard.up('KeyC');
+    if (menu2) await page.click('#swapList button[data-i="-1"]');
+    const kept = await page.evaluate(() => { const g = window.__game; return { closed: !g.G.modal, herd: g.herd.length, out: !g.herd.includes(window.__nf2) } });
+    report('herd swap', pr.herd === 6 && menu && swapped.closed && swapped.herd === 6 && swapped.inNew && swapped.oldOut && menu2 && kept.closed && kept.herd === 6 && kept.out,
+      `full herd ${pr.herd} · swap menu ${menu} · ${pr.nf} in, one out home ${swapped.inNew && swapped.oldOut} · "not now" keeps the herd ${menu2 && kept.out && kept.herd === 6}`);
   }
 
   // 5e. the barns: in through a hole, munch the hay, burrow onto every hidden treat, pop out, out through the other hole

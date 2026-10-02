@@ -29,6 +29,7 @@
 ### Guinea pigs everywhere
 - 12 more wild guinea pigs live out in the zones, one or two in each: Snowball on the peaks, Thistle and Fennel in the Deep Wood, Pretzel downtown, Sandy on the beach, Pebble and Willow by the creek, Cocoa at the petting zoo, Barley and Turnip on the farm, and Marigold and Honey in the sunflowers. That's 21 to meet, and your herd still holds six, so pick your favourites.
 - A guinea pig who scatters in fright in another zone now stays in that zone, and wild guinea pigs never wander into deep water.
+- Herd full? You can still chat. When a new friend is ready to join, pick who heads home to make room (they wait at home, so you can always swap them back), or say not now. A friend you've had before is welcomed back without the new-friend points, and the full-herd bonus comes once.
 
 ### Goals and requests
 - 22 goals to work through, from your first forage to finishing all nine places. The next one shows under your stats, the journal lists them all with their rewards, and each one cheers when you finish it. Saves from before keep the goals they'd already done, quietly.
