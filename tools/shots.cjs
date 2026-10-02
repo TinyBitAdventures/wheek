@@ -91,6 +91,11 @@ const scenes = {
     await page.waitForTimeout(1200);
   },
 };
+// A guinea pig who lives out on the beach, chatting.
+scenes.zonepig = async page => {
+  await setup(page, `document.getElementById('mapwrap').classList.remove('big');G.time=10.5;g.visit('beach',0,0,0);const f=g.friends.find(f=>f.origin==='beach');pig.pos.set(f.pos.x+.7,0,f.pos.z+.3);pig.heading=Math.atan2(f.pos.x-pig.pos.x,f.pos.z-pig.pos.z)`);
+  await camera(page, 'window.__game.pig.heading+Math.PI+.9', 1.3, .3);
+};
 // Each zone's signature forage spot (sig-peaks, sig-town, ...): the pig stands just off it, looking at it.
 for (const [zone, type, dist] of [['peaks', 'drift', 2], ['deepwood', 'bramble', 2.2], ['town', 'stall', 3.4], ['beach', 'picnic', 1.8], ['creek', 'cress', 1.8], ['zoo', 'trough', 2.2], ['farm', 'apples', 3.6], ['sunflowers', 'seedhead', 1.6]])
   scenes['sig-' + zone] = async page => {

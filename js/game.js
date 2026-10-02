@@ -209,6 +209,7 @@ function buildZone(z){
   const prev=rand;if(z.seed)rand=mulberry32(z.seed);   // the park keeps the world's own sequence: its layout predates zones
   z.build(z);rand=prev;if(z!==PARK)addSignposts(z);
   for(const i of G.zfound[z.id]||[])if(z.tunnels[i])z.tunnels[i].found=true;
+  if(z!==PARK)placeZoneFriends(z);
   // a plant that ended up inside a rock or trunk can never be eaten: leave it out (without touching the seeded layout)
   for(const ps of z.pickSets)for(const it of ps.items)if(z.colliders.some(c=>Math.hypot(c.x-it.x,c.z-it.z)<c.r)||insideBox(it.x,it.z)){it.alive=false;it.respawn=Infinity;ps.set.setMatrix(it.i,ZERO)}
   Object.assign(z,{leafpiles:G.leafpiles,lpSet:G.lpSet,bushSet:G.bushSet,lushSet:G.lushSet,glass:G.glass});z.built=true}
@@ -288,7 +289,7 @@ const RANKS=[[0,'Nibbler'],[4,'Sniffer'],[12,'Rummager'],[25,'Master Forager'],[
 const G={started:false,paused:false,over:false,modal:false,inTunnel:false,
   hp:100,full:80,vitc:75,energy:100,happy:50,score:0,best:lsGet('wheek-best',0),
   day:1,time:7.0,combo:0,comboT:0,forages:0,pets:0,petStreak:0,lastPetHuman:null,petStreakT:0,
-  found:{},curios:{},tunnels:0,zfound:{},visited:{park:1},met:{},luckT:0,giftT:40,huddle:false,wheekT:0,sniffCD:0,popcornCD:0,cause:'',nightsSurvived:0,eaten:0};
+  found:{},curios:{},tunnels:0,zfound:{},visited:{park:1},met:{},pals:[],luckT:0,giftT:40,huddle:false,wheekT:0,sniffCD:0,popcornCD:0,cause:'',nightsSurvived:0,eaten:0};
 const pig={pos:new THREE.Vector3(2.5,0,-1.5),vel:new THREE.Vector3(),heading:Math.PI,vy:0,air:false,phase:0,obj:null,parts:{},eating:0,foraging:0,knock:0,popSpin:0,fur:[]};
 (()=>{const s=lsGet('wheek-pig',null);const b=s&&BREEDS[s.breed]?s.breed:'american';G.breed=b;G.coat=s&&BREEDS[b].coats.includes(s.coat)?s.coat:BREEDS[b].coats[0];G.name=(s&&s.name)||PIG_NAMES[Math.floor(Math.random()*PIG_NAMES.length)];G.perk=perksFor(b)})();
 const keys={};
@@ -1548,6 +1549,10 @@ function hurtFx(){const h=$('hurt');h.style.transition='none';h.style.opacity=1;
 
 // ============================================================ other guinea pigs (herd)
 const HERD_MAX=6;const friends=[];const herd=[];const trail=[];let blobMat=null;
+// guinea pigs who live out in the other zones, after the park's nine: [zone, name, breed, coat, shy]
+const ZONE_PIGS=[['peaks','Snowball','peruvian','himalayan',1],['deepwood','Thistle','abyssinian','agouti',0],['deepwood','Fennel','american','agouti',1],['town','Pretzel','american','tricolor',0],
+  ['beach','Sandy','peruvian','golden',0],['creek','Pebble','abyssinian','dutch',0],['creek','Willow','skinny','dalmatian',1],['zoo','Cocoa','skinny','choc',0],
+  ['farm','Barley','american','golden',0],['farm','Turnip','abyssinian','tricolor',1],['sunflowers','Marigold','peruvian','tricolor',1],['sunflowers','Honey','abyssinian','golden',0]];
 function buildFriends(){
   const pool=PIG_NAMES.filter(n=>n!==G.name);const bk=Object.keys(BREEDS);
   const place=(n,test)=>{for(let k=0,tries=0;k<n&&tries<4000;tries++){const a=rand()*6.28,rr=R(6,EDGE-4);const x=Math.cos(a)*rr,z=Math.sin(a)*rr;
@@ -1559,14 +1564,28 @@ function buildFriends(){
     if(!blobMat)blobMat=new THREE.MeshBasicMaterial({map:blobTex,transparent:true,depthWrite:false});
     const blob=new THREE.Mesh(new THREE.PlaneGeometry(.34*sc,.4*sc),blobMat);blob.rotation.x=-Math.PI/2;scene.add(blob);
     const tag=document.createElement('div');tag.className='ntag';document.body.appendChild(tag);
-    friends.push({zone:'park',name,look,shy:rand()<.35,...m,blob,tag,pos:new THREE.Vector3(x,heightAt(x,z),z),vel:new THREE.Vector3(),heading:rand()*6.28,phase:0,seed:rand()*50,
+    friends.push({zone:'park',origin:'park',placed:true,name,look,shy:rand()<.35,...m,blob,tag,pos:new THREE.Vector3(x,heightAt(x,z),z),vel:new THREE.Vector3(),heading:rand()*6.28,phase:0,seed:rand()*50,
       state:'wild',home:{x,z},target:{x,z},act:'idle',actT:R(1,4),friend:0,eating:0,vy:0,air:false,popSpin:0,spookT:0,chatT:0,t:0,known:false,lastD:99})}
   place(4,(x,z)=>forestness(x,z)<.45&&Math.hypot(x,z+3)<24);
   place(5,(x,z)=>forestness(x,z)>.65);
+  // the zones' own guinea pigs: their own random sequence, so the park's layout (and the warren built after this) stays put
+  const zr=mulberry32(4242);
+  for(const [zone,name,breed,coat,shy] of ZONE_PIGS){const look={breed,coat},m=makePigModel(look,.6),sc=.84+zr()*.14;m.obj.scale.multiplyScalar(sc);m.obj.visible=false;scene.add(m.obj);
+    const blob=new THREE.Mesh(new THREE.PlaneGeometry(.34*sc,.4*sc),blobMat);blob.rotation.x=-Math.PI/2;blob.visible=false;scene.add(blob);
+    const tag=document.createElement('div');tag.className='ntag';document.body.appendChild(tag);
+    friends.push({zone,origin:zone,placed:false,name,look,shy:!!shy,...m,blob,tag,pos:new THREE.Vector3(0,-50,0),vel:new THREE.Vector3(),heading:zr()*6.28,phase:0,seed:zr()*50,
+      state:'wild',home:{x:0,z:0},target:{x:0,z:0},act:'idle',actT:1+zr()*3,friend:0,eating:0,vy:0,air:false,popSpin:0,spookT:0,chatT:0,t:0,known:false,lastD:99})}
 }
+// the first time a zone is built, its guinea pigs settle somewhere open and dry, well apart (from a sequence of their own)
+function placeZoneFriends(z){const zr=mulberry32(z.seed+202);
+  for(const f of friends){if(f.origin!==z.id||f.placed)continue;f.placed=true;if(f.state==='herd')continue;
+    for(let t=0;t<4000;t++){const a=zr()*Math.PI*2,rr=12+Math.sqrt(zr())*(EDGE-20),x=Math.cos(a)*rr,zz=Math.sin(a)*rr;
+      if(!freeAt(x,zz,.8)||wet(x,zz,.25)||insideBox(x,zz,1.2)||distToPath(x,zz)<1.5||tunnels.some(t=>Math.hypot(t.x-x,t.z-zz)<4)||spots.some(s=>Math.hypot(s.x-x,s.z-zz)<1.2)||
+        friends.some(o=>o!==f&&o.origin===z.id&&o.placed&&o.state!=='herd'&&Math.hypot(o.home.x-x,o.home.z-zz)<16))continue;
+      f.home={x,z:zz};f.target={x,z:zz};f.pos.set(x,heightAt(x,zz),zz);break}}}
 function nearestWild(maxd){let best=null,bd=maxd;for(const f of friends){if(f.state!=='wild'||f.spookT>0||f.zone!==Z.id)continue;const d=Math.hypot(f.pos.x-pig.pos.x,f.pos.z-pig.pos.z);if(d<bd){bd=d;best=f}}return best}
 function joinHerd(f){
-  f.state='herd';f.friend=1;herd.push(f);f.tag.style.display='none';
+  f.state='herd';f.friend=1;herd.push(f);f.tag.style.display='none';const fi=friends.indexOf(f);if(!G.pals.includes(fi))G.pals.push(fi);
   SFX.wheek();setTimeout(()=>SFX.purr(),350);for(let i=0;i<6;i++)setTimeout(()=>heart(f.pos.x,f.pos.y+.16,f.pos.z),i*120);
   G.happy=Math.min(100,G.happy+20);addScore(150,'new friend!','#ff9fd0');
   toast(`🐹 <b>${esc(f.name)}</b> the ${BREEDS[f.look.breed].name} joined your herd! (${herd.length}/${HERD_MAX})`,'gold',5);
@@ -1574,7 +1593,7 @@ function joinHerd(f){
   if(herd.length===HERD_MAX){toast('🏆 <b>A full herd!</b> Six best friends. +500','gold',6);addScore(500,'full herd!','#ffd23f');flash('rgba(255,160,210,.45)',.6)}
 }
 function scatterFriend(f){
-  herd.splice(herd.indexOf(f),1);f.state='scatter';f.t=4;f.friend=0;
+  herd.splice(herd.indexOf(f),1);f.state='scatter';f.t=4;f.friend=0;f.zone=Z.id;
   toast(`😱 <b>${esc(f.name)}</b> scattered in fright! Find them and befriend them again.`,'bad',5);
 }
 function regroupHerd(){
@@ -1635,7 +1654,7 @@ function updateFriends(dt,t){
     if(speed>0){const hx=tx-f.pos.x,hz=tz-f.pos.z,hl=Math.hypot(hx,hz);
       if(hl>.03){f.heading+=angDiff(f.heading,Math.atan2(hx,hz))*Math.min(1,dt*8);const s=Math.min(speed,hl/Math.max(dt,1e-3));f.vel.set(Math.sin(f.heading)*s,0,Math.cos(f.heading)*s)}else f.vel.set(0,0,0)}
     else{f.vel.multiplyScalar(Math.max(0,1-dt*10));if(face!==null)f.heading+=angDiff(f.heading,face)*Math.min(1,dt*4)}
-    f.pos.x+=f.vel.x*dt;f.pos.z+=f.vel.z*dt;
+    {const ox=f.pos.x,oz=f.pos.z;f.pos.x+=f.vel.x*dt;f.pos.z+=f.vel.z*dt;if(f.state!=='herd'&&Z.waterY!==undefined&&Z.waterY-heightAt(f.pos.x,f.pos.z)>.05){f.pos.x=ox;f.pos.z=oz;f.actT=0}}
     // personal space
     if(d<.22){f.pos.x-=dx/d*(.22-d);f.pos.z-=dz/d*(.22-d)}
     for(const o of friends){if(o===f)continue;const ox=f.pos.x-o.pos.x,oz=f.pos.z-o.pos.z,od=Math.hypot(ox,oz);if(od<.2&&od>1e-4){f.pos.x+=ox/od*(.2-od)*.5;f.pos.z+=oz/od*(.2-od)*.5}}
@@ -1878,7 +1897,7 @@ function drawArrow(g,px,pz){g.save();g.translate(px,pz);g.rotate(-pig.heading+Ma
 function openJournal(){G.modal=true;$('journal').classList.remove('hidden');const all=Object.keys(ITEMS);const found=all.filter(k=>G.found[k]).length;
   $('jsub').textContent=`${found}/${all.length} treats discovered · ${G.forages} forages · rank: ${RANKS[rankIdx()][1]}${rankIdx()<RANKS.length-1?` (next at ${RANKS[rankIdx()+1][0]})`:''} · ${Object.keys(G.visited).length}/9 places visited`;
   $('jgrid').innerHTML=all.map(k=>{const it=ITEMS[k];const n=G.found[k];return `<div class="jcell ${n?'':'unk'}"><div class="e">${n?it.icon:'❔'}</div><div class="nm" style="color:${RARITY[it.rarity][0]}">${n?it.name:'???'}</div><div class="ct">${n?'×'+n:(it.zone?ZONE[it.zone].icon+' ':'')+it.rarity}</div></div>`}).join('');
-  $('jherd').innerHTML=`<h2 style="margin:18px 0 8px;font-size:20px">🐹 Your herd · ${herd.length}/${HERD_MAX}</h2>`+[`<span class="hcell"><b>${esc(G.name)}</b> · ${BREEDS[G.breed].name} ${COATS[G.coat].name} (you)</span>`,...herd.map(f=>`<span class="hcell"><b>${esc(f.name)}</b> · ${BREEDS[f.look.breed].name} ${COATS[f.look.coat].name}</span>`)].join('')+(herd.length<HERD_MAX?`<p style="font-size:13px;margin:6px 0 0">${friends.filter(f=>f.state!=='herd').length} more piggies are out there. Sniff (R) to find them.</p>`:'');
+  $('jherd').innerHTML=`<h2 style="margin:18px 0 8px;font-size:20px">🐹 Your herd · ${herd.length}/${HERD_MAX}</h2>`+[`<span class="hcell"><b>${esc(G.name)}</b> · ${BREEDS[G.breed].name} ${COATS[G.coat].name} (you)</span>`,...herd.map(f=>`<span class="hcell"><b>${esc(f.name)}</b> · ${BREEDS[f.look.breed].name} ${COATS[f.look.coat].name}</span>`)].join('')+(herd.length<HERD_MAX?`<p style="font-size:13px;margin:6px 0 0">${friends.filter(f=>f.state!=='herd').length} more piggies are out there, in the park and all the places around it. Sniff (R) to find them.</p>`:'');
   const halls=W.nodes.filter(n=>n.kind==='hall');
   $('jwarren').innerHTML=`<h2 style="margin:18px 0 4px;font-size:20px">🕳 The Warren · ${warrenPct()}% mapped</h2><p style="font-size:13px;margin:0 0 8px">${halls.filter(n=>n.seen).length}/${halls.length} hidden chambers · ${PARK.tunnels.filter(t=>t.found).length}/${PARK.tunnels.length} park burrows · ${routeCount()} quick routes · curio stash ${W.curios.filter(c=>c.got).length}/${W.curios.length}</p><div class="jgrid">`+
     W.curios.map(c=>{const it=CURIOS[c.k];return `<div class="jcell ${c.got?'':'unk'}"><div class="e">${c.got?it.icon:'❔'}</div><div class="nm" style="color:${RARITY[it.rarity][0]}">${c.got?it.name:'???'}</div><div class="ct">${c.got?'curio':it.rarity}</div></div>`}).join('')+'</div>'}
@@ -1894,7 +1913,7 @@ function gameOver(){G.over=true;const best=Math.max(G.best,G.score);lsSet('wheek
 // Three slots in localStorage. The world is seeded (the same every game), so a save only keeps what changed:
 // the stats, what's been found, the herd (by friend index) and the warren's explored passages.
 const SLOTS=3,slotKey=i=>'wheek-slot-'+i;
-const SAVE_G=['hp','full','vitc','energy','happy','score','day','time','forages','pets','found','curios','nightsSurvived','eaten','luckT','warrenTip','zfound','visited','met'];
+const SAVE_G=['hp','full','vitc','energy','happy','score','day','time','forages','pets','found','curios','nightsSurvived','eaten','luckT','warrenTip','zfound','visited','met','pals'];
 function snapshot(){const g={};for(const k of SAVE_G)g[k]=G[k];const ix=(a,f)=>a.flatMap((x,i)=>f(x)?[i]:[]);
   return {v:1,saved:Date.now(),name:G.name,breed:G.breed,coat:G.coat,G:g,
     zone:Z.id,pig:{x:+pig.pos.x.toFixed(2),z:+pig.pos.z.toFixed(2),h:+pig.heading.toFixed(2)},under:G.under?PARK.tunnels.indexOf(W.from):-1,herd:herd.map(f=>friends.indexOf(f)),names:friends.map(f=>f.name),known:ix(friends,f=>f.known),
@@ -1909,6 +1928,7 @@ function restore(s){
   (s.names||[]).forEach((n,i)=>{if(friends[i])friends[i].name=n});
   s.known.forEach(i=>{if(friends[i])friends[i].known=true});
   s.herd.forEach(i=>{const f=friends[i];if(!f||herd.includes(f))return;f.state='herd';f.friend=1;f.tag.style.display='none';herd.push(f)});
+  if(!Array.isArray(G.pals))G.pals=[];for(const i of s.herd)if(!G.pals.includes(i))G.pals.push(i);   // saves before v0.3 only knew the herd
   const w=s.warren;
   W.edges.forEach((e,i)=>{const b=w.edges[i]||'';e.pts.forEach((p,k)=>{if(b[k]==='1'&&!p.seen){p.seen=true;W.seenPts++}});e.done=e.pts.filter(p=>p.seen).length>=e.pts.length*.9});
   w.seen.forEach(i=>{if(W.nodes[i])W.nodes[i].seen=true});w.heard.forEach(i=>{if(W.nodes[i])W.nodes[i].heard=true});

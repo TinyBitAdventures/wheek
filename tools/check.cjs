@@ -51,9 +51,10 @@ const frames = (page, n) => page.evaluate(n => new Promise(r => { let k = 0; (fu
       for(const s of Z.spots)chk(s.type+' spot',s.x,s.z,s.r+.25);
       for(const ps of Z.pickSets)for(const it of ps.items)if(it.respawn!==Infinity)chk(ps.type,it.x,it.z,.35);
       for(const h of Z.humans)chk('human '+h.name,h.obj.position.x,h.obj.position.z,.85);
+      const pigs=g.friends.filter(f=>f.origin===Z.id&&f.state==='wild');for(const f of pigs)chk('guinea pig '+f.name,f.home.x,f.home.z,.6);
       for(const c of Z.critters)if(c.kind==='Duck')chk('duck pond',c.area.x,c.area.z,c.area.r+2.4);else chk(c.kind,c.x,c.z,1.4);
-      out.counts=[Z.tunnels.length,Z.spots.length,Z.pickSets.reduce((n,p)=>n+p.items.length,0),Z.humans.length,Z.critters.length].join('/');return out})()`);
-    report(`reach ${id}`, !r.bad.length, `${r.arrivals} ways in · burrows/spots/plants/humans/animals ${r.counts}${r.bad.length ? ' · ' + r.bad.length + ' unreachable: ' + r.bad.slice(0, 6).join('; ') : ''}`);
+      out.counts=[Z.tunnels.length,Z.spots.length,Z.pickSets.reduce((n,p)=>n+p.items.length,0),Z.humans.length,Z.critters.length,pigs.length].join('/');return out})()`);
+    report(`reach ${id}`, !r.bad.length, `${r.arrivals} ways in · burrows/spots/plants/humans/animals/piggies ${r.counts}${r.bad.length ? ' · ' + r.bad.length + ' unreachable: ' + r.bad.slice(0, 6).join('; ') : ''}`);
     // placement: nothing to eat, enter or pet stands in water, and animals are where they belong
     const p = await page.evaluate(() => { const g = window.__game, Z = g.Z(), bad = [], wet = (x, z) => Z.waterY !== undefined && g.heightAt(x, z) < Z.waterY;
       for (const t of Z.tunnels) if (wet(t.ex, t.ez)) bad.push('burrow in water ' + t.name);
@@ -62,6 +63,8 @@ const frames = (page, n) => page.evaluate(n => new Promise(r => { let k = 0; (fu
       if (sig && Z.spots.filter(s => s.type === sig).length < 3) bad.push('only ' + Z.spots.filter(s => s.type === sig).length + ' ' + sig + ' spots');
       for (const ps of Z.pickSets) for (const it of ps.items) if (wet(it.x, it.z)) bad.push(ps.type + ' in water');
       for (const h of Z.humans) if (wet(h.x, h.z)) bad.push('human in water ' + h.name);
+      const pigs = g.friends.filter(f => f.origin === Z.id); if (!pigs.length) bad.push('no guinea pigs live here');
+      for (const f of pigs) if (f.state === 'wild' && (wet(f.home.x, f.home.z) || !g.freeAt(f.home.x, f.home.z, .1))) bad.push('guinea pig ' + f.name + ' lives in water or a wall');
       for (const c of Z.critters) { const swim = c.kind === 'Duck'; if (swim && !(Z.waterY - g.heightAt(c.x, c.z) > .05)) bad.push('duck on land'); if (!swim && wet(c.x, c.z)) bad.push(c.kind + ' in water') }
       return bad });
     report(`placement ${id}`, !p.length, p.slice(0, 5).join('; '));
@@ -159,6 +162,19 @@ const frames = (page, n) => page.evaluate(n => new Promise(r => { let k = 0; (fu
       report(`save slot ${slot} (${zone})`, r.zone === zone && r.name === name && r.herd === 1 && errors.length === before && (zone !== 'park' || r.park.startsWith('1001')) && (zone === 'park' || r.zoneFound[1] === '1'),
         `"${label}" → ${r.zone} at ${r.pos}, herd ${r.herd}, park burrows ${r.park}${zone === 'park' ? '' : ', zone burrows ' + r.zoneFound}`);
     }
+  }
+
+  // 6b. a v0.3 save round trip: befriend a guinea pig who lives on the farm, save there, reload, continue
+  if (pick('saves')) {
+    await page.evaluate(() => { for (let i = 1; i <= 3; i++) localStorage.removeItem('wheek-slot-' + i) });
+    await page.goto(URL); await start();
+    const want = await page.evaluate(() => { const g = window.__game; g.visit('farm', 0, 0, 0); const f = g.friends.find(f => f.origin === 'farm'); g.joinHerd(f); document.getElementById('saveBtn').click(); return { name: f.name, i: g.friends.indexOf(f) } });
+    await page.goto(URL);
+    await page.waitForFunction(() => !document.getElementById('slots').classList.contains('hidden'), null, { timeout: 180000 });
+    await page.evaluate(() => document.querySelector('#slots .slot .cont').click());
+    await page.waitForFunction(() => window.__game && window.__game.G.started, null, { timeout: 60000 });
+    const r = await page.evaluate(() => { const g = window.__game; return { zone: g.Z().id, herd: g.herd.map(f => f.name), pals: g.G.pals } });
+    report('save round trip (farm guinea pig)', r.zone === 'farm' && r.herd.includes(want.name) && r.pals.includes(want.i), `${r.zone}, herd ${r.herd.join(',')}, befriended ${r.pals.join(',')}`);
   }
 
   // 7. after visiting every zone: memory and what the renderer holds

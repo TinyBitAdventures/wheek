@@ -8,6 +8,10 @@
 - The humans in Downtown, Sandy Cove, Critter Corner and on the farm sometimes toss you their zone's treat.
 - The Deep Wood's brambles are thorny cover: the hawk can't reach you in one.
 
+### Guinea pigs everywhere
+- 12 more wild guinea pigs live out in the zones, one or two in each: Snowball on the peaks, Thistle and Fennel in the Deep Wood, Pretzel downtown, Sandy on the beach, Pebble and Willow by the creek, Cocoa at the petting zoo, Barley and Turnip on the farm, and Marigold and Honey in the sunflowers. That's 21 to meet, and your herd still holds six, so pick your favourites.
+- A guinea pig who scatters in fright in another zone now stays in that zone, and wild guinea pigs never wander into deep water.
+
 ### Models
 - 16 new Blender-built models: rose hips, raspberry leaves, romaine, a watermelon slice, watercress, a corn husk, an apple slice and sunflower seeds, plus a snowdrift, a bramble, a market stall, a picnic basket, a watercress bed, a feed trough, an apple tree and a fallen sunflower head.
 
