@@ -115,6 +115,14 @@ kbd{display:inline-block;min-width:20px;text-align:center;padding:0 5px;margin-r
 .pcell.done{border-color:rgba(255,210,63,.7);background:rgba(255,210,63,.1)}
 .pcell.unk{opacity:.5}
 @media (max-width:560px){.pgrid{grid-template-columns:1fr}}
+.glist{display:flex;flex-direction:column;gap:6px}
+.gcell{display:grid;grid-template-columns:30px 1fr auto;gap:8px;align-items:center;background:rgba(0,0,0,.25);border:1px solid var(--edge);border-radius:12px;padding:7px 10px;font-size:12px;color:var(--ink-dim)}
+.gcell b{color:var(--ink);font-size:13px;font-weight:600}
+.gcell .gi{font-size:20px;text-align:center}
+.gcell .gp{color:var(--gold);font-weight:600}
+.gcell.done{border-color:rgba(140,220,100,.45);opacity:.75}
+#goalline{font-size:12px;color:var(--ink-dim);max-width:230px;line-height:1.35}
+#goalline b{color:var(--ink);font-weight:600}
 .hcell{display:inline-block;background:rgba(0,0,0,.25);border:1px solid var(--edge);border-radius:10px;padding:5px 10px;margin:3px;font-size:13px}
 .slot{display:flex;gap:8px}
 .slot .btn{flex:1;margin:0;font-size:17px;padding:10px 16px;text-align:left}
@@ -176,6 +184,7 @@ body.pad .btn:focus,body.pad .breed:focus,body.pad .coat:focus{outline:3px solid
   <div class="bar" id="b-happy"><span>💕</span><div class="t"><div class="f" style="background:#ff8fc8"></div></div><span class="n"></span></div>
   <div id="rank"></div>
   <div id="herdline"></div>
+  <div id="goalline"></div>
 </div>
 <div id="top" class="hud hidden">
   <div id="score">0</div>
@@ -231,7 +240,7 @@ body.pad .btn:focus,body.pad .breed:focus,body.pad .coat:focus{outline:3px solid
   <button class="btn" id="goBtn">Start scurrying</button>
 </div></div>
 <div id="pause" class="overlay hidden"><div class="card" style="text-align:center"><h2>Paused</h2><p>Your guinea pig is having a little think.</p><div class="tlist" style="max-width:320px;margin:14px auto 0"><button class="btn" id="resumeBtn">Resume</button><button class="btn alt" id="saveBtn">💾 Save</button><button class="btn alt" id="quitBtn">🏠 Save &amp; quit to menu</button></div></div></div>
-<div id="journal" class="overlay hidden"><div class="card"><h2>🌿 Forager's Journal</h2><p id="jsub"></p><div class="jgrid" id="jgrid"></div><div id="jherd"></div><div id="jplaces"></div><div id="jwarren"></div><div style="text-align:center;margin-top:16px"><button class="btn" id="jclose">Close</button></div></div></div>
+<div id="journal" class="overlay hidden"><div class="card"><h2>🌿 Forager's Journal</h2><p id="jsub"></p><div class="jgrid" id="jgrid"></div><div id="jherd"></div><div id="jplaces"></div><div id="jgoals"></div><div id="jwarren"></div><div style="text-align:center;margin-top:16px"><button class="btn" id="jclose">Close</button></div></div></div>
 <div id="tunnelMenu" class="overlay hidden"><div class="card"><h2 id="tmTitle">🕳 Tunnel</h2><p>The burrow is warm and smells of earth. Where to?</p><div class="tlist" id="tmList"></div></div></div>
 <div id="over" class="overlay hidden"><div class="card" style="text-align:center"><h2 id="overTitle">Your adventure is over</h2><p id="overWhy"></p><div id="overStats" style="font-size:16px;line-height:1.8;margin:10px 0"></div><div class="tlist" style="max-width:320px;margin:14px auto 0"><button class="btn hidden" id="retryBtn">↺ Back to your last save</button><button class="btn alt" id="againBtn">🏠 Main menu</button></div></div></div>
 

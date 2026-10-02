@@ -142,6 +142,14 @@ for (const [zone, type, dist] of [['peaks', 'drift', 2], ['deepwood', 'bramble',
     await shot(name);
   }
   if (pick('journal')) { await page.keyboard.press('KeyJ'); await page.waitForTimeout(600); await shot('journal'); await page.keyboard.press('KeyJ'); }
+  // The journal's goals and requests, a few done, two requests heard (one curio in hand).
+  if (pick('goals')) {
+    await page.evaluate(() => { const { G } = window.__game; Object.assign(G.goals, { forage: 1, friend: 1, burrows3: 1, night1: 1 }); Object.assign(G.heard, { key: 1, marble: 1 }); G.curios.marble = true; G.given.coin = 'Grandpa Joe'; G.curios.coin = true });
+    if (await page.evaluate(() => document.getElementById('journal').classList.contains('hidden'))) await page.keyboard.press('KeyJ');
+    await page.waitForTimeout(600);
+    await page.evaluate(() => document.getElementById('jgoals').scrollIntoView());
+    await shot('goals'); await page.keyboard.press('KeyJ');
+  }
   // The journal's places checklist, part way through a game: three places visited, the farm finished.
   if (pick('places')) {
     await page.evaluate(() => { const { G, friends, ZONE } = window.__game; Object.assign(G.visited, { farm: 1, beach: 1 }); G.zfound.farm = [0, 1, 2]; G.met.Sheep = G.met.Duck = 1; G.found.apple = 2;

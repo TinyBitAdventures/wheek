@@ -289,7 +289,7 @@ const RANKS=[[0,'Nibbler'],[4,'Sniffer'],[12,'Rummager'],[25,'Master Forager'],[
 const G={started:false,paused:false,over:false,modal:false,inTunnel:false,
   hp:100,full:80,vitc:75,energy:100,happy:50,score:0,best:lsGet('wheek-best',0),
   day:1,time:7.0,combo:0,comboT:0,forages:0,pets:0,petStreak:0,lastPetHuman:null,petStreakT:0,
-  found:{},curios:{},tunnels:0,zfound:{},visited:{park:1},met:{},pals:[],placesDone:{},luckT:0,giftT:40,huddle:false,wheekT:0,sniffCD:0,popcornCD:0,cause:'',nightsSurvived:0,eaten:0};
+  found:{},curios:{},tunnels:0,zfound:{},visited:{park:1},met:{},pals:[],placesDone:{},goals:{},bestStreak:0,hawkDodged:0,foxEscapes:0,mazePrize:0,heard:{},given:{},luckT:0,giftT:40,huddle:false,wheekT:0,sniffCD:0,popcornCD:0,cause:'',nightsSurvived:0,eaten:0};
 const pig={pos:new THREE.Vector3(2.5,0,-1.5),vel:new THREE.Vector3(),heading:Math.PI,vy:0,air:false,phase:0,obj:null,parts:{},eating:0,foraging:0,knock:0,popSpin:0,fur:[]};
 (()=>{const s=lsGet('wheek-pig',null);const b=s&&BREEDS[s.breed]?s.breed:'american';G.breed=b;G.coat=s&&BREEDS[b].coats.includes(s.coat)?s.coat:BREEDS[b].coats[0];G.name=(s&&s.name)||PIG_NAMES[Math.floor(Math.random()*PIG_NAMES.length)];G.perk=perksFor(b)})();
 const keys={};
@@ -1049,6 +1049,8 @@ function nearest(list,px,pz,maxd,f=()=>true){let best=null,bd=maxd;for(const o o
 function currentActions(){
   const acts=[];if(pig.air)return acts;
   const m=mouthPos();
+  const gh=humans.find(h=>h.visible&&Math.hypot(h.obj.position.x-pig.pos.x,h.obj.position.z-pig.pos.z)<1.6);const gk=gh&&requestOf(gh);
+  if(gk&&G.curios[gk])acts.push({k:'E',label:`Give ${CURIOS[gk].icon} ${CURIOS[gk].name} to ${gh.name}`,do:()=>giveCurio(gh,gk)});
   const tun=tunnels.find(t=>Math.hypot(t.ex-pig.pos.x,t.ez-pig.pos.z)<.45);if(tun)acts.push({k:'E',label:`Enter tunnel · ${tun.name}`,do:()=>openTunnel(tun)});
   let bestP=null,bd=.22;for(const ps of pickSets)for(const it of ps.items){if(!it.alive)continue;const d=Math.hypot(it.x-m.x,it.z-m.z);if(d<bd){bd=d;bestP={ps,it}}}
   for(const d of drops){if(!d.landed)continue;const dd=Math.hypot(d.x-m.x,d.z-m.z);if(dd<.25&&dd<bd+.05){bd=dd;bestP={drop:d}}}
@@ -1092,7 +1094,7 @@ function updateForage(dt){
   if(f.t>=f.need){forageState=null;$('forage').style.display='none';completeForage(f.spot)}
 }
 function completeForage(spot){
-  spot.ready=false;spot.cd=spot.type==='prize'?300:R(55,90);
+  spot.ready=false;spot.cd=spot.type==='prize'?300:R(55,90);if(spot.type==='prize')G.mazePrize++;
   if(spot.type==='leafpile'){G.lpSet.setMatrix(spot.lp.i,mat4(spot.lp.x,heightAt(spot.lp.x,spot.lp.z)-.02,spot.lp.z,spot.lp.ry,spot.lp.s*1.15,0,0,spot.lp.s*.35))}
   let table={...LOOT[spot.type]};
   const luck=rankIdx()*.25+(G.luckT>0?1.5:0);
@@ -1472,14 +1474,34 @@ function updateHumans(dt){
       h.arm.rotation.x=lerp(h.arm.rotation.x,-.12+Math.sin(h.t*5)*.14,dt*8);h.arm.rotation.z=lerp(h.arm.rotation.z,Math.sin(h.t*2.5)*.05,dt*5);
       h.petBudget-=dt;h.petTick=(h.petTick||0)-dt;G.happy=Math.min(100,G.happy+dt*14*G.perk.petJoy);
       if(h.petTick<=0){h.petTick=.5;SFX.purr();const hp=pig.pos;heart(hp.x,hp.y+.18,hp.z);G.pets++;
-        if(G.lastPetHuman!==h){if(G.lastPetHuman&&G.petStreakT>0){G.petStreak++;toast(`💞 Pet streak ×${G.petStreak}! Everyone loves you.`,'good')}else G.petStreak=1;G.lastPetHuman=h}
+        if(G.lastPetHuman!==h){if(G.lastPetHuman&&G.petStreakT>0){G.petStreak++;G.bestStreak=Math.max(G.bestStreak,G.petStreak);toast(`💞 Pet streak ×${G.petStreak}! Everyone loves you.`,'good')}else G.petStreak=1;G.lastPetHuman=h}
         G.petStreakT=90;addScore(10*G.petStreak,'',"#ff9fd0")}
       if(h.petBudget<=0){h.cd=40;toast(`${h.name}: “Okay, that's enough cuddles for now!” (back in 40s)`);addScore(40,'pet bonus','#ff9fd0')}
     }else{h.arm.rotation.x=lerp(h.arm.rotation.x,.35+Math.sin(h.t*.8)*.03,dt*3);h.arm.rotation.z=lerp(h.arm.rotation.z,0,dt*3)}
-    if(d<2.2&&!h.greeted){h.greeted=true;toast(`🙂 ${h.name} kneels down: “Hello little one! Come here!”`)}
+    if(d<2.2&&!h.greeted){h.greeted=true;toast(`🙂 ${h.name} kneels down: “Hello little one! Come here!”`);setTimeout(()=>hearRequest(h),1200)}
     if(d>9)h.greeted=false;
   }
 }
+
+// ---- requests: some humans have lost a little thing, and it turned up down in the warren. Bring it back for a thank-you
+const REQUESTS={
+  marble:{who:'Maya',zone:'park',ask:'I lost my favourite blue marble down a hole in the woods. If you ever find it…',thanks:'My marble! You clever little thing!',gift:['strawberry','strawberry'],pts:200},
+  acorn:{who:'Leo',zone:'park',ask:"I need an acorn cap to make a tiny hat for my toy mouse. Don't laugh.",thanks:'Perfect! Mr. Whiskers will look so smart.',gift:['carrot','pepper'],pts:150},
+  button:{who:'Ellie',zone:'town',ask:'I popped a button off my coat chasing a squirrel through the park. It rolled right down a burrow!',thanks:'My button! Here, have some of my lunch.',gift:['romaine','romaine'],pts:150},
+  crystal:{who:'Rosa',zone:'town',ask:'A sparkly crystal would look perfect in my shop window. They say there are some deep under the park…',thanks:"It's beautiful! It's going right in the window.",gift:['goldCarrot'],pts:400},
+  coin:{who:'Grandpa Joe',zone:'beach',ask:'I dropped my lucky penny in the woods by the park, years ago. Probably long gone…',thanks:'My lucky penny! Well I never.',gift:['watermelon','strawberry'],pts:250},
+  shell:{who:'Sunny',zone:'beach',ask:'My sandcastle needs a little snail shell on top, but the sea ones are all too big!',thanks:'The perfect tiny shell! Watermelon for you!',gift:['watermelon','watermelon'],pts:200},
+  feather:{who:'Keeper Amy',zone:'zoo',ask:"I'm making a display about wild birds. A jay feather would be just the thing.",thanks:'A jay feather! The kids will love it.',gift:['cornhusk','carrot'],pts:250},
+  key:{who:'Farmer Gus',zone:'farm',ask:'I lost the tiny brass key to my seed chest. Fell right down a burrow near the park, it did.',thanks:'My key! Here, the best of the seed chest.',gift:['goldCarrot','apple'],pts:300},
+};
+function requestOf(h){for(const k in REQUESTS){const r=REQUESTS[k];if(r.who===h.name&&r.zone===Z.id&&!G.given[k])return k}return null}
+function hearRequest(h){const k=requestOf(h);if(!k)return;const r=REQUESTS[k],c=CURIOS[k];
+  if(G.curios[k]){toast(`🎁 ${h.name}: “${r.ask}” <b>You have the ${c.icon} ${c.name}!</b> Walk up to them and ${G.input==='touch'?'tap Give':'press '+kb('E')} to give it.`,'gold',8);return}
+  if(G.heard[k])return;G.heard[k]=1;toast(`🎁 ${h.name}: “${r.ask}”`,'',8);
+  if(!G.requestTip){G.requestTip=true;setTimeout(()=>toast('💡 Lost things turn up in the warren under the park. Requests are listed in your journal (J).','',7),2500)}}
+function giveCurio(h,k){const r=REQUESTS[k],c=CURIOS[k];G.given[k]=h.name;SFX.purr();setTimeout(()=>SFX.find('rare'),200);
+  for(let i=0;i<6;i++)setTimeout(()=>heart(pig.pos.x,pig.pos.y+.18,pig.pos.z),i*120);toast(`🎁 ${h.name}: “${r.thanks}”`,'gold',6);addScore(r.pts,'thank you!','#ff9fd0');
+  r.gift.forEach((t,i)=>{const a=pig.heading+(i-(r.gift.length-1)/2)*.7;spawnDrop(t,pig.pos.x+Math.sin(a)*.35,pig.pos.z+Math.cos(a)*.35)});h.petBudget=6;h.cd=0;G.happy=Math.min(100,G.happy+15)}
 
 // ============================================================ predators AI
 function isNight(){return G.time>=20.5||G.time<6}
@@ -1506,13 +1528,13 @@ function updateHawk(dt,t){
     let rate=(moving?(keys.ShiftLeft||keys.ShiftRight?.2:.12):.025)*(1-cov)*G.perk.hawk*(1-herd.length*.07);if(G.wheekT>0)rate+=.05;
     h.detect=clamp(h.detect+rate*dt-(cov>=1?dt*.2:0),0,1);h.t-=dt;
     if(h.detect>=1){h.state='dive';h.from.copy(o.position);h.dt=0;SFX.screech();toast('🦅 <b>THE HAWK IS DIVING! RUN FOR COVER!</b>','bad',2.5)}
-    else if(h.t<=0){h.state='leave';h.t=5;if(h.detect<.7){addScore(60,'evaded hawk','#9fe88a');toast('😮‍💨 The hawk lost interest. Well hidden!','good')}}
+    else if(h.t<=0){h.state='leave';h.t=5;if(h.detect<.7){G.hawkDodged++;addScore(60,'evaded hawk','#9fe88a');toast('😮‍💨 The hawk lost interest. Well hidden!','good')}}
     return}
   if(h.state==='dive'){
     h.dt+=dt/1.6;const k=h.dt;if(k<.75)h.aim=pig.pos.clone();const tgt=h.aim.clone();tgt.y+=.15;
     const p=new THREE.Vector3().lerpVectors(h.from,tgt,k*k);o.lookAt(tgt);o.position.copy(p);h.wL.rotation.z=.9;h.wR.rotation.z=-.9;
     if(k>=1){const cov=coverAt(pig.pos.x,pig.pos.z);
-      if(cov>=1||pig.pos.distanceTo(tgt)>.6){toast('💨 The hawk missed! Close call!','good');addScore(80,'close call!','#9fe88a')}
+      if(cov>=1||pig.pos.distanceTo(tgt)>.6){G.hawkDodged++;toast('💨 The hawk missed! Close call!','good');addScore(80,'close call!','#9fe88a')}
       else{damage(34,'was snatched at by a hawk');const a=pig.heading;pig.vel.set(Math.sin(a)*3,0,Math.cos(a)*3);pig.vy=2}
       h.state='leave';h.t=5}
     return}
@@ -1530,7 +1552,7 @@ function updateFoxes(dt,t){
     let speed=1.1;f.cool-=dt;
     if(f.state==='wander'){f.t-=dt;if(f.t<=0||Math.hypot(f.target.x-f.pos.x,f.target.z-f.pos.z)<.5){const a=rand()*6.28;f.target.set(pig.pos.x+Math.cos(a)*R(6,16),0,pig.pos.z+Math.sin(a)*R(6,16));f.t=R(4,8)}
       if(d<11&&!hidden&&!nearHome&&f.cool<=0){f.state='chase';SFX.yip();toast('🦊 <b>A fox spotted you! Scurry to a tunnel or log!</b>','bad',3)}}
-    else if(f.state==='chase'){f.target.set(pig.pos.x,0,pig.pos.z);speed=keys.ShiftLeft||keys.ShiftRight?2.9:3.1;if(hidden||nearHome||d>22){f.state='wander';f.cool=4;toast(hidden?'🦊 The fox lost your scent. Phew!':'🦊 The fox gave up.','good');addScore(70,'escaped!','#9fe88a')}
+    else if(f.state==='chase'){f.target.set(pig.pos.x,0,pig.pos.z);speed=keys.ShiftLeft||keys.ShiftRight?2.9:3.1;if(hidden||nearHome||d>22){f.state='wander';f.cool=4;G.foxEscapes++;toast(hidden?'🦊 The fox lost your scent. Phew!':'🦊 The fox gave up.','good');addScore(70,'escaped!','#9fe88a')}
       if(d<.32&&!pig.air){damage(28,'was caught by a fox');if(herd.length)scatterFriend(herd[herd.length-1]);pig.vel.set(dx/d*3.5,0,dz/d*3.5);pig.vy=1.8;f.state='wander';f.cool=7;const a=rand()*6.28;f.target.set(f.pos.x-dx/d*12,0,f.pos.z-dz/d*12)}}
     else if(f.state==='leave'){f.target.set(f.pos.x+(f.pos.x-pig.pos.x),0,f.pos.z+(f.pos.z-pig.pos.z));speed=2;if(d>30){f.active=false;f.obj.visible=false;return}}
     const tx=f.target.x-f.pos.x,tz=f.target.z-f.pos.z,tl=Math.hypot(tx,tz)||1;
@@ -1839,9 +1861,39 @@ function updateSurvival(dt){
   for(const ps of pickSets)for(const it of ps.items){if(!it.alive){it.respawn-=dt;if(it.respawn<=0&&Math.hypot(it.x-pig.pos.x,it.z-pig.pos.z)>4){it.alive=true;ps.set.setMatrix(it.i,mat4(it.x,it.y,it.z,it.ry,it.s))}}}
   // tunnel discovery
   if(!G.under)for(const tu of tunnels){if(!tu.found&&Math.hypot(tu.ex-pig.pos.x,tu.ez-pig.pos.z)<3.2)findTunnel(tu)}
-  G.placeT=(G.placeT||1)-dt;if(G.placeT<=0){G.placeT=1;checkPlaces()}
+  G.placeT=(G.placeT||1)-dt;if(G.placeT<=0){G.placeT=1;checkPlaces();checkGoals()}
   if(G.hp<=0&&!G.over)gameOver();
 }
+// ---- goals: a list in the journal, the next one under your stats. pts is the goal's own reward; bonus shows one the game already gives
+const GOALS=[
+  {id:'forage',icon:'🍂',name:'First Forage',desc:'Forage a leaf pile, berry bush, log or rock',test:()=>G.forages>=1,pts:25},
+  {id:'friend',icon:'🐹',name:'A New Friend',desc:'Walk up gently to another guinea pig and chat until they join you',test:()=>G.pals.length>=1,pts:50},
+  {id:'burrows3',icon:'🕳',name:'Burrow Finder',desc:'Find 3 burrows (sniffing helps)',test:()=>G.tunnels>=3,pts:100},
+  {id:'night1',icon:'🌙',name:'First Night',desc:'Survive a night',test:()=>G.nightsSurvived>=1,bonus:250},
+  {id:'pets3',icon:'💞',name:'Crowd Favourite',desc:'A ×3 pet streak: pets from three humans in a row',test:()=>G.bestStreak>=3,pts:100},
+  {id:'hawk3',icon:'🦅',name:'Hawk Dodger',desc:'Give the hawk the slip 3 times',test:()=>G.hawkDodged>=3,pts:120},
+  {id:'fox',icon:'🦊',name:'Fox Escape',desc:'Get away from a fox that is chasing you',test:()=>G.foxEscapes>=1,pts:100},
+  {id:'visit9',icon:'🧭',name:'Wanderer',desc:'Visit all nine places',test:()=>Object.keys(G.visited).length>=9,pts:500},
+  {id:'barnyard',icon:'🐐',name:'Barnyard Hello',desc:'Say hello to a goat, a sheep and a duck',test:()=>!!(G.met.Goat&&G.met.Sheep&&G.met.Duck),pts:150},
+  {id:'rank3',icon:'⭐',name:'Master Forager',desc:'Forage 25 times',test:()=>G.forages>=25,bonus:150},
+  {id:'maze',icon:'🌻',name:'Maze Runner',desc:'Forage the prize in the middle of the sunflower maze',test:()=>G.mazePrize>=1,pts:200},
+  {id:'requests3',icon:'🎁',name:'Good Neighbour',desc:'Bring 3 humans the lost things they ask about',test:()=>Object.keys(G.given).length>=3,pts:300},
+  {id:'place1',icon:'🗺',name:'Know Your Patch',desc:'Finish everything in one place (see Places)',test:()=>Object.keys(G.placesDone).length>=1,bonus:300},
+  {id:'parktunnels',icon:'🕳',name:'Tunnel Master',desc:'Find every burrow in the park',test:()=>PARK.tunnels.every(t=>t.found),bonus:1000},
+  {id:'halls',icon:'🌰',name:'Warren Explorer',desc:'Find all five hidden chambers in the warren',test:()=>W.nodes.filter(n=>n.kind==='hall').every(n=>n.seen),pts:300},
+  {id:'flavours',icon:'🍽',name:'Local Flavours',desc:"Taste every place's signature treat",test:()=>Object.values(ZONE).every(z=>!z.sig||G.found[z.sig]),pts:400},
+  {id:'herd',icon:'💕',name:'Full Herd',desc:'A herd of six friends',test:()=>herd.length>=HERD_MAX,bonus:500},
+  {id:'nights7',icon:'🌙',name:'Seasoned Survivor',desc:'Survive 7 nights',test:()=>G.nightsSurvived>=7,pts:500},
+  {id:'curios',icon:'🧺',name:'Curio Collector',desc:'Find all nine curios in the warren',test:()=>W.curios.every(c=>c.got),bonus:1000},
+  {id:'journal',icon:'📖',name:'Journal Complete',desc:'Discover every treat',test:()=>Object.keys(ITEMS).every(k=>k==='grass'||G.found[k]),bonus:1500},
+  {id:'rank4',icon:'🏆',name:'Legendary Forager',desc:'Forage 45 times',test:()=>G.forages>=45,bonus:150},
+  {id:'places9',icon:'🌍',name:'Wheek of the World',desc:'Finish everything in all nine places',test:()=>Object.keys(G.placesDone).length>=9,pts:2000},
+];
+function nextGoal(){return GOALS.find(g=>!G.goals[g.id])}
+function checkGoals(quiet){for(const g of GOALS){if(G.goals[g.id]||!g.test())continue;G.goals[g.id]=1;if(quiet)continue;
+    SFX.levelup();toast(`🎯 <b>Goal complete: ${g.icon} ${g.name}</b>${g.pts?' +'+g.pts:''}`,'gold',5);if(g.pts)addScore(g.pts,'goal!','#ffd23f')}
+  goalLine()}
+function goalLine(){const n=nextGoal();$('goalline').innerHTML=n?`🎯 Next: <b>${n.icon} ${n.name}</b> · ${n.desc}`:'🎯 Every goal done. What a guinea pig!'}
 // finishing everything in a place: a bonus, once (quiet marks the ones an older save had already finished)
 function checkPlaces(quiet){for(const id of PLACE_ORDER){if(G.placesDone[id]||!G.visited[id]||!placeStatus(ZONE[id]).done)continue;G.placesDone[id]=1;if(quiet)continue;
   const z=ZONE[id];SFX.levelup();toast(`🗺 <b>${z.icon} ${z.name} complete!</b> You've done everything there. +300`,'gold',6);addScore(300,'place complete!','#ffd23f')}}
@@ -1904,9 +1956,14 @@ function openJournal(){G.modal=true;$('journal').classList.remove('hidden');cons
   $('jgrid').innerHTML=all.map(k=>{const it=ITEMS[k];const n=G.found[k];return `<div class="jcell ${n?'':'unk'}"><div class="e">${n?it.icon:'❔'}</div><div class="nm" style="color:${RARITY[it.rarity][0]}">${n?it.name:'???'}</div><div class="ct">${n?'×'+n:(it.zone?ZONE[it.zone].icon+' ':'')+it.rarity}</div></div>`}).join('');
   $('jherd').innerHTML=`<h2 style="margin:18px 0 8px;font-size:20px">🐹 Your herd · ${herd.length}/${HERD_MAX}</h2>`+[`<span class="hcell"><b>${esc(G.name)}</b> · ${BREEDS[G.breed].name} ${COATS[G.coat].name} (you)</span>`,...herd.map(f=>`<span class="hcell"><b>${esc(f.name)}</b> · ${BREEDS[f.look.breed].name} ${COATS[f.look.coat].name}</span>`)].join('')+(herd.length<HERD_MAX?`<p style="font-size:13px;margin:6px 0 0">${friends.filter(f=>f.state!=='herd').length} more piggies are out there, in the park and all the places around it. Sniff (R) to find them.</p>`:'');
   $('jplaces').innerHTML=placesHTML();
+  const rq=Object.keys(REQUESTS).filter(k=>G.heard[k]||G.given[k]);
+  $('jgoals').innerHTML=`<h2 style="margin:18px 0 8px;font-size:20px">🎯 Goals · ${GOALS.filter(g=>G.goals[g.id]).length}/${GOALS.length}</h2><div class="glist">`+
+    GOALS.map(g=>`<div class="gcell${G.goals[g.id]?' done':''}"><span class="gi">${G.goals[g.id]?'✅':g.icon}</span><span><b>${g.name}</b><br>${g.desc}</span><span class="gp">+${g.pts||g.bonus}</span></div>`).join('')+'</div>'+
+    `<h2 style="margin:18px 0 8px;font-size:20px">🎁 Requests · ${Object.keys(G.given).length}/${Object.keys(REQUESTS).length}</h2>`+(rq.length?'<div class="glist">'+rq.map(k=>{const r=REQUESTS[k],c=CURIOS[k],z=ZONE[r.zone];
+      return `<div class="gcell${G.given[k]?' done':''}"><span class="gi">${G.given[k]?'✅':c.icon}</span><span><b>${r.who}</b> · ${z.icon} ${z.name}<br>${G.given[k]?`You gave them the ${c.name}.`:G.curios[k]?`Wants the ${c.icon} ${c.name}, and you have it! Go and give it.`:`Lost the ${c.name}. Lost things turn up in the warren.`}</span></div>`}).join('')+'</div>':'<p style="font-size:13px;margin:0">Chat to the humans in each place. Some of them have lost something.</p>');
   const halls=W.nodes.filter(n=>n.kind==='hall');
   $('jwarren').innerHTML=`<h2 style="margin:18px 0 4px;font-size:20px">🕳 The Warren · ${warrenPct()}% mapped</h2><p style="font-size:13px;margin:0 0 8px">${halls.filter(n=>n.seen).length}/${halls.length} hidden chambers · ${PARK.tunnels.filter(t=>t.found).length}/${PARK.tunnels.length} park burrows · ${routeCount()} quick routes · curio stash ${W.curios.filter(c=>c.got).length}/${W.curios.length}</p><div class="jgrid">`+
-    W.curios.map(c=>{const it=CURIOS[c.k];return `<div class="jcell ${c.got?'':'unk'}"><div class="e">${c.got?it.icon:'❔'}</div><div class="nm" style="color:${RARITY[it.rarity][0]}">${c.got?it.name:'???'}</div><div class="ct">${c.got?'curio':it.rarity}</div></div>`}).join('')+'</div>'}
+    W.curios.map(c=>{const it=CURIOS[c.k];return `<div class="jcell ${c.got?'':'unk'}"><div class="e">${c.got?it.icon:'❔'}</div><div class="nm" style="color:${RARITY[it.rarity][0]}">${c.got?it.name:'???'}</div><div class="ct">${G.given[c.k]?'given to '+esc(G.given[c.k]):c.got?'curio':it.rarity}</div></div>`}).join('')+'</div>'}
 function warrenPct(){return Math.round(W.seenPts/W.pts*100)}
 // ---- the places checklist: what there is to do in each of the nine places
 const ZONE_CRITTERS={zoo:['Goat','Sheep','Duck'],farm:['Sheep','Duck'],creek:['Duck']},CRITTER_ICON={Goat:'🐐',Sheep:'🐑',Duck:'🦆'};
@@ -1934,7 +1991,7 @@ function gameOver(){G.over=true;const best=Math.max(G.best,G.score);lsSet('wheek
 // Three slots in localStorage. The world is seeded (the same every game), so a save only keeps what changed:
 // the stats, what's been found, the herd (by friend index) and the warren's explored passages.
 const SLOTS=3,slotKey=i=>'wheek-slot-'+i;
-const SAVE_G=['hp','full','vitc','energy','happy','score','day','time','forages','pets','found','curios','nightsSurvived','eaten','luckT','warrenTip','zfound','visited','met','pals','placesDone'];
+const SAVE_G=['hp','full','vitc','energy','happy','score','day','time','forages','pets','found','curios','nightsSurvived','eaten','luckT','warrenTip','zfound','visited','met','pals','placesDone','goals','bestStreak','hawkDodged','foxEscapes','mazePrize','heard','given'];
 function snapshot(){const g={};for(const k of SAVE_G)g[k]=G[k];const ix=(a,f)=>a.flatMap((x,i)=>f(x)?[i]:[]);
   return {v:1,saved:Date.now(),name:G.name,breed:G.breed,coat:G.coat,G:g,
     zone:Z.id,pig:{x:+pig.pos.x.toFixed(2),z:+pig.pos.z.toFixed(2),h:+pig.heading.toFixed(2)},under:G.under?PARK.tunnels.indexOf(W.from):-1,herd:herd.map(f=>friends.indexOf(f)),names:friends.map(f=>f.name),known:ix(friends,f=>f.known),
@@ -1957,7 +2014,7 @@ function restore(s){
   const zn=ZONE[s.zone]||PARK;if(zn!==PARK){arriveZone(zn,0,s.pig)}else pig.pos.set(s.pig.x,heightAt(s.pig.x,s.pig.z),s.pig.z);pig.heading=s.pig.h;
   if(zn===PARK&&PARK.tunnels[s.under]){enterWarren(PARK.tunnels[s.under],true);pig.pos.set(s.pig.x,0,s.pig.z);pig.heading=s.pig.h;W.trail=[{x:pig.pos.x,z:pig.pos.z}];herd.forEach(f=>f.pos.copy(pig.pos))}
   else regroupHerd();
-  if(!s.G.placesDone)checkPlaces(true);
+  if(!s.G.placesDone)checkPlaces(true);if(!s.G.goals)checkGoals(true);
   G.camYaw=pig.heading+Math.PI;snapCamera();updateDay(0)}
 function ago(t){const m=Math.round((Date.now()-t)/60000);return m<1?'just now':m<60?`${m} min ago`:m<1440?`${Math.round(m/60)} h ago`:`${Math.round(m/1440)} days ago`}
 function renderSlots(){const el=$('slots');el.innerHTML='';
@@ -1972,7 +2029,7 @@ function continueGame(i){const s=lsGet(slotKey(i),null);if(!s)return renderSlots
 function startPlaying(welcome){
   friends.forEach(f=>{if(f.name===G.name)f.name=PIG_NAMES.find(n=>n!==G.name&&!friends.some(o=>o.name===n))});
   G.selecting=false;camera.clearViewOffset();$('select').classList.add('hidden');G.started=true;$('touchui').classList.remove('hidden');G.camDist=.95;G.camPitch=.2;G.camYaw=pig.heading+Math.PI;$('title').classList.add('hidden');['stats','top','mapwrap','help'].forEach(i=>$(i).classList.remove('hidden'));SFX.wheek();
-  welcome();saveGame(true)}
+  goalLine();welcome();saveGame(true)}
 addEventListener('pagehide',()=>saveGame(true));
 
 // ============================================================ input

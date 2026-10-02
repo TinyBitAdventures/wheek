@@ -12,6 +12,10 @@
 - 12 more wild guinea pigs live out in the zones, one or two in each: Snowball on the peaks, Thistle and Fennel in the Deep Wood, Pretzel downtown, Sandy on the beach, Pebble and Willow by the creek, Cocoa at the petting zoo, Barley and Turnip on the farm, and Marigold and Honey in the sunflowers. That's 21 to meet, and your herd still holds six, so pick your favourites.
 - A guinea pig who scatters in fright in another zone now stays in that zone, and wild guinea pigs never wander into deep water.
 
+### Goals and requests
+- 22 goals to work through, from your first forage to finishing all nine places. The next one shows under your stats, the journal lists them all with their rewards, and each one cheers when you finish it. Saves from before keep the goals they'd already done, quietly.
+- Some humans have lost a little something, and it turned up in the warren under the park: Maya's blue marble, Leo's acorn cap, Ellie's coat button, Rosa wants a glow crystal for her shop window, Grandpa Joe's lucky penny, Sunny's snail shell, Keeper Amy's jay feather and Farmer Gus's tiny brass key. Chat to them to hear what they've lost, then bring it back for a thank-you, treats and points. The journal keeps a list of who wants what, and a curio you've given away says who has it now.
+
 ### The journal
 - A Places page: the nine places laid out as they lie on the map, each with a checklist of burrows found, guinea pigs befriended, its signature treat and the animals to say hello to (and the warren's hidden chambers for the park). Finish everything in a place for a +300 bonus.
 

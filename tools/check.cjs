@@ -1,6 +1,6 @@
 // World checks: loads the game in a tiny headless window and tests the world's logic through window.__game.
 // Usage: PW=/path/to/node_modules/playwright node tools/check.cjs [check ...]
-//   checks: reach warren night chaos eat treats saves touch pad memory (default: all). URL defaults to the local dev site.
+//   checks: reach warren night chaos eat treats goals saves touch pad memory (default: all). URL defaults to the local dev site.
 // Prints a report and exits 1 if anything failed.
 const { chromium } = require(process.env.PW || 'playwright');
 const URL = process.env.URL || 'https://wheek.localhost/';
@@ -144,6 +144,20 @@ const frames = (page, n) => page.evaluate(n => new Promise(r => { let k = 0; (fu
     report('wade & forage watercress', ok, ok ? '' : 'the cress bed never got foraged');
   }
 
+  // 5c. goals and requests: a goal completes and pays out, Farmer Gus gets his brass key back
+  if (pick('goals')) {
+    const g1 = await page.evaluate(async () => { const g = window.__game, G = g.G; g.visit('park', 0, 0, 0); G.time = 11; const before = G.score, line = document.getElementById('goalline').textContent;
+      G.forages = Math.max(G.forages, 1); const t0 = performance.now(); while (!G.goals.forage && performance.now() - t0 < 60000) await new Promise(r => setTimeout(r, 100));
+      return { line, done: !!G.goals.forage, paid: G.score - before, next: document.getElementById('goalline').textContent } });
+    report('goal completes', g1.line.includes('First Forage') && g1.done && g1.paid >= 25 && !g1.next.includes('First Forage'), `"${g1.line}" → done ${g1.done}, +${g1.paid}, then "${g1.next}"`);
+    await page.evaluate(() => { const g = window.__game, G = g.G; G.time = 11; g.visit('farm', 0, 0, 0); G.curios.key = true; const h = g.Z().humans.find(h => h.name === 'Farmer Gus'); window.__gus = h; window.__drops = g.Z().drops.length; window.__heard = G.heard.key });
+    const heard = await page.waitForFunction(() => { const g = window.__game, h = window.__gus, a = h.obj.rotation.y; g.pig.pos.set(h.obj.position.x + Math.sin(a) * .9, 0, h.obj.position.z + Math.cos(a) * .9); g.pig.pos.y = g.heightAt(g.pig.pos.x, g.pig.pos.z);
+      return (g.G.acts || []).some(x => x.label.startsWith('Give')) }, null, { timeout: 60000, polling: 250 }).then(() => true, () => false);
+    await page.keyboard.press('KeyE'); await frames(page, 4);
+    const gave = await page.evaluate(() => { const g = window.__game; return { given: g.G.given.key, drops: g.Z().drops.length - window.__drops, toast: document.getElementById('toasts').textContent.includes('My key') } });
+    report('request: Farmer Gus and the brass key', heard && gave.given === 'Farmer Gus' && gave.drops === 2 && gave.toast, `offered ${heard} · given to ${gave.given} · ${gave.drops} gifts · thanks ${gave.toast}`);
+  }
+
   // 6. saves: continue a game saved before zones existed, and one saved in a zone
   if (pick('saves')) {
     await page.evaluate(() => { const g = window.__game, names = g.friends.map(f => f.name);
@@ -158,8 +172,8 @@ const frames = (page, n) => page.evaluate(n => new Promise(r => { let k = 0; (fu
       await page.evaluate(slot => document.querySelectorAll('#slots .slot')[slot - 1].querySelector('.cont').click(), slot);
       await page.waitForFunction(() => window.__game && window.__game.G.started, null, { timeout: 60000 });
       await frames(page, 10);
-      const r = await page.evaluate(() => { const g = window.__game, Z = g.Z(); return { zone: Z.id, name: g.G.name, herd: g.herd.length, park: g.PARK.tunnels.map(t => t.found ? 1 : 0).join(''), zoneFound: Z.tunnels.map(t => t.found ? 1 : 0).join(''), pos: [g.pig.pos.x, g.pig.pos.z].map(v => v.toFixed(1)).join(',') } });
-      report(`save slot ${slot} (${zone})`, r.zone === zone && r.name === name && r.herd === 1 && errors.length === before && (zone !== 'park' || r.park.startsWith('1001')) && (zone === 'park' || r.zoneFound[1] === '1'),
+      const r = await page.evaluate(() => { const g = window.__game, Z = g.Z(); return { quiet: !!g.G.goals.night1 && !document.getElementById('toasts').textContent.includes('Goal complete'), zone: Z.id, name: g.G.name, herd: g.herd.length, park: g.PARK.tunnels.map(t => t.found ? 1 : 0).join(''), zoneFound: Z.tunnels.map(t => t.found ? 1 : 0).join(''), pos: [g.pig.pos.x, g.pig.pos.z].map(v => v.toFixed(1)).join(',') } });
+      report(`save slot ${slot} (${zone})`, r.quiet && r.zone === zone && r.name === name && r.herd === 1 && errors.length === before && (zone !== 'park' || r.park.startsWith('1001')) && (zone === 'park' || r.zoneFound[1] === '1'),
         `"${label}" → ${r.zone} at ${r.pos}, herd ${r.herd}, park burrows ${r.park}${zone === 'park' ? '' : ', zone burrows ' + r.zoneFound}`);
     }
   }
