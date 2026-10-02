@@ -12,6 +12,9 @@
 - 12 more wild guinea pigs live out in the zones, one or two in each: Snowball on the peaks, Thistle and Fennel in the Deep Wood, Pretzel downtown, Sandy on the beach, Pebble and Willow by the creek, Cocoa at the petting zoo, Barley and Turnip on the farm, and Marigold and Honey in the sunflowers. That's 21 to meet, and your herd still holds six, so pick your favourites.
 - A guinea pig who scatters in fright in another zone now stays in that zone, and wild guinea pigs never wander into deep water.
 
+### The journal
+- A Places page: the nine places laid out as they lie on the map, each with a checklist of burrows found, guinea pigs befriended, its signature treat and the animals to say hello to (and the warren's hidden chambers for the park). Finish everything in a place for a +300 bonus.
+
 ### Models
 - 16 new Blender-built models: rose hips, raspberry leaves, romaine, a watermelon slice, watercress, a corn husk, an apple slice and sunflower seeds, plus a snowdrift, a bramble, a market stall, a picnic basket, a watercress bed, a feed trough, an apple tree and a fallen sunflower head.
 

@@ -134,7 +134,15 @@ for (const [zone, type, dist] of [['peaks', 'drift', 2], ['deepwood', 'bramble',
     await page.waitForTimeout(2000);
     await shot(name);
   }
-  if (pick('journal')) { await page.keyboard.press('KeyJ'); await page.waitForTimeout(600); await shot('journal'); }
+  if (pick('journal')) { await page.keyboard.press('KeyJ'); await page.waitForTimeout(600); await shot('journal'); await page.keyboard.press('KeyJ'); }
+  // The journal's places checklist, part way through a game: three places visited, the farm finished.
+  if (pick('places')) {
+    await page.evaluate(() => { const { G, friends, ZONE } = window.__game; Object.assign(G.visited, { farm: 1, beach: 1 }); G.zfound.farm = [0, 1, 2]; G.met.Sheep = G.met.Duck = 1; G.found.apple = 2;
+      friends.forEach((f, i) => { if (f.origin === 'farm' && !G.pals.includes(i)) G.pals.push(i) }); G.zfound.park = [0, 3]; G.found.watermelon = 1; G.placesDone.farm = 1 });
+    await page.keyboard.press('KeyJ'); await page.waitForTimeout(600);
+    await page.evaluate(() => document.getElementById('jplaces').scrollIntoView());
+    await shot('places');
+  }
   const info = await page.evaluate(() => { const g = window.__game, r = g.renderer.info.render; return { calls: r.calls, triangles: r.triangles, caveTris: g.W.tris, nodes: g.W.nodes.length, edges: g.W.edges.length, friends: g.friends.length, tunnels: g.tunnels.length, spots: g.spots.length }; });
   console.log(JSON.stringify({ url: URL, version, ...info }));
   console.log(errors.length ? 'ERRORS\n' + errors.join('\n') : 'no console errors');
