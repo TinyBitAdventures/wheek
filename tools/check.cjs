@@ -25,7 +25,7 @@ function near(R,seen,x,z,rad){const {N,res,O,cx}=R;for(let j=Math.max(0,Math.flo
 const frames = (page, n) => page.evaluate(n => new Promise(r => { let k = 0; (function f() { if (++k >= n) r(); else requestAnimationFrame(f) })() }), n);
 
 (async () => {
-  const browser = await chromium.launch({ args: ['--use-angle=swiftshader', '--enable-unsafe-swiftshader', '--ignore-gpu-blocklist', '--enable-precise-memory-info', '--autoplay-policy=no-user-gesture-required'] });
+  const browser = await chromium.launch({ args: ['--use-angle=swiftshader', '--enable-unsafe-swiftshader', '--ignore-gpu-blocklist', '--enable-precise-memory-info', '--js-flags=--expose-gc', '--autoplay-policy=no-user-gesture-required'] });
   const page = await browser.newPage({ viewport: { width: 200, height: 130 }, ignoreHTTPSErrors: true });
   const errors = [];
   page.on('console', m => { if (m.type() === 'error') errors.push(m.text().slice(0, 300)); });
@@ -623,10 +623,14 @@ const frames = (page, n) => page.evaluate(n => new Promise(r => { let k = 0; (fu
 
   // 7. after visiting every zone: memory and what the renderer holds
   if (pick('memory')) {
-    const r = await page.evaluate(async zones => { const g = window.__game; for (const id of zones) { g.visit(id, 0, 0, 0); await new Promise(r => requestAnimationFrame(r)) } g.visit('park', 0, 0, 0);
-      const m = g.renderer.info.memory; return { heap: performance.memory ? Math.round(performance.memory.usedJSHeapSize / 1048576) : -1, geometries: m.geometries, textures: m.textures } }, zones);
-    report('memory after every zone', true, `JS heap ${r.heap} MB · ${r.geometries} geometries · ${r.textures} textures`);
+    // after garbage collection (so the number is what's really kept), then a second round of visits must not grow it
+    const r = await page.evaluate(async zones => { const g = window.__game, mb = () => { if (window.gc) { gc(); gc() } return performance.memory ? Math.round(performance.memory.usedJSHeapSize / 1048576) : -1 };
+      const tour = async () => { for (const id of zones) { g.visit(id, 0, 0, 0); await new Promise(r => requestAnimationFrame(r)) } g.visit('park', 0, 0, 0); await new Promise(r => requestAnimationFrame(r)) };
+      await tour(); const heap = mb(); await tour(); const again = mb();
+      const m = g.renderer.info.memory; return { heap, again, geometries: m.geometries, textures: m.textures } }, zones);
+    report('memory after every zone', r.again - r.heap < 15, `JS heap ${r.heap} MB, ${r.again} MB after a second round · ${r.geometries} geometries · ${r.textures} textures`);
   }
+
 
   console.log(errors.length ? `console errors (${errors.length}):\n  ` + [...new Set(errors)].slice(0, 10).join('\n  ') : 'no console errors');
   await browser.close();
