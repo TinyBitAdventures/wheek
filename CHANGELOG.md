@@ -4,7 +4,7 @@
 
 ### Every zone has its own treat
 - Each of the eight zones around the park has a signature treat you can only find there, and a new place to forage it: rose hips under the snowdrifts on ❄️ Snowcap Peaks, raspberry leaves in 🌲 The Deep Wood's brambles, romaine from the market crates round 🏙️ Downtown's fountain, watermelon in 🏖️ Sandy Cove's picnic baskets, watercress in 🌊 Willow Creek's shallows (wade in to forage it), corn husks from 🐐 Critter Corner's feed troughs, apple slices under 🚜 Sunny Acres' new apple trees and sunflower seeds from the fallen heads in 🌻 Sunflower Fields.
-- The journal has 23 treats now. One you haven't found yet shows which zone it grows in.
+- The journal has 24 treats now (with the pet shop's pellets). One you haven't found yet shows which zone it grows in.
 - The humans in Downtown, Sandy Cove, Critter Corner and on the farm sometimes toss you their zone's treat.
 - The Deep Wood's brambles are thorny cover: the hawk can't reach you in one.
 
@@ -35,7 +35,7 @@
 - New goals: Clear Round and Best in Show (gold). Critter Corner's checklist includes a rosette.
 
 ### The leaf raft and Willow Island
-- A big leaf lies on the bank at the top of Willow Creek, beside a little "Leaf rides!" sign (sniff to find it). Hop on and the current carries you all the way down the creek: steer left and right, push forward to paddle, pull back to slow down.
+- A big leaf lies on the bank at the west end of Willow Creek, where it starts, beside a little "Leaf rides!" sign (sniff to find it). Hop on and the current carries you all the way down the creek: steer left and right, push forward to paddle, pull back to slow down.
 - The stepping-stone fords are rapids now: the water speeds up and you thread between the stones. Fallen branches reach out from the banks, ducks paddle in your way, and treats float by to scoop up. Three bumps and you tip off into the shallows and scramble ashore.
 - Make it to the end and the creek carries you round the bend to Willow Island: a hidden islet with a giant weeping willow. Curl up in its roots for a nap, forage the driftwood and the watercress, then ride the leaf back up the creek. Your herd waits on the bank, and the hawk and foxes leave you alone on the water.
 - New goals: Raft Rider and Not a Splash (the whole creek without a bump). Willow Creek's checklist includes the island.
@@ -64,11 +64,11 @@
 - Herd full? You can still chat. When a new friend is ready to join, pick who heads home to make room (they wait at home, so you can always swap them back), or say not now. A friend you've had before is welcomed back without the new-friend points, and the full-herd bonus comes once.
 
 ### Goals and requests
-- 22 goals to work through, from your first forage to finishing all nine places. The next one shows under your stats, the journal lists them all with their rewards, and each one cheers when you finish it. Saves from before keep the goals they'd already done, quietly.
+- 35 goals to work through, from your first forage to finishing all nine places. The next one shows under your stats, the journal lists them all with their rewards, and each one cheers when you finish it. Saves from before keep the goals they'd already done, quietly.
 - Some humans have lost a little something, and it turned up in the warren under the park: Maya's blue marble, Leo's acorn cap, Ellie's coat button, Rosa wants a glow crystal for her shop window, Grandpa Joe's lucky penny, Sunny's snail shell, Keeper Amy's jay feather and Farmer Gus's tiny brass key. Chat to them to hear what they've lost, then bring it back for a thank-you, treats and points. The journal keeps a list of who wants what, and a curio you've given away says who has it now.
 
 ### The journal
-- A Places page: the nine places laid out as they lie on the map, each with a checklist of burrows found, guinea pigs befriended, its signature treat and the animals to say hello to (and the warren's hidden chambers for the park). Finish everything in a place for a +300 bonus.
+- A Places page: the nine places laid out as they lie on the map, each with a checklist of burrows found, guinea pigs befriended, its signature treat, the animals to say hello to and, in most places, its big discovery (the warren's hidden chambers for the park). Finish everything in a place for a +300 bonus.
 
 ### Maps and finding things
 - The minimap and the big map (M) are drawn at your screen's real resolution, so they're crisp on high-density screens instead of blurry, and the terrain behind them is twice as detailed.
