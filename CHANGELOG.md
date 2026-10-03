@@ -13,7 +13,6 @@
 - Inside, the tide is already turning: you have 50 seconds. Scoop up the shells and the sea glass scattered over the sand (a fresh lot every time), and dodge the crabs scuttling sideways across the cave: they pinch. When the water starts creeping in it slows you down, and if you're still inside when it arrives it washes you out onto the beach.
 - Right at the back by the rock pool waits a message in a bottle (after that, the tide brings starfish). Your herd waits on the beach.
 - New goals: Message in a Bottle and Tide Runner (every shell, and out in time). Sandy Cove's checklist includes the bottle.
-- Fixed: the progress bar on the leaf raft (and now the agility, windmill and sea cave timers) only ever filled a sliver of its track.
 
 ### The old windmill
 - An old tower mill stands on the highest hill in 🌻 Sunflower Fields, its sails turning. There's a mouse hole at the foot of its door (sniff to find it).
@@ -71,9 +70,10 @@
 ### The journal
 - A Places page: the nine places laid out as they lie on the map, each with a checklist of burrows found, guinea pigs befriended, its signature treat and the animals to say hello to (and the warren's hidden chambers for the park). Finish everything in a place for a +300 bonus.
 
-### Sharper maps
+### Maps and finding things
 - The minimap and the big map (M) are drawn at your screen's real resolution, so they're crisp on high-density screens instead of blurry, and the terrain behind them is twice as detailed.
 - The warren map's names keep out of each other's way, and the hidden chambers are labelled in gold.
+- Each place's big discovery has an icon on its map (the leaf raft, the agility tent, the hollow oak, the windmill, the sea cave, the pet shop and the barns), and the welcome when you first arrive somewhere says what to look for.
 
 ### Music and settings
 - Wheek! has music: three gentle loops made for it. "Clover Meadow" by day (marimba, folk guitar, upright bass), "Moonlit Burrow" at night (a music-box glockenspiel, harp and vibraphone) and "Under the Roots" down in the warren (kalimba, pizzicato strings, bongos). They cross-fade as night falls, as the sun comes up and as you crawl underground, and loop without a seam. The game goes quiet when its tab is hidden.
@@ -84,6 +84,11 @@
 - Whatever you can do right now (eat, forage, chat, enter a tunnel, wheek at a human) pops up as a button on the right: tap it, or hold it to munch, forage and chat.
 - On a phone the screen makes room: no minimap (the map button opens the big one), smaller stats, and a shorter title screen when you hold the phone sideways.
 - Gamepads work everywhere, menus included: left stick to scurry, right stick to look, Ⓐ eat and enter, Ⓧ forage, Ⓨ chat, Ⓑ popcorn, RB sniff, LB wheek, RT scurry, Back for the map, d-pad up for the journal and Start to pause. The prompts and tips show whichever buttons you're using.
+
+### Fixes
+- The leaf raft's progress bar (and the agility, windmill and sea cave timers) only ever filled a sliver of its track.
+- When the humans head inside at dusk (and come back out at dawn) there's one toast for all of them, not one each.
+- Foxes only come out of the woods: there are none Downtown at night any more, where they used to appear out of nowhere.
 
 ### Models
 - The barn's inside, a hay pile, the holes in the barn walls and a fallen twig, built in Blender like everything else.

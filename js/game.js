@@ -660,7 +660,7 @@ defineZone({id:'peaks',blurb:'Snowy slopes and frosted pines. Brr! The cold drai
 
 // ---- The Deep Wood: giant old trees, ferns, logs and mushrooms, dim and misty even at noon
 const DEEP_TRAIL=[[-72,20],[-50,14],[-30,20],[-12,8],[0,-4],[14,-10],[30,-30]];
-defineZone({id:'deepwood',blurb:'Ancient trees and deep shade. Rare mushrooms and four-leaf clovers hide under the leaves, and wild raspberries tangle round the glades, but the foxes are bolder here.',name:'The Deep Wood',icon:'🌲',gx:1,gz:-1,seed:3202,sig:'raspleaf',fog:.42,fogTint:[0x4a6a50,.45],fireflies:.55,loot:{chanterelle:2.2,clover4:2,goldDandelion:1.5},foxes:2,
+defineZone({id:'deepwood',blurb:'Ancient trees and deep shade. Rare mushrooms and four-leaf clovers hide under the leaves, and wild raspberries tangle round the glades, but the foxes are bolder here. An enormous hollow oak stands in a glade by the trail.',name:'The Deep Wood',icon:'🌲',gx:1,gz:-1,seed:3202,sig:'raspleaf',fog:.42,fogTint:[0x4a6a50,.45],fireflies:.55,loot:{chanterelle:2.2,clover4:2,goldDandelion:1.5},foxes:2,
   height:(x,z)=>fbm(x*.014+20,z*.014,4)*4+fbm(x*.07,z*.07,3)*.6+rimLift(x,z,9),
   forest:(x,z)=>{const glade=Math.min(Math.hypot(x-4,z+2)/9,Math.hypot(x+34,z-30)/7,Math.hypot(x-30,z-26)/6);return clamp(smooth(.7,1.2,glade)*.97+fbm(x*.05,z*.05,2)*.1,0,1)},
   path:(x,z)=>lineDist(x,z,DEEP_TRAIL),
@@ -680,7 +680,7 @@ defineZone({id:'deepwood',blurb:'Ancient trees and deep shade. Rare mushrooms an
 // ---- Downtown: a small town, Main Street and Elm Street, houses, lawns and a town square
 const MAIN_Z=0,ELM_X=14;
 const townPath=(x,z)=>Math.max(0,Math.min(Math.abs(z-MAIN_Z),Math.abs(x-ELM_X))-5.2)+(Math.hypot(x,z)>EDGE+4?9:0);
-defineZone({id:'town',blurb:'Shops, a fountain square with a little market, and lots of friendly humans. Wheek for veggies, and look both ways before you cross!',name:'Downtown',icon:'🏙️',gx:1,gz:0,seed:3303,sig:'romaine',toss:{romaine:35,carrot:25,strawberry:20,pepper:18,goldCarrot:2},fog:1.1,edgeMsg:'🚗 That road leads to the highway. Much too busy for a guinea pig!',
+defineZone({id:'town',blurb:'Shops, a fountain square with a little market, and lots of friendly humans. Wheek for veggies, and look both ways before you cross! After closing time, a cat flap round the back of the pet shop lets a guinea pig in.',name:'Downtown',icon:'🏙️',gx:1,gz:0,seed:3303,sig:'romaine',toss:{romaine:35,carrot:25,strawberry:20,pepper:18,goldCarrot:2},fog:1.1,edgeMsg:'🚗 That road leads to the highway. Much too busy for a guinea pig!',
   height:(x,z)=>fbm(x*.01,z*.01,3)*.6*smooth(8,30,Math.min(Math.abs(z),Math.abs(x-ELM_X)))+rimLift(x,z,5),
   forest:(x,z)=>smooth(64,74,Math.hypot(x,z)),
   path:townPath,
@@ -724,7 +724,7 @@ defineZone({id:'town',blurb:'Shops, a fountain square with a little market, and 
 
 // ---- Sandy Cove: dunes running down to a sandy beach and the sea to the south-east
 const shoreD=(x,z)=>(x+z)*.7071;   // distance toward the sea
-defineZone({id:'beach',blurb:'Warm sand, dune grass and the sea. Driftwood hides treats, and picnic baskets hide watermelon.',name:'Sandy Cove',icon:'🏖️',gx:1,gz:1,seed:3404,sig:'watermelon',toss:{watermelon:30,strawberry:30,carrot:22,pepper:16,goldCarrot:2},fog:1.25,fogTint:[0xdff0ff,.3],edgeMsg:'🌊 Only the sea that way. Guinea pigs do not swim!',
+defineZone({id:'beach',blurb:'Warm sand, dune grass and the sea. Driftwood hides treats, and picnic baskets hide watermelon. When the tide is out (8 to 2, morning and night) a sea cave opens in the rocks at the water\'s edge.',name:'Sandy Cove',icon:'🏖️',gx:1,gz:1,seed:3404,sig:'watermelon',toss:{watermelon:30,strawberry:30,carrot:22,pepper:16,goldCarrot:2},fog:1.25,fogTint:[0xdff0ff,.3],edgeMsg:'🌊 Only the sea that way. Guinea pigs do not swim!',
   height(x,z){const d=shoreD(x,z),land=fbm(x*.03+4,z*.03,3)*2.2+2.2+rimLift(x,z,7)*(1-smooth(-10,20,d));return lerp(land,.9-(d-14)*.07,smooth(0,16,d))+fbm(x*.2,z*.2,2)*.05*smooth(12,20,d)},
   forest:(x,z)=>clamp(smooth(4,-20,shoreD(x,z))*.8+fbm(x*.05,z*.05,2)*.3,0,1),
   path:(x,z)=>lineDist(x,z,[[-72,-4],[-40,-8],[-18,-2],[-4,6]]),
@@ -754,7 +754,7 @@ defineZone({id:'beach',blurb:'Warm sand, dune grass and the sea. Driftwood hides
 const CREEK=[[-80,2],[-56,8],[-36,0],[-18,6],[0,14],[18,8],[36,16],[56,10],[80,14]];
 const FORDS=[[-36,0],[0,14],[36,16]];
 const creekD=(x,z)=>lineDist(x,z,CREEK);
-defineZone({id:'creek',blurb:'A winding creek. Guinea pigs can wade the shallow fords by the stepping stones, and watercress grows in the shallows, but the deep water is a no-go.',name:'Willow Creek',icon:'🌊',gx:0,gz:1,seed:3505,sig:'watercress',fog:1,edgeMsg:'🌾 Just endless marsh that way. Better turn back.',
+defineZone({id:'creek',blurb:'A winding creek. Guinea pigs can wade the shallow fords by the stepping stones, and watercress grows in the shallows, but the deep water is a no-go. A big leaf waits on the bank at the west end of the creek: hop on for a ride downstream.',name:'Willow Creek',icon:'🌊',gx:0,gz:1,seed:3505,sig:'watercress',fog:1,edgeMsg:'🌾 Just endless marsh that way. Better turn back.',
   height(x,z){const d=creekD(x,z),ford=Math.min(...FORDS.map(([a,b])=>Math.hypot(x-a,z-b)));let h=(fbm(x*.02+7,z*.02,3)+1)*1.1*smooth(4,20,d)+.35*smooth(2,6,d)+rimLift(x,z,7);
     const bed=-.55*(1-smooth(1.6,3.4,d));return h+bed*smooth(1.2,3.5,ford)+(1-smooth(1.2,3.5,ford))*(1-smooth(1.6,3.4,d))*-.17},
   forest:(x,z)=>clamp(fbm(x*.04+11,z*.04,3)*1.2+.25+smooth(60,70,Math.hypot(x,z)),0,1)*smooth(3,7,creekD(x,z)),
@@ -784,7 +784,7 @@ defineZone({id:'creek',blurb:'A winding creek. Guinea pigs can wade the shallow 
 const ZOO_LOOP=[[72,-6],[50,-4],[30,0],[14,-10],[-6,-14],[-24,-2],[-18,18],[4,24],[24,14],[30,0]];
 const PENS=[[-10,-30,10,7,'Goat',3],[12,-28,9,7,'Sheep',3],[-38,-14,8,9,'Goat',2],[-34,20,9,7,'Sheep',3],[-6,36,11,7,'Goat',3],[24,32,10,8,'Duck',4]];
 const ZOO_POND=[24,32];
-defineZone({id:'zoo',blurb:'A petting zoo of goats, sheep and ducks. Squeeze under the fences to say hello, forage the hay and raid the feed troughs.',name:'Critter Corner',icon:'🐐',gx:-1,gz:1,seed:3606,sig:'cornhusk',toss:{cornhusk:35,carrot:30,strawberry:18,pepper:15,goldCarrot:2},edgeMsg:'🚧 The zoo fence. Staff only past here!',water:-.12,
+defineZone({id:'zoo',blurb:'A petting zoo of goats, sheep and ducks. Squeeze under the fences to say hello, forage the hay and raid the feed troughs. There\'s an agility course in the striped tent by the path.',name:'Critter Corner',icon:'🐐',gx:-1,gz:1,seed:3606,sig:'cornhusk',toss:{cornhusk:35,carrot:30,strawberry:18,pepper:15,goldCarrot:2},edgeMsg:'🚧 The zoo fence. Staff only past here!',water:-.12,
   height(x,z){const h=(fbm(x*.015+2,z*.015,3)+1)*.7+.2+rimLift(x,z,6),p=Math.hypot((x-ZOO_POND[0])/4.2,(z-ZOO_POND[1])/3.2);return p<1.6?lerp(h,-.55,1-smooth(.8,1.6,p)):h},
   forest:(x,z)=>smooth(52,66,Math.hypot(x,z))*.9,
   path:(x,z)=>lineDist(x,z,ZOO_LOOP),
@@ -817,7 +817,7 @@ const FARM_ROAD=[[72,0],[40,-2],[20,4],[4,2],[-8,-4]];
 const FIELDS=[[-34,-30,26,18],[-36,6,22,20],[-10,30,26,16]];
 const inField=(x,z)=>FIELDS.some(([fx,fz,w,h])=>Math.abs(x-fx)<w/2&&Math.abs(z-fz)<h/2);
 const PADDOCK=[24,-26,16,11];
-defineZone({id:'farm',blurb:'Fields of carrots in neat rows, hay bales by the big red barn, an apple orchard, sheep in the paddock and ducks on the pond.',name:'Sunny Acres Farm',icon:'🚜',gx:-1,gz:0,seed:3707,sig:'apple',toss:{apple:35,carrot:30,strawberry:15,pepper:18,goldCarrot:2},edgeMsg:'🌾 Nothing but more fields that way, for miles.',
+defineZone({id:'farm',blurb:'Fields of carrots in neat rows, hay bales by the big red barn, an apple orchard, sheep in the paddock and ducks on the pond. Look for little holes at the foot of the barn walls.',name:'Sunny Acres Farm',icon:'🚜',gx:-1,gz:0,seed:3707,sig:'apple',toss:{apple:35,carrot:30,strawberry:15,pepper:18,goldCarrot:2},edgeMsg:'🌾 Nothing but more fields that way, for miles.',
   height(x,z){let h=(fbm(x*.012+5,z*.012,3)+1)*.9+.3+rimLift(x,z,6);const p=Math.hypot(x-26,z-28);if(p<9)h=lerp(h,-.5,1-smooth(5,9,p));return h},
   forest:(x,z)=>smooth(54,68,Math.hypot(x,z))*.9+(inField(x,z)?-1:0),
   path:(x,z)=>lineDist(x,z,FARM_ROAD),
@@ -851,7 +851,7 @@ defineZone({id:'farm',blurb:'Fields of carrots in neat rows, hay bales by the bi
 
 // ---- Sunflower Fields: rolling hills of wildflowers around a sunflower maze with a prize in the middle
 const MAZE={cx:-6,cz:-4,n:11,cell:2.6};
-defineZone({id:'sunflowers',blurb:'Rolling hills of wildflowers around a sunflower maze. Something golden waits in the middle, and fallen sunflower heads are full of seeds.',name:'Sunflower Fields',icon:'🌻',gx:-1,gz:-1,seed:3808,sig:'seeds',edgeMsg:'🌻 Just more sunflowers, as far as a guinea pig can see.',
+defineZone({id:'sunflowers',blurb:'Rolling hills of wildflowers around a sunflower maze. Something golden waits in the middle, and fallen sunflower heads are full of seeds. An old windmill turns on the highest hill.',name:'Sunflower Fields',icon:'🌻',gx:-1,gz:-1,seed:3808,sig:'seeds',edgeMsg:'🌻 Just more sunflowers, as far as a guinea pig can see.',
   height(x,z){const m=Math.max(Math.abs(x-MAZE.cx),Math.abs(z-MAZE.cz))-MAZE.n*MAZE.cell/2;return fbm(x*.016+8,z*.016,4)*3.2*smooth(0,14,m)+.3+rimLift(x,z,7)},
   forest:(x,z)=>smooth(58,70,Math.hypot(x,z))*.8,
   path:(x,z)=>lineDist(x,z,[[48,48],[30,26],[16,12],[MAZE.cx+MAZE.n*MAZE.cell/2+1,MAZE.cz+MAZE.n*MAZE.cell/2-MAZE.cell/2]]),
@@ -1523,11 +1523,15 @@ function drawWarrenMap(g,s){const w=v=>s(v/WS),big=$('mapwrap').classList.contai
   return w}
 
 // ============================================================ humans / petting
+// humans head in at dusk and out at dawn all together: one toast for the lot, not one each
+let hNote=null;
+function humanNote(name,out){if(!hNote){hNote={in:[],out:[]};setTimeout(()=>{const n=hNote;hNote=null;const list=a=>a.length<=2?a.join(' and '):`${a.slice(0,2).join(', ')} and ${a.length-2} more`;
+  if(n.in.length)toast(`🏡 ${list(n.in)} went inside for the night.`);if(n.out.length)toast(`🌅 ${list(n.out)} ${n.out.length>1?'are':'is'} back outside!`)},600)}hNote[out?'out':'in'].push(name)}
 function updateHumans(dt){
   const night=isNight();
   for(const h of humans){
     const target=night?0:1;h.fade=lerp(h.fade,target,dt*1.5);
-    const vis=h.fade>.05;if(vis!==h.visible){h.visible=vis;h.obj.visible=vis;if(!vis)toast(`🏡 ${h.name} went inside for the night.`);else toast(`🌅 ${h.name} is back outside!`)}
+    const vis=h.fade>.05;if(vis!==h.visible){h.visible=vis;h.obj.visible=vis;humanNote(h.name,vis)}
     if(!h.visible)continue;
     h.cd=Math.max(0,h.cd-dt);h.tossCD=Math.max(0,h.tossCD-dt);if(h.cd<=0&&h.petBudget<=0)h.petBudget=6;
     const dx=pig.pos.x-h.obj.position.x,dz=pig.pos.z-h.obj.position.z,d=Math.hypot(dx,dz);
@@ -2367,7 +2371,9 @@ function updateHawk(dt,t){
 function updateFoxes(dt,t){
   const night=isNight();const want=night?(Z.foxes||(G.day>=3?2:1)):0;
   foxes.forEach((f,i)=>{
-    if(i<want&&!f.active){let x,z,tries=0;do{const a=rand()*6.28;x=pig.pos.x+Math.cos(a)*24;z=pig.pos.z+Math.sin(a)*24;tries++}while((forestness(x,z)<.6||Math.hypot(x,z)>EDGE)&&tries<40);
+    f.retry=Math.max(0,(f.retry||0)-dt);
+    if(i<want&&!f.active&&f.retry<=0){let x,z,tries=0;do{const a=rand()*6.28;x=pig.pos.x+Math.cos(a)*24;z=pig.pos.z+Math.sin(a)*24;tries++}while((forestness(x,z)<.6||Math.hypot(x,z)>EDGE)&&tries<40);
+      if(tries>=40&&(forestness(x,z)<.6||Math.hypot(x,z)>EDGE)){f.retry=8;return}
       f.active=true;f.pos.set(x,heightAt(x,z),z);f.obj.visible=true;f.state='wander';f.target.set(x,0,z);f.t=0;if(i===0)toast('🦊 Night falls… something is prowling the woods.','bad',4)}
     if(!f.active)return;
     if(!night){f.state='leave'}
@@ -2816,6 +2822,7 @@ function drawMap(){if(!mapBg)drawMapBg();fitMap();const g=mctx;const s=v=>(v/72*
   if(Z===PARK)for(const e of W.edges)for(let k=0;k<e.pts.length-1;k++){const a=e.pts[k],b=e.pts[k+1];if(a.seen&&b.seen){g.moveTo(s(a.x/WS),s(a.z/WS));g.lineTo(s(b.x/WS),s(b.z/WS))}}g.stroke();g.setLineDash([]);
   if(Z.id==='sunflowers'&&G.mazeView){const rt=mazeRoute();if(rt){const {cx,cz,n,cell}=MAZE,x0=cx-n*cell/2,z0=cz-n*cell/2;g.setLineDash([4,4]);g.strokeStyle='#ffd23f';g.lineWidth=2.5;g.beginPath();g.moveTo(s(x0+n*cell+1),s(z0+(n-.5)*cell));rt.forEach(([c,r])=>g.lineTo(s(x0+(c+.5)*cell),s(z0+(r+.5)*cell)));g.stroke();g.setLineDash([])}}
   if(Z.id==='deepwood'&&G.lookout){g.setLineDash([3,3]);g.strokeStyle='#ffd9a0';g.lineWidth=2;tunnels.forEach(t=>{if(t.found)return;g.beginPath();g.arc(s(t.x),s(t.z),6,0,7);g.stroke()});g.setLineDash([])}
+  for(const [x,z,ic] of mapLandmarks()){g.fillStyle='rgba(255,248,230,.92)';g.strokeStyle='rgba(60,40,20,.8)';g.lineWidth=1.5;g.beginPath();g.arc(s(x),s(z),12,0,7);g.fill();g.stroke();g.font='15px sans-serif';g.textAlign='center';g.textBaseline='middle';g.fillStyle='#000';g.fillText(ic,s(x),s(z)+1)}
   tunnels.forEach(t=>{if(!t.found)return;g.fillStyle='#2a1a0a';g.strokeStyle='#ffd9a0';g.lineWidth=2;g.beginPath();g.arc(s(t.x),s(t.z),6,0,7);g.fill();g.stroke()});
   if(!isNight())humans.forEach(h=>{g.fillStyle='#ffb0d0';g.beginPath();g.arc(s(h.obj.position.x),s(h.obj.position.z),5,0,7);g.fill()});
   friends.forEach(f=>{if(f.state!=='herd'&&f.zone!==Z.id)return;if(f.state==='herd'){g.fillStyle='#ff9fd0';g.beginPath();g.arc(s(f.pos.x),s(f.pos.z),3.5,0,7);g.fill()}else if(f.known){g.fillStyle='#f2d6a8';g.strokeStyle='#6a4a2a';g.lineWidth=1.5;g.beginPath();g.arc(s(f.pos.x),s(f.pos.z),4.5,0,7);g.fill();g.stroke()}});
@@ -2825,6 +2832,9 @@ function drawMap(){if(!mapBg)drawMapBg();fitMap();const g=mctx;const s=v=>(v/72*
     for(let k=0;k<8;k++){const nb=neighbour(Z,k);if(!nb)continue;const a=k*Math.PI/4,x=170+Math.cos(a)*(EDGE+1)/72*170,y=170+Math.sin(a)*(EDGE+1)/72*170,t=`${nb.icon} ${nb.name}`;
       g.save();g.translate(clamp(x,50,290),clamp(y,40,330));g.strokeText(t,0,4);g.fillText(t,0,4);g.restore()}}
   drawArrow(g,s(pig.pos.x),s(pig.pos.z))}
+// each zone's big discovery, marked on its map so you can find your way back to it
+function mapLandmarks(){const out=[],at=(b,ic)=>{if(b&&b.holes&&b.holes[0])out.push([b.holes[0].ex,b.holes[0].ez,ic])};
+  for(const b of Z.barns)out.push([b.obj.position.x,b.obj.position.z,'🛖']);at(Z.shop,'🐾');if(Z.raft)out.push([Z.raft.ex,Z.raft.ez,'🍃']);at(Z.agility,'🏅');at(Z.oak,'🌳');at(Z.mill,'🌻');at(Z.cave,'🌊');return out}
 function drawArrow(g,px,pz){g.save();g.translate(px,pz);g.rotate(-pig.heading+Math.PI);g.fillStyle='#fff';g.strokeStyle='#000';g.lineWidth=2;g.beginPath();g.moveTo(0,-10);g.lineTo(7,8);g.lineTo(-7,8);g.closePath();g.fill();g.stroke();g.restore()}
 
 // ============================================================ journal / game over
@@ -3069,5 +3079,5 @@ function loop(){
   $('setBtn').onclick=openSettings;$('setBtn2').onclick=openSettings;$('setClose').onclick=closeSettings;applyQuality();
   $('resumeBtn').onclick=()=>togglePause(false);$('saveBtn').onclick=()=>saveGame();$('quitBtn').onclick=()=>{saveGame(true);location.reload()};$('jclose').onclick=closeJournal;$('againBtn').onclick=()=>location.reload();
   $('retryBtn').onclick=()=>{try{sessionStorage.setItem('wheek-continue',G.slot)}catch(e){}location.reload()};
-  window.__game={G,W,WS,ZONE,PARK,EDGE,ITEMS,CAVE,tideOpen,tideLevel,MILL,MAZE,angNorm,millSurf,millBlocked,mazeRoute,AGI,AGI_COURSE,WEAVE_X,WEAVE_Z,OAK,OAK_SHELVES,oakSurf,oakBlocked,owlNoise,startRaft,creekAt,offerSwap,insideCollide,TUBE_NODES,startGnaw,gnawHit,enterBarn:enterInside,exitBarn:exitInside,enterInside,exitInside,enterTube:n=>enterTube(n),catNoise:n=>catNoise(n),startBurrow,popOut,insideHeight,revealItem,setInput,SET,sun,music:()=>({now:musicNow&&musicNow.k,gain:musicGain&&musicGain.gain.value,tracks:Object.fromEntries(Object.entries(MUSIC).map(([k,m])=>[k,m.buf?{dur:+m.buf.duration.toFixed(4),start:m.start,len:m.len}:null]))}),wSdf,neighbour,freeAt,Z:()=>Z,visit:(id,x=0,z=0,h=0)=>arriveZone(ZONE[id],0,{x,z,h}),enterWarren,exitWarren,pig,friends,herd,joinHerd,keys,applyLook,humans,tunnels,spots,hawk,foxes,heightAt,renderer,scene,camera};
+  window.__game={G,W,WS,ZONE,PARK,EDGE,ITEMS,mapLandmarks,CAVE,tideOpen,tideLevel,MILL,MAZE,angNorm,millSurf,millBlocked,mazeRoute,AGI,AGI_COURSE,WEAVE_X,WEAVE_Z,OAK,OAK_SHELVES,oakSurf,oakBlocked,owlNoise,startRaft,creekAt,offerSwap,insideCollide,TUBE_NODES,startGnaw,gnawHit,enterBarn:enterInside,exitBarn:exitInside,enterInside,exitInside,enterTube:n=>enterTube(n),catNoise:n=>catNoise(n),startBurrow,popOut,insideHeight,revealItem,setInput,SET,sun,music:()=>({now:musicNow&&musicNow.k,gain:musicGain&&musicGain.gain.value,tracks:Object.fromEntries(Object.entries(MUSIC).map(([k,m])=>[k,m.buf?{dur:+m.buf.duration.toFixed(4),start:m.start,len:m.len}:null]))}),wSdf,neighbour,freeAt,Z:()=>Z,visit:(id,x=0,z=0,h=0)=>arriveZone(ZONE[id],0,{x,z,h}),enterWarren,exitWarren,pig,friends,herd,joinHerd,keys,applyLook,humans,tunnels,spots,hawk,foxes,heightAt,renderer,scene,camera};
 })().catch(e=>{console.error(e);$('loading').textContent='Failed to load: '+e.message});

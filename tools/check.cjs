@@ -1,6 +1,6 @@
 // World checks: loads the game in a tiny headless window and tests the world's logic through window.__game.
 // Usage: PW=/path/to/node_modules/playwright node tools/check.cjs [check ...]
-//   checks: reach warren night chaos eat treats goals music gnaw barn shop swap raft agility oak mill cave saves touch pad memory (default: all). URL defaults to the local dev site.
+//   checks: reach warren night chaos eat treats goals music gnaw barn shop swap raft agility oak mill cave landmarks saves touch pad memory (default: all). URL defaults to the local dev site.
 // Prints a report and exits 1 if anything failed.
 const { chromium } = require(process.env.PW || 'playwright');
 const URL = process.env.URL || 'https://wheek.localhost/';
@@ -476,6 +476,22 @@ const frames = (page, n) => page.evaluate(n => new Promise(r => { let k = 0; (fu
       for (let k = 0; k < 30 && g.G.inside; k++) await fr(1); return !g.G.inside && g.G.energy < e0 });
     report('sea cave', placed && flooded && inside && run.got === run.total && run.got === 8 && run.bottle === 1 && run.pinched && out.out && out.tideRun === 1 && washed,
       `placed ${placed} · flooded at high tide ${flooded} · in at low tide ${inside} · shells ${run.got}/${run.total} · bottle ${run.bottle} · crab pinch ${run.pinched} · out in time ${out.out} (tide runner ${out.tideRun}) · washed out when late ${washed}`);
+  }
+
+  // 5j. each zone's big discovery is on its map; no foxes Downtown (no woods); one toast when the humans head in at dusk
+  if (pick('landmarks')) {
+    const want = { creek: '🍃', zoo: '🏅', deepwood: '🌳', sunflowers: '🌻', beach: '🌊', town: '🐾', farm: '🛖' };
+    const marks = await page.evaluate(want => { const g = window.__game, out = {}; if (g.G.inside) g.exitBarn();
+      for (const id of Object.keys(want)) { g.visit(id, 0, 0, 0); out[id] = g.mapLandmarks().map(m => m[2]).join('') } return out }, want);
+    const missing = Object.keys(want).filter(id => !marks[id].includes(want[id]));
+    report('map landmarks', !missing.length, Object.entries(marks).map(([id, m]) => `${id} ${m}`).join(' · ') + (missing.length ? ` · missing ${missing}` : ''));
+    await page.evaluate(() => { const g = window.__game; g.visit('town', 0, 0, 0); g.G.time = 19.4; window.__toastLog = []; new MutationObserver(ms => ms.forEach(m => m.addedNodes.forEach(n => window.__toastLog.push(n.textContent || '')))).observe(document.getElementById('toasts'), { childList: true }) });
+    await page.evaluate(() => { window.__game.G.time = 21.5 });
+    const allIn = await page.waitForFunction(() => window.__game.Z().humans.every(h => !h.visible), null, { timeout: 120000, polling: 250 }).then(() => true, () => false);
+    await page.waitForTimeout(1500);
+    await frames(page, 30);
+    const night = await page.evaluate(() => ({ inside: window.__toastLog.filter(t => t.includes('went inside')).length, foxes: window.__game.foxes.filter(f => f.active).length }));
+    report('dusk downtown', allIn && night.inside === 1 && night.foxes === 0, `everyone in ${allIn} · "went inside" toasts ${night.inside} · foxes out ${night.foxes}`);
   }
 
   // 5e. the barns: in through a hole, munch the hay, burrow onto every hidden treat, pop out, out through the other hole

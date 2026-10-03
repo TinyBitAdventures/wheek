@@ -224,6 +224,11 @@ scenes.cavewater = async page => {
   await page.evaluate(() => { window.__game.pig.pos.y = 0 });
   await page.waitForTimeout(1500);
 };
+scenes.creekmap = async page => {
+  await setup(page, `G.time=11;if(G.inside)g.exitBarn();g.visit('creek',-20,-20,0);document.getElementById('mapwrap').classList.add('big')`);
+  await page.waitForTimeout(1500);
+  await setup(page, `document.getElementById('mapwrap').classList.remove('big')`);
+};
 scenes.raftstart = async page => {
   await setup(page, `document.getElementById('mapwrap').classList.remove('big');G.time=10.5;if(G.inside)g.exitBarn();g.visit('creek',0,0,0);const R=g.Z().raft;pig.pos.set(R.ex+Math.sin(R.out+Math.PI)*-.5,0,R.ez+Math.cos(R.out+Math.PI)*-.5);pig.heading=R.out`);
   await camera(page, 'window.__game.pig.heading+Math.PI+.6', 2.2, .32);
