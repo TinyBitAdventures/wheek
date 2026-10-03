@@ -2994,6 +2994,297 @@ def build_agility_kit():
     paint(bbo, lambda p, n: (0.15, 0.45, 0.9) if int((p.x + 1) / 0.06) % 2 else (0.98, 0.95, 0.9))
     export("AgilityKit")
 
+# ================================================================ the Hollow Oak (The Deep Wood)
+OAK_R = 1.75        # the trunk's radius just above its flare
+OAK_TOP_PHI = 3.157   # the lookout window's angle in the game's frame (x = r sin phi, z = r cos phi); Blender angle = phi - pi/2
+
+def oak_r(a, z):
+    """The Hollow Oak's outer radius at angle a (Blender) and height z: a wide flare at the foot, gnarls all the way up."""
+    t = max(0.0, z) / 5.6
+    return OAK_R * (1 - 0.35 * t) * (1 + 0.25 * math.exp(-max(z, 0) / 0.6)) * (1 + 0.06 * noise.noise(Vector((math.cos(a) * 2.2, math.sin(a) * 2.2, z * 0.8 + 3.3))))
+
+def knothole_bm(a, z0, w, h, r_out, depth=0.02):
+    """A dark arch on a curved wall facing outwards at angle a: a half-ellipse from z0 up."""
+    bm = bmesh.new()
+    nx, ny = math.cos(a), math.sin(a)
+    tx, ty = -ny, nx
+    c = bm.verts.new((nx * (r_out + depth), ny * (r_out + depth), z0))
+    ring = []
+    for i in range(17):
+        u = math.pi * i / 16
+        x, zz = math.cos(u) * w / 2, math.sin(u) * h
+        ring.append(bm.verts.new((nx * (r_out + depth) + tx * x, ny * (r_out + depth) + ty * x, z0 + zz)))
+    for i in range(16):
+        bm.faces.new((c, ring[i + 1], ring[i]))
+    return bm
+
+def build_hollow_oak():
+    """An enormous ancient oak for the Deep Wood: a trunk 3.5 m across that is hollow inside, buttress roots, bracket fungi,
+    a knothole between two roots at its foot (facing -Y) and a high knothole window (the lookout), under a huge crown."""
+    clear()
+    random.seed(211)
+    rt = root("HollowOak")
+    H, seg, rings = 5.6, 40, 28
+    bm = bmesh.new()
+    rows = []
+    for i in range(rings + 1):
+        z = -0.3 + (H + 0.3) * i / rings
+        rows.append([bm.verts.new((math.cos(a) * oak_r(a, z), math.sin(a) * oak_r(a, z), z)) for a in [j / seg * math.tau for j in range(seg)]])
+    for i in range(rings):
+        for j in range(seg):
+            bm.faces.new((rows[i][j], rows[i][(j + 1) % seg], rows[i + 1][(j + 1) % seg], rows[i + 1][j]))
+    parts = [bm]
+    front = -math.pi / 2
+    for k in range(9):
+        a = front + 0.5 + k * (math.tau - 1.0) / 8 + random.uniform(-0.12, 0.12)
+        r1, L = oak_r(a, 0.3) * 0.85, random.uniform(1.4, 2.0)
+        d, sd = Vector((math.cos(a), math.sin(a), 0)), Vector((-math.sin(a), math.cos(a), 0))
+        rb = sphere_bm(1, 20, 12)
+        def root_f(v, d=d, sd=sd, r1=r1, L=L):
+            u = min(1.0, max(0.0, (v.x + 1) / 2))   # 0 at the trunk, 1 at the tip
+            tp = (1 - u) ** 0.6 * 0.82 + 0.18
+            c = d * (r1 + u * L) + Vector((0, 0, 0.55 * (1 - u) ** 1.4 - 0.16))   # the tip dives into the soil
+            return c + sd * v.y * 0.36 * tp + Vector((0, 0, v.z * 0.5 * tp))
+        parts.append(deform(rb, root_f))
+    for i in range(7):
+        a = i / 7 * math.tau + random.random() * 0.6
+        s = Vector((math.cos(a) * 0.8, math.sin(a) * 0.8, H * (0.82 + 0.03 * i)))
+        e = s + Vector((math.cos(a) * 3.0, math.sin(a) * 3.0, 1.4 + random.random() * 1.2))
+        parts.append(limb_bm(s, e, 0.45, 0.14, 12))
+    to = from_bm(merge_bms(parts), "Trunk", material("Bark", rough=0.95), parent=rt)
+    paint(to, lambda p, n: scl(bark_color(p * 0.6, n), 0.92))
+    # the knothole at its foot, and the lookout window high up, each with a ring of lighter wood round it
+    holes, lips = [], []
+    for a, z0, w, h in ((front, -0.05, 0.44, 0.4), (OAK_TOP_PHI - math.pi / 2, 2.8, 0.38, 0.3)):
+        r = oak_r(a, z0 + h / 2)
+        holes.append(knothole_bm(a, z0, w, h, r, 0.03))
+        nx, ny, tx, ty = math.cos(a), math.sin(a), -math.sin(a), math.cos(a)
+        for i in range(12):
+            u = math.pi * i / 11
+            x, zz = math.cos(u) * (w / 2 + 0.03), math.sin(u) * (h + 0.03)
+            b = sphere_bm(0.045, 8, 6)
+            xform(b, Matrix.Translation((nx * (r + 0.02) + tx * x, ny * (r + 0.02) + ty * x, z0 + zz)))
+            lips.append(b)
+    ho = from_bm(merge_bms(holes), "Knotholes", material("HoleDark", rough=1.0), parent=rt, smooth_shade=False)
+    paint(ho, solid((0.03, 0.02, 0.015)))
+    lo = from_bm(merge_bms(lips), "HoleLips", material("Bark", rough=0.95), parent=rt)
+    paint(lo, solid((0.5, 0.38, 0.26)))
+    # bracket fungi up the outside
+    fun = []
+    for i in range(9):
+        a = random.uniform(0, math.tau)
+        if abs(math.atan2(math.sin(a - front), math.cos(a - front))) < 0.5:
+            continue
+        z = random.uniform(1.2, 4.6)
+        r = oak_r(a, z) - 0.05
+        f = ring_sector_bm(r, r + random.uniform(0.25, 0.4), a - 0.18, a + 0.18, z, z + 0.07, 8)
+        fun.append(f)
+    fo = from_bm(merge_bms(fun), "Fungi", material("Fungus", rough=0.8), parent=rt)
+    paint(fo, lambda p, n: (0.95, 0.85, 0.62) if n.z < -0.5 else mix((0.72, 0.42, 0.16), (0.9, 0.62, 0.28), noise.noise(p * 6) * 0.5 + 0.5))
+    # the crown
+    blobs = []
+    centers = [Vector((0, 0, H + 2.4))] + [Vector((math.cos(a) * 3.2, math.sin(a) * 3.2, H + 1.2 + random.random() * 1.4)) for a in [i / 7 * math.tau + 0.3 for i in range(7)]]
+    for i, c in enumerate(centers):
+        b = blob_bm(3.0 if i == 0 else 2.2 + random.random() * 0.6, 3, 0.32, 1.2, seed=i * 4.1 + 2, squash=0.75)
+        xform(b, Matrix.Translation(c))
+        blobs.append(b)
+    lv = from_bm(merge_bms(blobs), "Leaves", material("Leaves", rough=0.85, spec=0.25), parent=rt)
+    paint(lv, leaf_color((0.13, 0.28, 0.07), (0.26, 0.42, 0.1)))
+    export("HollowOak")
+
+def build_oak_inside():
+    """The Hollow Oak from inside: a gnarled wooden shaft 2.3 m round and 3.7 m high, a floor of soft rotten wood and leaf
+    litter with roots, a domed ceiling, little glowing mushrooms, the knothole at the foot (facing in from -Y) and the
+    lookout window up at the top. The climb (the bracket fungi) is added by the game."""
+    clear()
+    random.seed(212)
+    rt = root("OakInside")
+    R, H, seg, rings = 2.3, 3.7, 48, 30
+    bm = bmesh.new()
+    rows = []
+    for i in range(rings + 1):
+        z = -0.05 + (H + 0.05) * i / rings
+        row = []
+        for j in range(seg):
+            a = j / seg * math.tau
+            r = R + 0.08 * noise.noise(Vector((math.cos(a) * 3, math.sin(a) * 3, z * 1.4))) + 0.05 * math.sin(a * 7 + z * 2)
+            row.append(bm.verts.new((math.cos(a) * r, math.sin(a) * r, z)))
+        rows.append(row)
+    for i in range(rings):
+        for j in range(seg):
+            bm.faces.new((rows[i][j], rows[i + 1][j], rows[i + 1][(j + 1) % seg], rows[i][(j + 1) % seg]))
+    # the dome
+    top = [rows[-1]]
+    for k in range(1, 6):
+        u = k / 6
+        z = H + 0.6 * math.sin(u * math.pi / 2)
+        top.append([bm.verts.new((v.co.x * math.cos(u * math.pi / 2), v.co.y * math.cos(u * math.pi / 2), z)) for v in rows[-1]])
+    cap = bm.verts.new((0, 0, H + 0.62))
+    for k in range(5):
+        for j in range(seg):
+            bm.faces.new((top[k][j], top[k + 1][j], top[k + 1][(j + 1) % seg], top[k][(j + 1) % seg]))
+    for j in range(seg):
+        bm.faces.new((top[5][j], cap, top[5][(j + 1) % seg]))
+    wo = from_bm(bm, "Wall", material("Heartwood", rough=0.95), parent=rt)
+    def heart(p, n):
+        a = math.atan2(p.y, p.x)
+        g = noise.noise(Vector((a * 6, a * 6, p.z * 0.6))) * 0.5 + 0.5
+        c = mix((0.24, 0.13, 0.07), (0.42, 0.25, 0.13), g)
+        c = mix(c, (0.16, 0.1, 0.06), smooth(3.4, 4.2, p.z))
+        return scl(c, 0.85 + 0.15 * noise.noise(p * 12))
+    paint(wo, heart)
+    fl = bmesh.new()
+    bmesh.ops.create_circle(fl, cap_ends=True, radius=R + 0.15, segments=48)
+    bmesh.ops.subdivide_edges(fl, edges=fl.edges, cuts=6, use_grid_fill=True)
+    deform(fl, lambda v: Vector((v.x, v.y, 0.02 * noise.noise(v * 3) - 0.004)))
+    flo = from_bm(fl, "Floor", material("Litter", rough=1.0), parent=rt, smooth_shade=False)
+    paint(flo, lambda p, n: mix((0.3, 0.18, 0.09), (0.55, 0.36, 0.16), noise.noise(p * 5) * 0.5 + 0.5))
+    roots = []
+    for k in range(9):
+        a = -math.pi / 2 + 0.55 + k * (math.tau - 1.1) / 8
+        roots.append(limb_bm((math.cos(a) * (R + 0.05), math.sin(a) * (R + 0.05), 0.35), (math.cos(a) * (R - 0.5), math.sin(a) * (R - 0.5), -0.05), 0.13, 0.05, 10))
+    ro = from_bm(merge_bms(roots), "Roots", material("Heartwood", rough=0.95), parent=rt)
+    paint(ro, lambda p, n: mix((0.3, 0.18, 0.1), (0.45, 0.3, 0.17), noise.noise(p * 8) * 0.5 + 0.5))
+    # the knothole at the foot and the window at the top, seen from inside: light comes in (the game tints them to the sky)
+    holes = []
+    for a, z0, w, h in ((-math.pi / 2, 0.0, 0.34, 0.3), (OAK_TOP_PHI - math.pi / 2, 2.8, 0.38, 0.3)):
+        b = knothole_bm(a + math.pi, z0, w, h, -(R - 0.02), 0.0)
+        bmesh.ops.reverse_faces(b, faces=b.faces)
+        holes.append(b)
+    ho = from_bm(merge_bms(holes), "Lights", material("HoleDark", rough=1.0), parent=rt, smooth_shade=False)
+    paint(ho, solid((0.95, 0.95, 0.9)))
+    # little glowing mushrooms on the floor
+    gl = []
+    for k in range(7):
+        a = random.uniform(0, math.tau)
+        if abs(math.atan2(math.sin(a + math.pi / 2), math.cos(a + math.pi / 2))) < 0.6:
+            continue
+        r = random.uniform(1.0, 1.7)
+        for m in range(random.randint(2, 4)):
+            x, y = math.cos(a) * r + random.uniform(-0.12, 0.12), math.sin(a) * r + random.uniform(-0.12, 0.12)
+            h = random.uniform(0.03, 0.07)
+            gl.append(limb_bm((x, y, 0), (x, y, h), 0.006, 0.006, 6, caps=False))
+            c = sphere_bm(0.022, 10, 6)
+            xform(c, Matrix.Translation((x, y, h)) @ Matrix.Diagonal((1, 1, 0.5, 1)))
+            gl.append(c)
+    go = from_bm(merge_bms(gl), "GlowShrooms", material("Glow", rough=0.6, emit=(0.4, 0.95, 0.75), emit_str=1.5), parent=rt)
+    paint(go, solid((0.55, 1.0, 0.85)))
+    export("OakInside")
+
+def build_owl():
+    """The tawny owl who sleeps in the Hollow Oak: about 0.42 tall, perched. EyesOpen and EyesShut swap; WingL and WingR
+    pivot at the shoulder so the game can flap them. Faces -Y."""
+    clear()
+    rt = root("Owl")
+    bm = sphere_bm(1, 28, 18)
+    deform(bm, lambda v: Vector((v.x * 0.15, v.y * 0.13, (v.z * 0.19 if v.z > 0 else v.z * 0.15) + 0.2)))
+    bo = from_bm(bm, "Body", material("Feather", rough=0.9), parent=rt)
+    def plumage(p, n):
+        streak = abs(math.sin(p.x * 70 + noise.noise(p * 20) * 2)) < 0.25 and p.z < 0.3
+        c = mix((0.45, 0.28, 0.14), (0.62, 0.42, 0.22), noise.noise(p * 18) * 0.5 + 0.5)
+        if n.y < -0.4 and p.z < 0.28:
+            c = mix(c, (0.85, 0.72, 0.52), 0.55)
+        return scl(c, 0.7) if streak else c
+    paint(bo, plumage)
+    hd = sphere_bm(1, 24, 16)
+    deform(hd, lambda v: Vector((v.x * 0.12, v.y * 0.1, v.z * 0.1 + 0.37)))
+    ho = from_bm(hd, "Head", material("Feather", rough=0.9), parent=rt)
+    paint(ho, lambda p, n: mix((0.5, 0.32, 0.16), (0.66, 0.46, 0.25), noise.noise(p * 20) * 0.5 + 0.5))
+    face = []
+    for sx in (-1, 1):
+        d = sphere_bm(1, 16, 10)
+        deform(d, lambda v, sx=sx: Vector((v.x * 0.055 + sx * 0.045, v.y * 0.015 - 0.085, v.z * 0.06 + 0.38)))
+        face.append(d)
+    fo = from_bm(merge_bms(face), "FaceDisc", material("Feather", rough=0.9), parent=rt)
+    paint(fo, solid((0.86, 0.74, 0.55)))
+    eo, es = [], []
+    for sx in (-1, 1):
+        e = sphere_bm(0.028, 14, 10)
+        xform(e, Matrix.Translation((sx * 0.045, -0.096, 0.39)))
+        eo.append(e)
+        pu = sphere_bm(0.016, 10, 8)
+        xform(pu, Matrix.Translation((sx * 0.045, -0.118, 0.39)))
+        eo.append(pu)
+        lid = sphere_bm(1, 14, 8)
+        deform(lid, lambda v, sx=sx: Vector((v.x * 0.03 + sx * 0.045, v.y * 0.012 - 0.1, v.z * 0.008 + 0.388)))
+        es.append(lid)
+    eyo = from_bm(merge_bms(eo), "EyesOpen", material("Eye", rough=0.3, spec=0.6), parent=rt)
+    paint(eyo, lambda p, n: (0.04, 0.03, 0.02) if p.y < -0.112 else (0.98, 0.72, 0.12))
+    eso = from_bm(merge_bms(es), "EyesShut", material("Feather", rough=0.9), parent=rt)
+    paint(eso, solid((0.36, 0.22, 0.12)))
+    bk = cone_bm(0.016, 0.0, 0.04, 8)
+    xform(bk, Matrix.Translation((0, -0.105, 0.355)) @ Matrix.Rotation(math.radians(110), 4, 'X'))
+    bko = from_bm(bk, "Beak", material("Horn", rough=0.5), parent=rt)
+    paint(bko, solid((0.75, 0.68, 0.45)))
+    tufts = []
+    for sx in (-1, 1):
+        t = cone_bm(0.025, 0.0, 0.06, 8)
+        xform(t, Matrix.Translation((sx * 0.07, -0.01, 0.46)) @ Matrix.Rotation(sx * -0.4, 4, 'Y'))
+        tufts.append(t)
+    tf = from_bm(merge_bms(tufts), "Tufts", material("Feather", rough=0.9), parent=rt)
+    paint(tf, solid((0.42, 0.26, 0.13)))
+    for sx, nm in ((-1, "WingL"), (1, "WingR")):
+        piv = bpy.data.objects.new(nm, None)
+        bpy.context.scene.collection.objects.link(piv)
+        piv.parent = rt
+        piv.location = (sx * 0.13, 0.0, 0.3)
+        bpy.context.view_layer.update()
+        w = sphere_bm(1, 16, 10)
+        deform(w, lambda v, sx=sx: Vector((v.x * 0.035 + sx * 0.14, v.y * 0.11 + 0.01, v.z * 0.15 + 0.18)))
+        wo = from_bm(w, nm + "Feathers", material("Feather", rough=0.9), parent=piv)
+        paint(wo, lambda p, n: (0.36, 0.22, 0.11) if int(p.z * 40) % 2 else (0.52, 0.34, 0.17))
+    ft = []
+    for sx in (-1, 1):
+        for k in (-1, 0, 1):
+            ft.append(limb_bm((sx * 0.05, -0.02, 0.04), (sx * 0.05 + k * 0.018, -0.07, 0.0), 0.008, 0.005, 6))
+    fto = from_bm(merge_bms(ft), "Talons", material("Horn", rough=0.5), parent=rt)
+    paint(fto, solid((0.7, 0.6, 0.35)))
+    export("Owl")
+
+def build_owl_nest():
+    """The owl's stash at the top of the Hollow Oak: a twiggy nest heaped with shiny things (buttons, a marble, foil, a key, a cap)."""
+    clear()
+    random.seed(213)
+    rt = root("OwlNest")
+    tw = []
+    for k in range(70):
+        a = random.uniform(0, math.tau)
+        r = random.uniform(0.15, 0.24)
+        z = random.uniform(0.0, 0.08)
+        L = random.uniform(0.12, 0.22)
+        d = Vector((-math.sin(a), math.cos(a), random.uniform(-0.2, 0.2))).normalized()
+        c = Vector((math.cos(a) * r, math.sin(a) * r, z + 0.02))
+        tw.append(limb_bm(c - d * L / 2, c + d * L / 2, 0.008, 0.006, 5, caps=False))
+    to = from_bm(merge_bms(tw), "Twigs", material("Bark", rough=0.95), parent=rt)
+    paint(to, lambda p, n: mix((0.32, 0.22, 0.12), (0.5, 0.38, 0.22), noise.noise(p * 30) * 0.5 + 0.5))
+    bed = sphere_bm(1, 16, 8)
+    deform(bed, lambda v: Vector((v.x * 0.17, v.y * 0.17, max(v.z, -0.2) * 0.04 + 0.03)))
+    bo = from_bm(bed, "Down", material("Feather", rough=1.0), parent=rt)
+    paint(bo, solid((0.72, 0.62, 0.48)))
+    shiny = []
+    cols = []
+    for (x, y, kind, col) in ((0.04, 0.03, 'button', (0.85, 0.15, 0.12)), (-0.06, 0.02, 'marble', (0.2, 0.5, 0.95)), (0.0, -0.07, 'foil', (0.85, 0.86, 0.9)),
+                              (-0.03, 0.08, 'button', (0.95, 0.8, 0.2)), (0.08, -0.04, 'cap', (0.9, 0.75, 0.25))):
+        if kind == 'button':
+            b = cone_bm(0.022, 0.022, 0.008, 14)
+            xform(b, Matrix.Translation((x, y, 0.075)) @ Matrix.Rotation(0.3, 4, 'X'))
+        elif kind == 'marble':
+            b = sphere_bm(0.02, 14, 10); xform(b, Matrix.Translation((x, y, 0.085)))
+        elif kind == 'foil':
+            b = ico_bm(0.025, 1); deform(b, lambda v: v * (1 + 0.25 * noise.noise(v * 90))); xform(b, Matrix.Translation((x, y, 0.08)))
+        else:
+            b = cone_bm(0.02, 0.018, 0.012, 14); xform(b, Matrix.Translation((x, y, 0.078)))
+        shiny.append((b, col))
+    for b, col in shiny:
+        o = from_bm(b, "Shiny", material("Shiny", rough=0.25, metal=0.6, spec=0.8), parent=rt)
+        paint(o, solid(col))
+    key = merge_bms([limb_bm((-0.09, -0.05, 0.075), (-0.03, -0.03, 0.075), 0.005, 0.005, 6), sphere_bm(0.014, 10, 8)])
+    xform(key, Matrix.Translation((0, 0, 0)))
+    ko = from_bm(key, "Key", material("Shiny", rough=0.25, metal=0.6, spec=0.8), parent=rt)
+    ko.location = (0, 0, 0)
+    paint(ko, solid((0.85, 0.68, 0.25)))
+    export("OwlNest")
+
 jobs = {
     "GuineaPig": build_guinea_pig, "Human": build_human, "Oak": lambda: build_oak("Oak", 1),
     "Oak2": lambda: build_oak("Oak2", 9), "Pine": build_pine, "Birch": build_birch, "Bush": build_bush,
@@ -3021,6 +3312,7 @@ jobs = {
     "PetShopInside": build_petshop_inside, "CatFlap": build_cat_flap, "Cat": build_cat, "CatLoaf": build_cat_loaf, "Pellets": build_pellets,
     "LeafRaft": build_leaf_raft, "Willow": build_willow,
     "AgilityTent": build_agility_tent, "AgilityInside": build_agility_inside, "AgilityKit": build_agility_kit,
+    "HollowOak": build_hollow_oak, "OakInside": build_oak_inside, "Owl": build_owl, "OwlNest": build_owl_nest,
 }
 for k, fn in jobs.items():
     if only and k not in only:

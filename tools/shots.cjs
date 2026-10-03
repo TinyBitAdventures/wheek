@@ -176,6 +176,22 @@ scenes.agility2 = async page => {
   await page.waitForTimeout(400);
   await camera(page, 'Math.PI/2-.35', 3, .5);
 };
+scenes.oakout = async page => {
+  await setup(page, `G.time=10.5;if(G.inside)g.exitBarn();g.visit('deepwood',0,0,0);const h=g.Z().oak.holes[0];pig.pos.set(h.ex+Math.sin(h.out)*.9,0,h.ez+Math.cos(h.out)*.9);pig.heading=h.out+Math.PI`);
+  await camera(page, 'window.__game.pig.heading+Math.PI+.6', 3.2, .12);
+  await page.waitForFunction(() => { const g = window.__game, d = g.camera.position.distanceTo(g.pig.pos); return Math.abs(d - g.G.camDist) < .25 }, null, { timeout: 120000, polling: 500 });
+};
+scenes.oak = async page => {
+  await setup(page, `G.time=11;if(G.inside)g.exitBarn();if(g.Z().id!=='deepwood')g.visit('deepwood',0,0,0);const b=g.Z().oak;g.enterInside(b,b.holes[0]);const s=g.OAK_SHELVES[6];pig.pos.set(Math.sin(s.phi)*1.9,s.h,Math.cos(s.phi)*1.9);pig.heading=s.phi+Math.PI/2;window.__f0=g.renderer.info.render.frame`);
+  await page.evaluate(() => { const g = window.__game, s = g.OAK_SHELVES[6]; g.pig.pos.y = s.h; g.pig.air = false });
+  await page.waitForFunction(() => window.__game.renderer.info.render.frame - window.__f0 > 4, null, { timeout: 180000, polling: 500 });
+  await page.waitForTimeout(800);
+};
+scenes.oaktop = async page => {
+  await setup(page, `const s=g.OAK_SHELVES[g.OAK.N];pig.pos.set(Math.sin(s.phi-.2)*1.8,s.h,Math.cos(s.phi-.2)*1.8);pig.heading=s.phi+Math.PI/2`);
+  await page.evaluate(() => { const g = window.__game, s = g.OAK_SHELVES[g.OAK.N]; g.pig.pos.y = s.h; g.pig.air = false });
+  await page.waitForTimeout(1500);
+};
 scenes.raftstart = async page => {
   await setup(page, `document.getElementById('mapwrap').classList.remove('big');G.time=10.5;if(G.inside)g.exitBarn();g.visit('creek',0,0,0);const R=g.Z().raft;pig.pos.set(R.ex+Math.sin(R.out+Math.PI)*-.5,0,R.ez+Math.cos(R.out+Math.PI)*-.5);pig.heading=R.out`);
   await camera(page, 'window.__game.pig.heading+Math.PI+.6', 2.2, .32);

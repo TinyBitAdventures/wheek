@@ -73,7 +73,7 @@ const furNoise=(()=>{const n=256,d=new Uint8Array(n*n*4);for(let i=0;i<n*n;i++){
 const MODELS=['Birch','Blanket','Burrow','Bush','Carrot','Clover','Clover4','Dandelion','Fence','Fern','FlowerPurple','FlowerWhite','Fox','GardenBed','Grass','GuineaPig','Hawk','Hay','House','Human','LeafPile','Log','LushGrass','MushroomBrown','MushroomRed','Oak','Oak2','Pepper','Pine','Rock','Rock2','Strawberry',
   'Sunflower','Barn','Shop','LampPost','Bench','Goat','Sheep','Duck','Car','Cattail','Umbrella','Sandcastle','Scarecrow','Fountain',
   'RoseHip','RaspLeaf','Lettuce','Watermelon','Cress','Corn','Apple','Seeds','Snowdrift','Bramble','MarketStall','Basket','CressBed','Trough','AppleTree','SunflowerHead',
-  'BarnInside','HayPile','BarnHole','Twig','PetShopInside','CatFlap','Cat','CatLoaf','Pellets','LeafRaft','Willow','AgilityTent','AgilityInside','AgilityKit'];
+  'BarnInside','HayPile','BarnHole','Twig','PetShopInside','CatFlap','Cat','CatLoaf','Pellets','LeafRaft','Willow','AgilityTent','AgilityInside','AgilityKit','HollowOak','OakInside','Owl','OwlNest'];
 const M={};
 const DOUBLE=new Set(['Grass','Plant','Leaves','DryLeaves','Petal','Needles','Cloth','Skin','Flesh']);
 async function loadAssets(progress){
@@ -217,6 +217,7 @@ function buildZone(z){
   if(z.id==='town')setupPetShop(z);
   if(z.id==='creek')setupRaft(z);
   if(z.id==='zoo')setupAgility(z);
+  if(z.id==='deepwood')setupHollowOak(z);
   placeTwigs(z);
   // a plant that ended up inside a rock or trunk can never be eaten: leave it out (without touching the seeded layout)
   for(const ps of z.pickSets)for(const it of ps.items)if(z.colliders.some(c=>Math.hypot(c.x-it.x,c.z-it.z)<c.r)||insideBox(it.x,it.z)){it.alive=false;it.respawn=Infinity;ps.set.setMatrix(it.i,ZERO)}
@@ -272,10 +273,11 @@ const LOOT={
   seedhead:{seeds:40,daisy:14,violet:12,dandelion:12,clover4:2,goldDandelion:1.5,nothing:18},
   shopspill:{pellets:55,hay:15,carrot:10,clover:10,nothing:10},
   shopbin:{pellets:25,strawberry:18,carrot:15,pepper:14,apple:8,goldCarrot:4,clover4:2,nothing:4},
+  owlstash:{goldDandelion:16,clover4:14,goldCarrot:8,chanterelle:16,raspleaf:14,berries:12,nothing:10},
   islandlog:{watercress:18,berries:15,strawberry:14,chanterelle:12,raspleaf:8,clover4:5,goldDandelion:4,nothing:10},
 };
 const SPOTNAME={leafpile:'Leaf Pile',bush:'Berry Bush',log:'Mossy Log',rock:'Mossy Rock',bed:'Garden Bed',hay:'Hay Bale',prize:'the Maze Prize',
-  drift:'Snowdrift',bramble:'Bramble Patch',stall:'Market Crate',picnic:'Picnic Basket',cress:'Watercress Bed',trough:'Feed Trough',apples:'Windfall Apples',seedhead:'Sunflower Head',shopspill:'Spilled Pellets',shopbin:'Treat Bin',islandlog:'Driftwood'};
+  drift:'Snowdrift',bramble:'Bramble Patch',stall:'Market Crate',picnic:'Picnic Basket',cress:'Watercress Bed',trough:'Feed Trough',apples:'Windfall Apples',seedhead:'Sunflower Head',shopspill:'Spilled Pellets',shopbin:'Treat Bin',islandlog:'Driftwood',owlstash:'Owl\'s Stash'};
 // ============================================================ breeds & coats
 const BREEDS={
   american:{name:'American',tag:'Smooth & speedy',desc:'A short, sleek coat. The classic all-rounder.',perk:'🏃 Scurries 12% faster, and sprinting costs less energy',fur:{len:1,droop:1,swirl:0,dens:[340,200],face:.8,layers:16},coats:['tricolor','golden','dutch','agouti','himalayan'],speed:1.12,sprintCost:.75},
@@ -302,7 +304,7 @@ const RANKS=[[0,'Nibbler'],[4,'Sniffer'],[12,'Rummager'],[25,'Master Forager'],[
 const G={started:false,paused:false,over:false,modal:false,inTunnel:false,
   hp:100,full:80,vitc:75,energy:100,happy:50,score:0,best:lsGet('wheek-best',0),
   day:1,time:7.0,combo:0,comboT:0,forages:0,pets:0,petStreak:0,lastPetHuman:null,petStreakT:0,
-  found:{},curios:{},tunnels:0,zfound:{},visited:{park:1},met:{},pals:[],placesDone:{},goals:{},bestStreak:0,hawkDodged:0,foxEscapes:0,mazePrize:0,heard:{},given:{},barns:{},hayFinds:0,teethT:0,gnaws:0,cleanGnaws:0,shop:0,fullHerd:0,island:0,rafts:0,cleanRaft:0,agility:0,rosette:0,agilityBest:0,agilityRuns:0,luckT:0,giftT:40,huddle:false,wheekT:0,sniffCD:0,popcornCD:0,cause:'',nightsSurvived:0,eaten:0};
+  found:{},curios:{},tunnels:0,zfound:{},visited:{park:1},met:{},pals:[],placesDone:{},goals:{},bestStreak:0,hawkDodged:0,foxEscapes:0,mazePrize:0,heard:{},given:{},barns:{},hayFinds:0,teethT:0,gnaws:0,cleanGnaws:0,shop:0,fullHerd:0,island:0,rafts:0,cleanRaft:0,agility:0,rosette:0,agilityBest:0,agilityRuns:0,oak:0,lookout:0,quietClimb:0,owlSwoops:0,luckT:0,giftT:40,huddle:false,wheekT:0,sniffCD:0,popcornCD:0,cause:'',nightsSurvived:0,eaten:0};
 const pig={pos:new THREE.Vector3(2.5,0,-1.5),vel:new THREE.Vector3(),heading:Math.PI,vy:0,air:false,phase:0,obj:null,parts:{},eating:0,foraging:0,knock:0,popSpin:0,fur:[]};
 (()=>{const s=lsGet('wheek-pig',null);const b=s&&BREEDS[s.breed]?s.breed:'american';G.breed=b;G.coat=s&&BREEDS[b].coats.includes(s.coat)?s.coat:BREEDS[b].coats[0];G.name=(s&&s.name)||PIG_NAMES[Math.floor(Math.random()*PIG_NAMES.length)];G.perk=perksFor(b)})();
 const keys={};
@@ -1079,6 +1081,7 @@ function currentActions(){
   const m=mouthPos();
   for(const b of Z.barns)for(const h of b.holes)if(Math.hypot(h.ex-pig.pos.x,h.ez-pig.pos.z)<.45)acts.push({k:'E',label:'Squeeze into the barn',do:()=>enterInside(b,h)});
   if(Z.raft&&Math.hypot(Z.raft.ex-pig.pos.x,Z.raft.ez-pig.pos.z)<.65)acts.push({k:'E',label:'Hop on the leaf raft',do:startRaft});
+  if(Z.oak){const b=Z.oak,h=b.holes[0];if(Math.hypot(h.ex-pig.pos.x,h.ez-pig.pos.z)<.5)acts.push({k:'E',label:'Squeeze into the knothole',do:()=>enterInside(b,h)})}
   if(Z.agility){const b=Z.agility,h=b.holes[0];if(Math.hypot(h.ex-pig.pos.x,h.ez-pig.pos.z)<.5)acts.push({k:'E',label:'Duck under the tent flap',do:()=>enterInside(b,h)})}
   if(Z.shop){const b=Z.shop,h=b.holes[0];if(Math.hypot(h.ex-pig.pos.x,h.ez-pig.pos.z)<.5){const open=shopOpen();
     acts.push(b.flapCD>0?{k:'E',label:`Duchess is watching the cat flap (${Math.ceil(b.flapCD)}s)`,disabled:true}:open?{k:'E',label:'Push through the cat flap',do:()=>enterInside(b,h)}:{k:'E',label:'Cat flap · locked while the shop is open (after 6 PM)',disabled:true})}}
@@ -1127,7 +1130,7 @@ function updateForage(dt){
   const f=forageState;if(!f)return;
   if(!keys.KeyF||Math.hypot(f.spot.x-pig.pos.x,f.spot.z-pig.pos.z)>f.spot.r+.45){forageState=null;$('forage').style.display='none';return}
   f.t+=dt;f.rustle-=dt;pig.foraging=.2;
-  if(f.rustle<=0){f.rustle=.14;SFX.rustle();const c={leafpile:[.75,.4,.1],bush:[.2,.45,.12],log:[.45,.32,.2],rock:[.5,.5,.45],bed:[.3,.2,.12],hay:[.8,.7,.35],prize:[1,.85,.3],drift:[.92,.96,1],bramble:[.25,.42,.12],stall:[.45,.72,.28],picnic:[.85,.3,.3],cress:[.7,.88,1],trough:[.8,.7,.35],apples:[.8,.2,.15],seedhead:[1,.8,.2],shopspill:[.5,.55,.25],shopbin:[.95,.75,.3],islandlog:[.55,.45,.35]}[f.spot.type];emit(f.spot.x+R(-.15,.15),groundAt(f.spot.x,f.spot.z)+.08,f.spot.z+R(-.15,.15),5,{col:c,spread:.6,up:1.2,size:.018,life:.8,grav:3})}
+  if(f.rustle<=0){f.rustle=.14;SFX.rustle();const c={leafpile:[.75,.4,.1],bush:[.2,.45,.12],log:[.45,.32,.2],rock:[.5,.5,.45],bed:[.3,.2,.12],hay:[.8,.7,.35],prize:[1,.85,.3],drift:[.92,.96,1],bramble:[.25,.42,.12],stall:[.45,.72,.28],picnic:[.85,.3,.3],cress:[.7,.88,1],trough:[.8,.7,.35],apples:[.8,.2,.15],seedhead:[1,.8,.2],shopspill:[.5,.55,.25],shopbin:[.95,.75,.3],islandlog:[.55,.45,.35],owlstash:[.85,.78,.55]}[f.spot.type]||[.6,.5,.35];emit(f.spot.x+R(-.15,.15),groundAt(f.spot.x,f.spot.z)+.08,f.spot.z+R(-.15,.15),5,{col:c,spread:.6,up:1.2,size:.018,life:.8,grav:3})}
   $('forage').querySelector('i').style.width=(f.t/f.need*100)+'%';
   if(f.t>=f.need){forageState=null;$('forage').style.display='none';completeForage(f.spot)}
 }
@@ -1174,7 +1177,7 @@ function updateReveals(dt){for(let i=revealAnims.length-1;i>=0;i--){const a=reve
 
 // wheek & tossing
 function wheek(){if(G.wheekCD>0)return;G.wheekCD=1.2;SFX.wheek();G.wheekT=3;floaty('Wheek!','#fff');
-  if(G.inside){if(G.inside.cat)catNoise(.4);if(herd.length)setTimeout(()=>SFX.chut(),500);return}
+  if(G.inside){if(G.inside.cat)catNoise(.4);if(G.inside.owl)owlNoise(.6);if(herd.length)setTimeout(()=>SFX.chut(),500);return}
   if(G.under){setTimeout(()=>SFX.wheek(),420);if(herd.length)setTimeout(()=>SFX.chut(),700);return}
   const h=humans.find(h=>h.visible&&Math.hypot(h.obj.position.x-pig.pos.x,h.obj.position.z-pig.pos.z)<6);
   if(h){if(h.tossCD>0){toast(`${h.name}: “You already had a snack, silly!” (${Math.ceil(h.tossCD)}s)`);return}
@@ -1187,14 +1190,17 @@ function updateDrops(dt){for(let i=drops.length-1;i>=0;i--){const d=drops[i];if(
   else{d.life-=dt;d.obj.position.y=d.to.y+Math.abs(Math.sin(performance.now()/300))*.01;if(d.life<=0){d.obj.removeFromParent();drops.splice(i,1)}}}}
 
 // sniff
+// the little ways in to each zone's big discovery, for the outdoor sniff
+const SNIFF_WAYS_IN=[['oak','a knothole in the giant oak 🌳',0x9fe88a],['agility','a gap under the tent flap 🏅',0xffd060]];
 function sniff(){if(G.sniffCD>0){toast(`Your nose needs a moment (${Math.ceil(G.sniffCD)}s)`);return}G.sniffCD=10;SFX.sniff();if(G.under){sniffWarren();return}let n=0,t=0;
   for(const s of spots){if(!s.ready)continue;const d=Math.hypot(s.x-pig.pos.x,s.z-pig.pos.z);if(d<22){marker(s.x,heightAt(s.x,s.z)+.2,s.z,0xffd060);n++}}
   for(const tu of tunnels){const d=Math.hypot(tu.x-pig.pos.x,tu.z-pig.pos.z);if(d<32){marker(tu.ex,heightAt(tu.ex,tu.ez)+.35,tu.ez,tu.found?0x7fd0ff:0x9a7bff);if(!tu.found)t++}}
   let bh=0;for(const b of Z.barns)for(const h of b.holes)if(Math.hypot(h.ex-pig.pos.x,h.ez-pig.pos.z)<32){marker(h.ex,heightAt(h.ex,h.ez)+.3,h.ez,0xffb060);bh++}
   if(Z.raft&&Math.hypot(Z.raft.ex-pig.pos.x,Z.raft.ez-pig.pos.z)<32){marker(Z.raft.ex,heightAt(Z.raft.ex,Z.raft.ez)+.3,Z.raft.ez,0x9fe88a);toast('👃 …and a big leaf down by the water. Looks like it would float!')}
   let sf=0;if(Z.shop){const h=Z.shop.holes[0];if(Math.hypot(h.ex-pig.pos.x,h.ez-pig.pos.z)<32){marker(h.ex,heightAt(h.ex,h.ez)+.3,h.ez,0xff9fd0);sf=1}}
+  let ent='';for(const [k,say,col] of SNIFF_WAYS_IN){const b=Z[k],h=b&&b.holes[0];if(h&&Math.hypot(h.ex-pig.pos.x,h.ez-pig.pos.z)<32){marker(h.ex,heightAt(h.ex,h.ez)+.3,h.ez,col);ent+=`, and <b>${say}</b>`}}
   let w=0;for(const f of friends){if(f.state!=='wild'||f.zone!==Z.id)continue;const d=Math.hypot(f.pos.x-pig.pos.x,f.pos.z-pig.pos.z);if(d<30){marker(f.pos.x,f.pos.y+.3,f.pos.z,0xff9fd0);f.known=true;w++}}
-  toast(`👃 Sniff sniff… ${n} forage spot${n===1?'':'s'} nearby${t?`, and <b>${t} hidden tunnel${t>1?'s':''}</b>`:''}${bh?`, and <b>a way into the barn</b> 🛖`:''}${sf?`, and <b>a cat flap</b> 🐾`:''}${w?`, and <b>${w} guinea pig${w>1?'s':''}</b> 🐹`:''}!`)}
+  toast(`👃 Sniff sniff… ${n} forage spot${n===1?'':'s'} nearby${t?`, and <b>${t} hidden tunnel${t>1?'s':''}</b>`:''}${bh?`, and <b>a way into the barn</b> 🛖`:''}${sf?`, and <b>a cat flap</b> 🐾`:''}${ent}${w?`, and <b>${w} guinea pig${w>1?'s':''}</b> 🐹`:''}!`)}
 
 // ============================================================ tunnels
 const tScene=new THREE.Scene();tScene.background=new THREE.Color(0x070403);tScene.fog=new THREE.Fog(0x070403,.5,6);
@@ -1581,7 +1587,7 @@ function insideCollide(P,pr,free){const B=G.inside;
 // hidden treats, fresh every day
 function hideTreats(B){B.day=G.day;B.found=0;B.treats=[];for(let i=0;i<4;i++){const a=Math.random()*Math.PI*2,r=Math.sqrt(Math.random())*B.pile.R*.8;B.treats.push({x:B.pile.x+Math.cos(a)*r,z:B.pile.z+Math.sin(a)*r,type:pick(HAYLOOT),got:false})}}
 // in through a hole (or a cat flap): the inside is its own scene; each kind (barn, shop) adds its own actions and update
-function enterInside(b,hole){G.acts=null;iScene.background=new THREE.Color(0x140c06);iScene.fog=null;if(!b.inside)({shop:buildShopInside,island:buildIslandInside,agility:buildAgilityInside}[b.kind]||buildBarnInside)(b);const B=b.inside;iScene.clear();iScene.add(B.group);G.inside=B;G.insideHole=hole;B.from=b;G.hidden=true;forageState=null;$('forage').style.display='none';
+function enterInside(b,hole){G.acts=null;iScene.background=new THREE.Color(0x140c06);iScene.fog=null;if(!b.inside)({shop:buildShopInside,island:buildIslandInside,agility:buildAgilityInside,oak:buildOakInside}[b.kind]||buildBarnInside)(b);const B=b.inside;iScene.clear();iScene.add(B.group);G.inside=B;G.insideHole=hole;B.from=b;G.hidden=true;forageState=null;$('forage').style.display='none';
   SFX.rustle();flash('rgba(0,0,0,1)',1);swapScene(pig.obj,iScene);swapScene(pts,iScene);pig.blob.visible=false;pig.light.intensity=0;pig.air=false;pig.vy=0;
   const h=B.holes[Math.max(0,b.holes.indexOf(hole))];pig.pos.set(h.x,0,h.z);pig.vel.set(0,0,0);pig.heading=h.heading;G.camYaw=h.heading+Math.PI;W.trail.length=0;W.trail.push({x:pig.pos.x,z:pig.pos.z});
   if(!B.noHerd)herd.forEach(f=>{swapScene(f.obj,iScene);f.blob.visible=false;f.pos.set(h.x,0,h.z);f.vel.set(0,0,0);f.air=false;f.vy=0});friends.forEach(f=>f.tag.style.display='none');snapCamera();
@@ -2038,6 +2044,96 @@ function agiFinish(B,r){const total=r.t+r.faults,rs=total<=AGI.GOLD?3:total<=AGI
 function sniffAgility(B){const r=B.run;if(r){const c=AGI_COURSE[r.next];marker(c.x,.3,c.z,0xffd060,B.group);toast(`👃 Next up: ${r.next<6?(r.next+1)+', the '+c.name.toLowerCase():'the finish line'}!`);return}
   marker(AGI.START.x,.15,AGI.START.z,0x7fd0ff,B.group);toast('👃 Sawdust, canvas and excitement. The green mat is the start.')}
 
+// ============================================================ the Hollow Oak (The Deep Wood)
+// An enormous ancient oak in one of the glades, hollow inside. Squeeze in through the knothole between its roots and climb:
+// bracket fungi spiral up the inside of the trunk to a lookout window at the top, where you can see the whole wood (its
+// burrows go on your map) and the owl keeps her stash of shiny things. She sleeps on a branch halfway up: noise wakes her
+// (scurrying, hard landings, wheeking, rummaging). If she wakes, freeze until she nods off again, or she flaps you off.
+const OAK={R:2.22,r0:1.55,r1:2.3,step:.17,arc:.42,dphi:.55,phi0:.75,N:15,thick:.1,jump:2.15,TOP:3.157,topArc:1.3,trunk:2.1,door:2.55};
+const OAK_SHELVES=[];for(let i=0;i<OAK.N;i++)OAK_SHELVES.push({i,phi:OAK.phi0+i*OAK.dphi,half:OAK.arc/2,h:(i+1)*OAK.step,r0:OAK.r0,root:i<2});
+OAK_SHELVES.push({i:OAK.N,phi:OAK.TOP,half:OAK.topArc/2,h:(OAK.N+1)*OAK.step,r0:1.35,top:true});
+const OWL={phi:4.88,r:2.02,h:1.95};
+function setupHollowOak(z){const fits=(x,zz)=>{for(let r=0;r<=3.4;r+=.6)for(let k=0;k<(r?12:1);k++){const a=k/12*Math.PI*2,px=x+Math.cos(a)*r,pz=zz+Math.sin(a)*r;if(!freeAt(px,pz,.2)||Math.hypot(px,pz)>EDGE-6)return false}
+    return distToPath(x,zz)>3.4&&!spots.some(s=>Math.hypot(s.x-x,s.z-zz)<3.6)&&!tunnels.some(t=>Math.hypot(t.x-x,t.z-zz)<4)};
+  let at=null;for(const [gx,gz] of [[4,-2],[-34,30],[30,26]]){at=nearFree(gx,gz,fits,.8,8);if(at)break}if(!at)return;const [x,zz]=at;
+  // the knothole faces back toward the trail
+  let best=1e9,tx=0,tz=0;for(let i=0;i<DEEP_TRAIL.length-1;i++)for(let k=0;k<=1;k+=.05){const px=lerp(DEEP_TRAIL[i][0],DEEP_TRAIL[i+1][0],k),pz=lerp(DEEP_TRAIL[i][1],DEEP_TRAIL[i+1][1],k),d=Math.hypot(px-x,pz-zz);if(d<best){best=d;tx=px;tz=pz}}
+  const rot=Math.atan2(tx-x,tz-zz),o=M.HollowOak.clone(true);o.position.set(x,Math.min(heightAt(x,zz),heightAt(x+Math.sin(rot)*2.2,zz+Math.cos(rot)*2.2))-.06,zz);o.rotation.y=rot;z.group.add(o);addCollider(x,zz,OAK.trunk);trees.push({x,z:zz,r:OAK.trunk,canopy:5,kind:'Oak'});
+  o.traverse(m=>{if(!m.isMesh)return;if(m.material.name==='Leaves')windify(m.material,{amp:.03,hScale:.3});if(m.material.name==='HoleDark')m.material=new THREE.MeshBasicMaterial({color:0x2c4c3a})});   // a faint glow from inside
+  const nx=Math.sin(rot),nz=Math.cos(rot);z.oak={obj:o,kind:'oak',scale:1,x,z:zz,holes:[{ex:x+nx*OAK.door,ez:zz+nz*OAK.door,out:rot,h:{x:0,z:OAK.door}}]}}
+function oakIn(s,x,z){const r=Math.hypot(x,z);return r>=s.r0&&r<OAK.r1&&Math.abs(angDiff(s.phi,Math.atan2(x,z)))<s.half}
+// the highest shelf under you (you can step up 6 cm without hopping), or the floor
+function oakSurf(x,z,y){let best=0;if(Math.hypot(x,z)<1.35)return 0;for(const s of OAK_SHELVES)if(s.h<=y+.06&&s.h>best&&oakIn(s,x,z))best=s.h;return best}
+// a shelf you'd bump into at this height: its slab overlaps your body
+function oakBlocked(x,z,y){if(Math.hypot(x,z)<1.35)return false;for(const s of OAK_SHELVES)if(s.h>y+.06&&s.h-OAK.thick<y+.2&&oakIn(s,x,z))return true;return false}
+function buildOakInside(b){const g=new THREE.Group(),B={kind:'oak',title:'🌳 The Hollow Oak',noHerd:true,onEnter:oakEnter,onExit:oakExit,actions:oakActions,update:oakUpdate,sniff:sniffOak,danger:oakDanger,
+    group:g,s:1,hx:2.4,hz:2.4,ceil:3.9,loftX:Infinity,cols:[],boxes:[],radius:OAK.R,height:(x,z)=>oakSurf(x,z,pig.pos.y),ledges:true,blocked:oakBlocked,jump:OAK.jump,
+    camDist:()=>Math.min(2.6,Math.hypot(pig.pos.x,pig.pos.z)+.45),spots:[],climbClean:true};
+  const room=M.OakInside.clone(true);g.add(room);
+  room.traverse(m=>{if(!m.isMesh)return;if(m.material.name==='HoleDark'){m.material=new THREE.MeshBasicMaterial({color:0xfff0d0});B.lightMat=m.material}if(m.material.name==='Heartwood'||m.material.name==='Litter'){m.material=m.material.clone();m.material.color.setScalar(1.7)}});
+  // the bracket fungi (and two root steps at the bottom): slabs shaped like slices of a ring, rounded at the edges
+  const fungi=[0xc8823a,0xd99a4a,0xb8702e,0xe0a858],bark=0x5a3a22;
+  for(const s of OAK_SHELVES){const sh=new THREE.Shape(),a0=s.phi-s.half,a1=s.phi+s.half,n=14,P=(r,a)=>[r*Math.sin(a),-r*Math.cos(a)];
+    sh.moveTo(...P(s.r0,a0));for(let k=0;k<=n;k++)sh.lineTo(...P(s.top?s.r0:s.r0+.06*Math.sin(k/n*Math.PI),a0+(a1-a0)*k/n));for(let k=n;k>=0;k--)sh.lineTo(...P(OAK.r1+.05,a0+(a1-a0)*k/n));sh.closePath();
+    const geo=new THREE.ExtrudeGeometry(sh,{depth:OAK.thick-.03,bevelEnabled:true,bevelThickness:.015,bevelSize:.025,bevelSegments:2,curveSegments:4});geo.rotateX(-Math.PI/2);
+    const m=new THREE.Mesh(geo,new THREE.MeshStandardMaterial({color:s.root||s.top?bark:fungi[s.i%4],roughness:.85}));m.position.y=s.h-OAK.thick+.015;m.castShadow=m.receiveShadow=true;g.add(m)}
+  // the owl on her branch stub, her stash at the top by the window
+  {const x=Math.sin(OWL.phi)*(OAK.R+.05),z=Math.cos(OWL.phi)*(OAK.R+.05),x2=Math.sin(OWL.phi)*OWL.r,z2=Math.cos(OWL.phi)*OWL.r;
+    const st=new THREE.Mesh(new THREE.CylinderGeometry(.04,.07,.42,8),new THREE.MeshStandardMaterial({color:0x4a3020,roughness:.95}));st.position.set((x+x2)/2,OWL.h-.03,(z+z2)/2);st.rotation.z=Math.PI/2;st.rotation.y=OWL.phi+Math.PI/2;g.add(st)}
+  const owl=M.Owl.clone(true);owl.position.set(Math.sin(OWL.phi)*OWL.r,OWL.h,Math.cos(OWL.phi)*OWL.r);owl.rotation.y=OWL.phi+Math.PI;g.add(owl);
+  B.owl={obj:owl,state:'sleep',noise:0,t:0,open:owl.getObjectByName('EyesOpen'),shut:owl.getObjectByName('EyesShut'),wl:owl.getObjectByName('WingL'),wr:owl.getObjectByName('WingR'),face:OWL.phi+Math.PI};B.owl.open.visible=false;
+  const top=OAK_SHELVES[OAK.N],np=top.phi+.38,nest=M.OwlNest.clone(true);nest.position.set(Math.sin(np)*1.95,top.h,Math.cos(np)*1.95);g.add(nest);
+  B.spots.push({type:'owlstash',x:Math.sin(np)*1.75,z:Math.cos(np)*1.75,r:.32,ready:true,cd:0});B.window={x:Math.sin(top.phi)*1.95,z:Math.cos(top.phi)*1.95,h:top.h};
+  // light: dim, warm; a shaft from the window and one from the knothole
+  B.hemi=new THREE.HemisphereLight(0xe8e8d0,0x5a3a20,1);g.add(B.hemi);B.amb=new THREE.AmbientLight(0xffe8c8,.4);g.add(B.amb);B.sun=new THREE.DirectionalLight(0xfff0d0,1.4);B.sun.position.set(Math.sin(top.phi)*3,4.5,Math.cos(top.phi)*3);B.sun.target.position.set(0,1,0);g.add(B.sun,B.sun.target);
+  B.glow=new THREE.PointLight(0x7fe8c0,.9,4,1.5);B.glow.position.set(0,.4,0);g.add(B.glow);
+  B.beams=[];for(const [phi,y,len] of [[top.phi,top.h+.2,2.6],[0,.15,1.6]]){const bm=new THREE.Mesh(new THREE.PlaneGeometry(.3,len),new THREE.MeshBasicMaterial({map:glowTex,color:0xffe8b0,transparent:true,opacity:.16,blending:THREE.AdditiveBlending,depthWrite:false,side:THREE.DoubleSide}));
+    bm.position.set(Math.sin(phi)*(OAK.R-len*.35),y-len*.25,Math.cos(phi)*(OAK.R-len*.35));bm.rotation.set(0,phi,0);bm.rotateX(phi===0?1.25:.9);g.add(bm);B.beams.push(bm)}
+  B.holes=[{x:0,z:OAK.R-.4,heading:Math.PI,i:0}];
+  b.inside=B}
+function owlNoise(n){const B=G.inside;if(!B||!B.owl)return;const o=B.owl;if(o.state==='sleep'){o.noise+=n;if(o.noise>=1)owlWake(B)}}
+function owlWake(B){const o=B.owl;o.state='awake';o.t=0;o.open.visible=true;o.shut.visible=false;tone('sine',420,380,.35,.18);tone('sine',380,340,.45,.16,.45);
+  toast('🦉 <b>Hoo?</b> The owl\'s eyes snap open. <b>Freeze!</b> Don\'t move a whisker till she nods off.','bad',4)}
+function oakEnter(B){B.prevAir=false;B.climbClean=true;const o=B.owl;o.state='sleep';o.noise=Math.min(o.noise,.3);o.open.visible=false;o.shut.visible=true;
+  if(!G.oak){G.oak=1;SFX.find('rare');callout('rare','🌳 The Hollow Oak',120);addScore(120,'new place!','#7fd0ff');
+    toast(`🌳 <b>Inside the Hollow Oak!</b> Bracket fungi spiral up the inside of the trunk: hop from one to the next (${kb('Space')}) to climb to the window at the top. An owl is asleep halfway up. Shh: scurrying, hard landings and wheeking wake her. Your herd waits by the roots.`,'gold',11)}
+  else toast('🌳 Into the Hollow Oak. Shh…')}
+function oakExit(B){$('danger').style.display='none'}
+function oakActions(B){const acts=[],top=OAK_SHELVES[OAK.N],onTop=pig.pos.y>top.h-.02;
+  if(pig.pos.y<.05){const a=exitActs(B,'Squeeze out through the knothole');acts.push(...a)}
+  if(onTop&&Math.hypot(pig.pos.x-B.window.x,pig.pos.z-B.window.z)<.5)acts.push({k:'E',label:G.lookout?'Look out over the Deep Wood':'Peek out of the window',do:()=>oakLookout(B)});
+  if(onTop)for(const sp of B.spots){if(Math.hypot(sp.x-pig.pos.x,sp.z-pig.pos.z)<sp.r+.28){acts.push(sp.ready?{k:'F',hold:true,label:'Rummage in the owl\'s stash',spot:sp,do:()=>{if(!forageState)startForage(sp)}}:{k:'F',label:`Owl's stash · nothing new (${Math.ceil(sp.cd)}s)`,disabled:true});break}}
+  if(onTop&&!acts.some(a=>a.k==='E'))acts.push({k:'E',label:'Slide back down the trunk',do:()=>{SFX.whoosh();pig.pos.set(0,0,OAK.R-.7);pig.vel.set(0,0,0);pig.air=false;pig.vy=0;pig.heading=0;G.acts=null;toast('🌳 Wheee! Down the inside of the trunk.')}});
+  return acts}
+function oakLookout(B){SFX.find('epic');flash('rgba(255,250,220,.6)',.6);
+  if(!G.lookout){G.lookout=1;callout('epic','🔭 The lookout',250);addScore(250,'lookout!','#c98bff');if(B.climbClean)G.quietClimb=1}
+  const z=ZONE.deepwood;let pigs=0;for(const f of friends)if(f.origin==='deepwood'&&f.state==='wild'&&!f.known){f.known=true;pigs++}
+  const left=z.tunnels.filter(t=>!t.found).length;
+  toast(`🔭 <b>You can see the whole Deep Wood from up here!</b> ${left?`${left} burrow${left>1?'s':''} you haven't found yet ${left>1?'are':'is'} marked on your map.`:'You have found every burrow in it.'}${pigs?` And you spot ${pigs} guinea pig${pigs>1?'s':''} down there.`:''}${B.climbClean?' You never woke the owl, either. Light paws!':''}`,'gold',8)}
+function oakDanger(B){const o=B.owl;if(o.state==='sleep')return o.noise>.04?{text:'🦉 The owl is asleep. Shh…',pct:o.noise*100}:null;
+  return {text:o.state==='awake'?'🦉 The owl is awake! Freeze!':'🦉 The owl is settling down again…',pct:100}}
+function oakUpdate(B,dt,t){const day=clamp(sun.intensity/2.9,0,1);B.lightMat&&B.lightMat.color.copy(skyMat.uniforms.hor.value).multiplyScalar(.6+day*.8);B.sun.intensity=.15+day*1.4;B.hemi.intensity=.6+day*.6;B.amb.intensity=.3+day*.25;
+  for(const bm of B.beams)bm.material.opacity=.03+day*.16;B.glow.intensity=.6+(1-day)*.8;
+  for(const sp of B.spots)if(!sp.ready){sp.cd-=dt;if(sp.cd<=0)sp.ready=true}
+  // the camera looks out from the middle of the trunk at you on the wall
+  const r=Math.hypot(pig.pos.x,pig.pos.z);if(r>.7&&!G.drag)G.camYaw+=angDiff(G.camYaw,Math.atan2(-pig.pos.x,-pig.pos.z))*Math.min(1,dt*4);
+  // noise: scurrying, hops, landings, rummaging
+  const o=B.owl,sp=Math.hypot(pig.vel.x,pig.vel.z);
+  if(B.prevAir&&!pig.air)owlNoise(B.fallFrom-pig.pos.y>.45?.35:.12);if(!B.prevAir&&pig.air){B.fallFrom=pig.pos.y;if(pig.vy>0)owlNoise(.05)}if(pig.air)B.fallFrom=Math.max(B.fallFrom,pig.pos.y);B.prevAir=pig.air;
+  if(sp>2.2)owlNoise(dt*.5);else if(sp>.2)owlNoise(dt*.02);if(forageState)owlNoise(dt*.28);
+  if(pig.pos.y<.02&&!pig.air)B.climbClean=true;   // back on the floor: a fresh climb
+  if(o.state==='sleep'){o.noise=Math.max(0,o.noise-dt*.1);o.obj.rotation.y+=angDiff(o.obj.rotation.y,o.face)*Math.min(1,dt*2);o.obj.position.y=OWL.h+Math.sin(t*1.3)*.004}
+  else{o.t+=dt;const look=Math.atan2(pig.pos.x-o.obj.position.x,pig.pos.z-o.obj.position.z);o.obj.rotation.y+=angDiff(o.obj.rotation.y,look)*Math.min(1,dt*6);
+    if(o.state==='awake'){if(o.t>.6&&(sp>.25||pig.air)){o.state='swoop';o.t=0;SFX.whoosh();setTimeout(()=>SFX.hurt(),150);
+        if(pig.pos.y>.05){const k=1.1/Math.max(r,.01);pig.pos.x*=k;pig.pos.z*=k;pig.air=true;pig.vy=.6;pig.vel.set(0,0,0)}B.climbClean=false;G.owlSwoops=(G.owlSwoops||0)+1;
+        toast(pig.pos.y>.05?'🦉 <b>WHOOSH!</b> The owl flaps at you and you tumble all the way down to the roots. Try again, quietly.':'🦉 <b>Hoo-HOO!</b> The owl flaps crossly at you. Shh!','bad',5)}
+      else if(o.t>3.5){o.state='settle';o.t=0;toast('🦉 The owl\'s eyes droop… she\'s asleep again. Phew.','good',3)}}
+    if(o.state==='swoop'){const f=Math.sin(o.t*22)*.9;o.wl.rotation.y=f;o.wr.rotation.y=-f;if(o.t>1.2){o.state='settle';o.t=0;o.wl.rotation.y=o.wr.rotation.y=0}}
+    if(o.state==='settle'&&o.t>2){o.state='sleep';o.noise=.3;o.open.visible=false;o.shut.visible=true}}}
+function sniffOak(B){const top=OAK_SHELVES[OAK.N];marker(B.window.x,top.h+.3,B.window.z,0x7fd0ff,B.group);for(const sp of B.spots)if(sp.ready)marker(sp.x,top.h+.25,sp.z,0xffd060,B.group);
+  const next=OAK_SHELVES.find(s=>s.h>pig.pos.y+.06);if(next)marker(Math.sin(next.phi)*1.9,next.h+.15,Math.cos(next.phi)*1.9,0x9fe88a,B.group);
+  toast(`👃 Sniff sniff… fresh air from the window at the top, something shiny up there too${next?', and the next fungus up is marked':''}.`)}
+
 // ---- requests: some humans have lost a little thing, and it turned up down in the warren. Bring it back for a thank-you
 const REQUESTS={
   marble:{who:'Maya',zone:'park',ask:'I lost my favourite blue marble down a hole in the woods. If you ever find it…',thanks:'My marble! You clever little thing!',gift:['strawberry','strawberry'],pts:200},
@@ -2298,6 +2394,8 @@ function collide(P,pr){
     if(Math.abs(along)<.86&&Math.abs(lat)>.13&&Math.abs(lat)<.33){lat=Math.abs(lat)>.23?Math.sign(lat)*.33:Math.sign(lat)*.13;P.x=l.x+s*along+c*lat;P.z=l.z+c*along-s*lat}}
   const dc=Math.hypot(P.x,P.z);if(dc>EDGE){P.x*=EDGE/dc;P.z*=EDGE/dc}
 }
+// interiors with ledges (the Hollow Oak): you can't walk into a shelf above you; slide along it, or stay put
+function ledgeStep(ox,oz){const B=G.inside,P=pig.pos;if(!B.blocked(P.x,P.z,P.y))return;const nx=P.x,nz=P.z;P.z=oz;if(!B.blocked(P.x,P.z,P.y))return;P.x=ox;P.z=nz;if(!B.blocked(P.x,P.z,P.y))return;P.x=ox;P.z=oz}
 function updatePig(dt,t){
   const P=pig.parts;
   // input
@@ -2318,10 +2416,10 @@ function updatePig(dt,t){
   const ox=pig.pos.x,oz=pig.pos.z;pig.pos.x+=pig.vel.x*dt;pig.pos.z+=pig.vel.z*dt;
   // collisions
   const gh=G.under?()=>0:G.inside?insideHeight:heightAt;
-  if(G.under)warrenCollide(pig.pos,.1);else if(G.inside)insideCollide(pig.pos,.1);else{collide(pig.pos,.1);waterStep(ox,oz);edgeStep(dt)}
+  if(G.under)warrenCollide(pig.pos,.1);else if(G.inside){insideCollide(pig.pos,.1);if(G.inside.ledges)ledgeStep(ox,oz)}else{collide(pig.pos,.1);waterStep(ox,oz);edgeStep(dt)}
   // vertical
   const gy=gh(pig.pos.x,pig.pos.z);
-  if(pig.air||pig.vy>0){pig.vy-=9.8*dt;pig.pos.y+=pig.vy*dt;if(pig.pos.y<=gy){pig.pos.y=gy;pig.vy=0;pig.air=false;pig.popSpin=0}else pig.air=true}else pig.pos.y=gy;
+  if(pig.air||pig.vy>0){pig.vy-=9.8*dt;pig.pos.y+=pig.vy*dt;if(pig.pos.y<=gy){pig.pos.y=gy;pig.vy=0;pig.air=false;pig.popSpin=0}else pig.air=true}else if(G.inside&&G.inside.ledges&&gy<pig.pos.y-.03){pig.air=true;pig.vy=0}else pig.pos.y=gy;
   // pose
   const o=pig.obj;const moving=Math.hypot(pig.vel.x,pig.vel.z)>.12;
   const hf=gh(pig.pos.x+Math.sin(pig.heading)*.12,pig.pos.z+Math.cos(pig.heading)*.12),hb=gh(pig.pos.x-Math.sin(pig.heading)*.12,pig.pos.z-Math.cos(pig.heading)*.12);
@@ -2381,7 +2479,7 @@ function updateCamera(dt){
     const reach=p=>{aim(p,d);for(let s=1;s<=12;s++){const q=s/12;if(wSdf(lerp(camTgt.x,want.x,q),lerp(camTgt.y,want.y,q),lerp(camTgt.z,want.z,q),false)>-.1)return (s-1)/12}return 1};
     let best=p,bk=reach(p);for(const q of [.7,.95,1.2]){if(bk>=.6||q<=p)continue;const k=reach(q);if(k>bk+.1){bk=k;best=q}}
     aim(best,d*Math.max(.15,bk))}
-  else if(G.inside){const B=G.inside;if(B.tube)aim(.6,.75);else aim(p,Math.min(d,B.camMax||(B.radius?4:2.6)));if(B.waterY!==undefined)want.y=Math.max(want.y,B.waterY+.12);want.x=clamp(want.x,-B.hx-.05,B.hx+.05);want.z=clamp(want.z,-B.hz-.05,B.hz+.05);want.y=clamp(want.y,insideHeight(want.x,want.z)+.08,B.ceilAt?B.ceilAt(want.x,want.z):want.x>B.loftX-.15?B.loftY-.15:B.ceil-.25)}
+  else if(G.inside){const B=G.inside;if(B.tube)aim(.6,.75);else aim(B.camPitch||p,B.camDist?B.camDist():Math.min(d,B.camMax||(B.radius?4:2.6)));if(B.waterY!==undefined)want.y=Math.max(want.y,B.waterY+.12);want.x=clamp(want.x,-B.hx-.05,B.hx+.05);want.z=clamp(want.z,-B.hz-.05,B.hz+.05);want.y=clamp(want.y,insideHeight(want.x,want.z)+.08,B.ceilAt?B.ceilAt(want.x,want.z):want.x>B.loftX-.15?B.loftY-.15:B.ceil-.25)}
   else if(G.raft){const c=creekAt(G.raft.s-2.1);want.set(c.x+c.nx*G.raft.lat*.6,-.12+.78,c.z+c.nz*G.raft.lat*.6)}   // behind you along the creek's curve, over the water
   else{aim(p,d);const gy=heightAt(want.x,want.z)+.07;if(want.y<gy)want.y=gy}
   camPos.lerp(want,Math.min(1,dt*8));if(G.under&&wSdf(camPos.x,camPos.y,camPos.z,false)>-.05)camPos.copy(want);camera.position.copy(camPos);camera.lookAt(camTgt);
@@ -2463,6 +2561,8 @@ const GOALS=[
   {id:'cleanraft',icon:'🌊',name:'Not a Splash',desc:'Ride the whole creek on the leaf without a single bump',test:()=>G.cleanRaft>=1,pts:250},
   {id:'agility',icon:'🏅',name:'Clear Round',desc:'Run the agility course in the Critter Corner tent',test:()=>G.agilityRuns>=1,pts:150},
   {id:'agilitygold',icon:'🥇',name:'Best in Show',desc:`Win a gold rosette on the agility course (under ${AGI.GOLD} s)`,test:()=>G.rosette>=3,pts:300},
+  {id:'lookout',icon:'🔭',name:'Top of the Tree',desc:'Climb the Hollow Oak in the Deep Wood all the way to the lookout',test:()=>G.lookout>=1,pts:250},
+  {id:'quietclimb',icon:'🦉',name:'Light Paws',desc:'Climb the Hollow Oak to the lookout without waking the owl',test:()=>G.quietClimb>=1,pts:250},
   {id:'shop',icon:'🐾',name:'After Hours',desc:'Sneak into the pet shop at night and make friends with Butterscotch',test:()=>G.pals.includes(friends.findIndex(f=>f.shopPig)),pts:300},
   {id:'gnaw',icon:'🦷',name:'Tidy Teeth',desc:'Gnaw a twig down without a single miss',test:()=>G.cleanGnaws>=1,pts:150},
   {id:'hay',icon:'🌾',name:'Hay Diver',desc:"Squeeze into a barn, burrow into its hay and find 3 hidden treats",test:()=>G.hayFinds>=3,pts:200},
@@ -2506,6 +2606,7 @@ function updateHUD(dt){
   const dg=$('danger');
   if(G.inside&&G.inside.cat){const c=G.inside.cat;if(c.state==='sleep'){dg.style.display=c.noise>.04?'block':'none';dg.querySelector('.l').textContent='🐈 Duchess is asleep. Tiptoe…';dg.querySelector('i').style.width=Math.min(100,c.noise*100)+'%'}
     else{dg.style.display='block';dg.querySelector('.l').textContent=c.state==='return'?'🐈 Duchess is going back to sleep…':G.inside.tube?'😼 Duchess is looking for you… stay in the tubes!':'😼 Duchess is awake! Hide in a tube!';dg.querySelector('i').style.width='100%'}}
+  else if(G.inside&&G.inside.danger){const d=G.inside.danger(G.inside);dg.style.display=d?'block':'none';if(d){dg.querySelector('.l').textContent=d.text;dg.querySelector('i').style.width=Math.min(100,d.pct)+'%'}}
   else if(hawk.state==='circle'||hawk.state==='dive'){dg.style.display='block';dg.querySelector('.l').textContent=hawk.state==='dive'?'🦅 DIVING! GET UNDER COVER!':`🦅 Hawk overhead ${coverAt(pig.pos.x,pig.pos.z)>=1?'— you are hidden 🌿':'— hide or freeze!'}`;dg.querySelector('i').style.width=(hawk.detect*100)+'%'}
   else if(Z.cars.some(c=>c.warn&&!c.wait)){dg.style.display='block';dg.querySelector('.l').textContent='🚗 Car coming! Get off the road!';dg.querySelector('i').style.width='100%'}
   else if(foxes.some(f=>f.active&&f.state==='chase')){dg.style.display='block';dg.querySelector('.l').textContent='🦊 A fox is chasing you!';dg.querySelector('i').style.width='100%'}
@@ -2536,6 +2637,7 @@ function drawMap(){if(!mapBg)drawMapBg();fitMap();const g=mctx;const s=v=>(v/72*
   // passages you have explored, faint under the woods
   g.setLineDash([5,6]);g.strokeStyle='rgba(50,30,12,.5)';g.lineWidth=3;g.beginPath();
   if(Z===PARK)for(const e of W.edges)for(let k=0;k<e.pts.length-1;k++){const a=e.pts[k],b=e.pts[k+1];if(a.seen&&b.seen){g.moveTo(s(a.x/WS),s(a.z/WS));g.lineTo(s(b.x/WS),s(b.z/WS))}}g.stroke();g.setLineDash([]);
+  if(Z.id==='deepwood'&&G.lookout){g.setLineDash([3,3]);g.strokeStyle='#ffd9a0';g.lineWidth=2;tunnels.forEach(t=>{if(t.found)return;g.beginPath();g.arc(s(t.x),s(t.z),6,0,7);g.stroke()});g.setLineDash([])}
   tunnels.forEach(t=>{if(!t.found)return;g.fillStyle='#2a1a0a';g.strokeStyle='#ffd9a0';g.lineWidth=2;g.beginPath();g.arc(s(t.x),s(t.z),6,0,7);g.fill();g.stroke()});
   if(!isNight())humans.forEach(h=>{g.fillStyle='#ffb0d0';g.beginPath();g.arc(s(h.obj.position.x),s(h.obj.position.z),5,0,7);g.fill()});
   friends.forEach(f=>{if(f.state!=='herd'&&f.zone!==Z.id)return;if(f.state==='herd'){g.fillStyle='#ff9fd0';g.beginPath();g.arc(s(f.pos.x),s(f.pos.z),3.5,0,7);g.fill()}else if(f.known){g.fillStyle='#f2d6a8';g.strokeStyle='#6a4a2a';g.lineWidth=1.5;g.beginPath();g.arc(s(f.pos.x),s(f.pos.z),4.5,0,7);g.fill();g.stroke()}});
@@ -2575,6 +2677,7 @@ function placeStatus(z){const items=[],nf=(G.zfound[z.id]||[]).length,nb=z===PAR
   if(z.id==='farm'||z.id==='zoo')items.push({icon:'🛖',label:'Squeezed into the barn',done:!!G.barns[z.id]});
   if(z.id==='town')items.push({icon:'🐾',label:'Snuck into the pet shop',done:!!G.shop});
   if(z.id==='creek')items.push({icon:'🍃',label:'Rode the leaf raft to Willow Island',done:!!G.island});
+  if(z.id==='deepwood')items.push({icon:'🔭',label:'Climbed the Hollow Oak to the lookout',done:!!G.lookout});
   if(z.id==='zoo')items.push({icon:'🏅',label:'Won a rosette in the agility tent',done:G.rosette>=1});
   return {items,done:items.every(i=>i.done)}}
 function placesHTML(){const done=PLACE_ORDER.filter(id=>G.placesDone[id]).length;
@@ -2592,7 +2695,7 @@ function gameOver(){G.over=true;const best=Math.max(G.best,G.score);lsSet('wheek
 // Three slots in localStorage. The world is seeded (the same every game), so a save only keeps what changed:
 // the stats, what's been found, the herd (by friend index) and the warren's explored passages.
 const SLOTS=3,slotKey=i=>'wheek-slot-'+i;
-const SAVE_G=['hp','full','vitc','energy','happy','score','day','time','forages','pets','found','curios','nightsSurvived','eaten','luckT','warrenTip','zfound','visited','met','pals','placesDone','goals','bestStreak','hawkDodged','foxEscapes','mazePrize','heard','given','barns','hayFinds','teethT','gnaws','cleanGnaws','shop','fullHerd','island','rafts','cleanRaft','agility','rosette','agilityBest','agilityRuns'];
+const SAVE_G=['hp','full','vitc','energy','happy','score','day','time','forages','pets','found','curios','nightsSurvived','eaten','luckT','warrenTip','zfound','visited','met','pals','placesDone','goals','bestStreak','hawkDodged','foxEscapes','mazePrize','heard','given','barns','hayFinds','teethT','gnaws','cleanGnaws','shop','fullHerd','island','rafts','cleanRaft','agility','rosette','agilityBest','agilityRuns','oak','lookout','quietClimb','owlSwoops'];
 function snapshot(){const g={};for(const k of SAVE_G)g[k]=G[k];const ix=(a,f)=>a.flatMap((x,i)=>f(x)?[i]:[]);
   return {v:1,saved:Date.now(),name:G.name,breed:G.breed,coat:G.coat,G:g,
     zone:Z.id,pig:G.raft?{x:+Z.raft.ex.toFixed(2),z:+Z.raft.ez.toFixed(2),h:+Z.raft.out.toFixed(2)}:G.inside?{x:+G.insideHole.ex.toFixed(2),z:+G.insideHole.ez.toFixed(2),h:+G.insideHole.out.toFixed(2)}:{x:+pig.pos.x.toFixed(2),z:+pig.pos.z.toFixed(2),h:+pig.heading.toFixed(2)},under:G.under?PARK.tunnels.indexOf(W.from):-1,herd:herd.map(f=>friends.indexOf(f)),names:friends.map(f=>f.name),known:ix(friends,f=>f.known),
@@ -2644,7 +2747,7 @@ function press(code,repeat=false){
   if(G.modal||G.paused||G.over||G.inTunnel||repeat)return;
   if(G.inside&&G.inside.burrow&&(code==='Space'||code==='KeyF'||code==='KeyE')){popOut();return}
   if(G.gnaw&&(code==='KeyE'||code==='Space')){gnawHit();return}
-  if(code==='Space'){if(G.inside&&G.inside.tube)return;if(!pig.air){if(G.inside&&G.inside.cat)catNoise(.15);pig.vy=1.55;pig.air=true;SFX.jump();if(G.happy>70&&G.popcornCD<=0){G.popcornCD=3;addScore(15,'popcorn!','#ffb0e0');herdPopcorn();emit(pig.pos.x,pig.pos.y+.1,pig.pos.z,10,{col:[1,.8,.9],spread:.5,up:.8,size:.015,life:.6})}}}
+  if(code==='Space'){if(G.inside&&G.inside.tube)return;if(!pig.air){if(G.inside&&G.inside.cat)catNoise(.15);pig.vy=G.inside&&G.inside.jump||1.55;pig.air=true;SFX.jump();if(G.happy>70&&G.popcornCD<=0){G.popcornCD=3;addScore(15,'popcorn!','#ffb0e0');herdPopcorn();emit(pig.pos.x,pig.pos.y+.1,pig.pos.z,10,{col:[1,.8,.9],spread:.5,up:.8,size:.015,life:.6})}}}
   if(code==='KeyE'){const a=(G.acts||currentActions()).find(a=>a.k==='E'&&!a.hold&&a.do&&!a.disabled);if(a)a.do()}
   if(code==='KeyM')$('mapwrap').classList.toggle('big');
   if(code==='KeyF'&&G.inside){const a=insideActions().find(a=>a.k==='F'&&a.do);if(a)a.do()}
@@ -2786,5 +2889,5 @@ function loop(){
   $('setBtn').onclick=openSettings;$('setBtn2').onclick=openSettings;$('setClose').onclick=closeSettings;applyQuality();
   $('resumeBtn').onclick=()=>togglePause(false);$('saveBtn').onclick=()=>saveGame();$('quitBtn').onclick=()=>{saveGame(true);location.reload()};$('jclose').onclick=closeJournal;$('againBtn').onclick=()=>location.reload();
   $('retryBtn').onclick=()=>{try{sessionStorage.setItem('wheek-continue',G.slot)}catch(e){}location.reload()};
-  window.__game={G,W,WS,ZONE,PARK,EDGE,ITEMS,AGI,AGI_COURSE,WEAVE_X,WEAVE_Z,startRaft,creekAt,offerSwap,insideCollide,TUBE_NODES,startGnaw,gnawHit,enterBarn:enterInside,exitBarn:exitInside,enterInside,exitInside,enterTube:n=>enterTube(n),catNoise:n=>catNoise(n),startBurrow,popOut,insideHeight,revealItem,setInput,SET,sun,music:()=>({now:musicNow&&musicNow.k,gain:musicGain&&musicGain.gain.value,tracks:Object.fromEntries(Object.entries(MUSIC).map(([k,m])=>[k,m.buf?{dur:+m.buf.duration.toFixed(4),start:m.start,len:m.len}:null]))}),wSdf,neighbour,freeAt,Z:()=>Z,visit:(id,x=0,z=0,h=0)=>arriveZone(ZONE[id],0,{x,z,h}),enterWarren,exitWarren,pig,friends,herd,joinHerd,keys,applyLook,humans,tunnels,spots,hawk,foxes,heightAt,renderer,scene,camera};
+  window.__game={G,W,WS,ZONE,PARK,EDGE,ITEMS,AGI,AGI_COURSE,WEAVE_X,WEAVE_Z,OAK,OAK_SHELVES,oakSurf,oakBlocked,owlNoise,startRaft,creekAt,offerSwap,insideCollide,TUBE_NODES,startGnaw,gnawHit,enterBarn:enterInside,exitBarn:exitInside,enterInside,exitInside,enterTube:n=>enterTube(n),catNoise:n=>catNoise(n),startBurrow,popOut,insideHeight,revealItem,setInput,SET,sun,music:()=>({now:musicNow&&musicNow.k,gain:musicGain&&musicGain.gain.value,tracks:Object.fromEntries(Object.entries(MUSIC).map(([k,m])=>[k,m.buf?{dur:+m.buf.duration.toFixed(4),start:m.start,len:m.len}:null]))}),wSdf,neighbour,freeAt,Z:()=>Z,visit:(id,x=0,z=0,h=0)=>arriveZone(ZONE[id],0,{x,z,h}),enterWarren,exitWarren,pig,friends,herd,joinHerd,keys,applyLook,humans,tunnels,spots,hawk,foxes,heightAt,renderer,scene,camera};
 })().catch(e=>{console.error(e);$('loading').textContent='Failed to load: '+e.message});

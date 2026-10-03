@@ -1,6 +1,6 @@
 // World checks: loads the game in a tiny headless window and tests the world's logic through window.__game.
 // Usage: PW=/path/to/node_modules/playwright node tools/check.cjs [check ...]
-//   checks: reach warren night chaos eat treats goals music gnaw barn shop swap raft agility saves touch pad memory (default: all). URL defaults to the local dev site.
+//   checks: reach warren night chaos eat treats goals music gnaw barn shop swap raft agility oak saves touch pad memory (default: all). URL defaults to the local dev site.
 // Prints a report and exits 1 if anything failed.
 const { chromium } = require(process.env.PW || 'playwright');
 const URL = process.env.URL || 'https://wheek.localhost/';
@@ -345,6 +345,61 @@ const frames = (page, n) => page.evaluate(n => new Promise(r => { let k = 0; (fu
     const out = await page.evaluate(() => { const g = window.__game, h = g.Z().agility.holes[0]; return !g.G.inside && Math.hypot(g.pig.pos.x - h.ex, g.pig.pos.z - h.ez) < .3 });
     report('agility tent', placed && inside && run.started && run.after?.join() === '1,2,3,4,5,6' && run.barDown && run.faults === 5 && run.weaveMiss === 0 && run.finished && run.runs === 1 && run.rosette >= 1 && out,
       `placed ${placed} · inside ${inside} · obstacles cleared in order ${run.after?.join(',')} · bar knocked +${run.faults} s · weave misses ${run.weaveMiss} · finished ${run.finished} in ${run.best} s, rosette ${run.rosette} · back outside ${out}`);
+  }
+
+  // 5g. the Hollow Oak: in through the knothole, ledges (blocked from below, hop up, fall off), the owl, the lookout, the stash, down and out
+  if (pick('oak')) {
+    const act = async (place, text) => { await page.evaluate(place); return page.waitForFunction(([place, text]) => { eval(place); return (window.__game.G.acts || []).some(a => a.label.includes(text)) }, [place, text], { timeout: 60000, polling: 250 }).then(() => true, () => false) };
+    await page.evaluate(() => { const g = window.__game; g.G.time = 11; if (g.G.inside) g.exitBarn(); g.visit('deepwood', 0, 0, 0); g.G.hp = 100; g.G.energy = 100 });
+    const placed = await page.evaluate(() => !!window.__game.Z().oak);
+    const inOk = placed && await act(`{const g=window.__game,h=g.Z().oak.holes[0];g.pig.pos.set(h.ex,g.heightAt(h.ex,h.ez),h.ez)}`, 'knothole');
+    if (inOk) { await page.keyboard.press('KeyE'); await frames(page, 4) }
+    const inside = await page.evaluate(() => window.__game.G.inside?.kind === 'oak');
+    const phys = inside && await page.evaluate(async () => { const g = window.__game, B = g.G.inside, P = g.pig.pos, S = g.OAK_SHELVES, at = (s, r) => [Math.sin(s.phi) * r, Math.cos(s.phi) * r];
+      const fr = n => new Promise(res => { let k = 0; (function f() { if (k++ >= n) res(); else requestAnimationFrame(f) })() });
+      B.owl.noise = 0;
+      // walking from the floor into the first fungus: blocked
+      let [x0, z0] = at(S[0], 1.4);P.set(x0, 0, z0); g.pig.air = false; await fr(2);
+      const ux0 = Math.sin(S[0].phi), uz0 = Math.cos(S[0].phi); for (let k = 0; k < 30; k++) { g.pig.vel.set(ux0 * 1.4, 0, uz0 * 1.4); await fr(1) }
+      const blocked = Math.hypot(P.x, P.z) < 1.56 && P.y < .05;
+      // a hop outwards from under it lands on it
+      P.set(x0, 0, z0); await fr(2); const ux = Math.sin(S[0].phi), uz = Math.cos(S[0].phi);
+      g.pig.vy = g.OAK.jump; g.pig.air = true; let landed = false;
+      for (let k = 0; k < 60 && !landed; k++) { g.pig.vel.set(ux * 1.4, 0, uz * 1.4); await fr(1); if (!g.pig.air && P.y > .1) landed = true }
+      const onShelf = Math.abs(P.y - S[0].h) < .01;
+      // step off the inside edge of a high fungus: fall to the floor
+      const [x8, z8] = at(S[8], 1.9); P.set(x8, S[8].h, z8); g.pig.air = false; await fr(2); const stood = Math.abs(P.y - S[8].h) < .01;
+      const [x9, z9] = at(S[8], 1.2); P.set(x9, S[8].h, z9); g.pig.vel.set(0, 0, 0); let fell = false; B.owl.noise = 0;
+      for (let k = 0; k < 120 && !fell; k++) { await fr(1); if (!g.pig.air && P.y < .02) fell = true }
+      return { blocked, landed: landed && onShelf, stood, fell, quiet: B.owl.state === 'sleep' } });
+    // the owl: wake her, move, get flapped off a fungus
+    const owl = inside && await page.evaluate(async () => { const g = window.__game, B = g.G.inside, P = g.pig.pos, S = g.OAK_SHELVES, s = S[10];
+      const fr = n => new Promise(res => { let k = 0; (function f() { if (k++ >= n) res(); else requestAnimationFrame(f) })() });
+      P.set(Math.sin(s.phi) * 1.9, s.h, Math.cos(s.phi) * 1.9); g.pig.air = false; await fr(2); g.owlNoise(1.2); const woke = B.owl.state === 'awake';
+      for (let k = 0; k < 40 && B.owl.t < .7; k++) await fr(1);
+      for (let k = 0; k < 60 && B.owl.state === 'awake'; k++) { g.pig.vel.set(.8, 0, 0); await fr(1) }
+      const swooped = B.owl.state === 'swoop' || B.owl.state === 'settle'; let down = false;
+      for (let k = 0; k < 120 && !down; k++) { await fr(1); if (!g.pig.air && P.y < .02) down = true }
+      return { woke, swooped, down, swoops: g.G.owlSwoops } });
+    // the top: the lookout window, the stash, slide down, out
+    await page.evaluate(() => { const g = window.__game, B = g.G.inside; B.owl.state = 'sleep'; B.owl.noise = 0; B.owl.open.visible = false; B.owl.shut.visible = true });
+    const topPlace = `{const g=window.__game,B=g.G.inside,s=g.OAK_SHELVES[g.OAK.N];g.pig.pos.set(B.window.x*.95,s.h,B.window.z*.95);g.pig.air=false;B.owl.noise=0}`;
+    const winOk = inside && await act(topPlace, 'window');
+    if (winOk) { await page.keyboard.press('KeyE'); await frames(page, 3) }
+    const goal = await page.waitForFunction(() => !!window.__game.G.goals.lookout, null, { timeout: 60000, polling: 250 }).then(() => true, () => false);
+    const look = await page.evaluate(goal => { const g = window.__game; return { lookout: g.G.lookout, quiet: g.G.quietClimb, goal } }, goal);
+    await page.evaluate(() => { const g = window.__game, B = g.G.inside, sp = B.spots[0], s = g.OAK_SHELVES[g.OAK.N]; window.__sp = sp; g.pig.pos.set(sp.x, s.h, sp.z); g.pig.air = false; g.G.acts = null });
+    await page.keyboard.down('KeyF');
+    const stash = await page.waitForFunction(() => { const g = window.__game, sp = window.__sp, s = g.OAK_SHELVES[g.OAK.N]; g.G.inside.owl.noise = 0; if (sp.ready) { g.pig.pos.set(sp.x, s.h, sp.z); if (!document.getElementById('forage').style.display.includes('block')) document.dispatchEvent(new KeyboardEvent('keydown', { code: 'KeyF' })) } return !sp.ready }, null, { timeout: 120000, polling: 250 }).then(() => true, () => false);
+    await page.keyboard.up('KeyF');
+    const slideOk = inside && await act(`{const g=window.__game,B=g.G.inside,s=g.OAK_SHELVES[g.OAK.N],a=s.phi-.45;g.pig.pos.set(Math.sin(a)*1.8,s.h,Math.cos(a)*1.8);g.pig.air=false;B.owl.noise=0}`, 'Slide back down');
+    if (slideOk) { await page.keyboard.press('KeyE'); await frames(page, 3) }
+    const slid = await page.evaluate(() => window.__game.pig.pos.y < .02);
+    const outOk = inside && await act(`{const g=window.__game,h=g.G.inside.holes[0];g.pig.pos.set(h.x,0,h.z)}`, 'knothole');
+    if (outOk) { await page.keyboard.press('KeyE'); await frames(page, 3) }
+    const out = await page.evaluate(() => { const g = window.__game, h = g.Z().oak.holes[0]; return !g.G.inside && Math.hypot(g.pig.pos.x - h.ex, g.pig.pos.z - h.ez) < .3 });
+    report('hollow oak', placed && inside && phys.blocked && phys.landed && phys.stood && phys.fell && owl.woke && owl.swooped && owl.down && look.lookout === 1 && look.goal && stash && slid && out,
+      `placed ${placed} · inside ${inside} · blocked from below ${phys.blocked} · hop onto a fungus ${phys.landed} · stand on one ${phys.stood} · fall off the edge ${phys.fell} · owl woke ${owl.woke}, flapped you off ${owl.swooped && owl.down} · lookout ${look.lookout} (light paws ${look.quiet}, goal ${look.goal}) · stash ${stash} · slid down ${slid} · back outside ${out}`);
   }
 
   // 5e. the barns: in through a hole, munch the hay, burrow onto every hidden treat, pop out, out through the other hole

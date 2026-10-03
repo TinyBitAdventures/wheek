@@ -8,6 +8,13 @@
 - The humans in Downtown, Sandy Cove, Critter Corner and on the farm sometimes toss you their zone's treat.
 - The Deep Wood's brambles are thorny cover: the hawk can't reach you in one.
 
+### The Hollow Oak
+- In a glade in 🌲 The Deep Wood stands an enormous ancient oak, three and a half metres across, with a knothole between its roots (sniff to find it). Squeeze in: the trunk is hollow all the way up.
+- Bracket fungi spiral up the inside of the trunk. Hop from one to the next (hops go higher in here) to climb to the window at the top; slip off the inside edge and you drop back down to the roots. The camera looks out at you from the middle of the trunk. Your herd waits outside.
+- An owl is asleep on a branch halfway up. Scurrying, hard landings, wheeking and rummaging wake her (watch the meter). If her eyes snap open, freeze: move before she nods off again and she flaps you all the way back down to the roots.
+- At the top, look out of the window over the whole wood: the burrows you haven't found yet go on your map, and you spot any wild guinea pigs down below. Rummage in the owl's stash of shiny things for rare treats, then slide back down the inside of the trunk.
+- New goals: Top of the Tree and Light Paws (climb to the lookout without waking the owl). The Deep Wood's checklist includes the lookout.
+
 ### The agility tent
 - A striped marquee with a "Piggy Agility" sign stands by the visitor path in 🐐 Critter Corner. The door flaps don't quite meet the ground: duck under.
 - Inside, a little agility course in the sawdust, because guinea pig agility is a real thing. Step on the green start mat, wait for the judge's whistle, and run the hoop, the weave poles (in and out, first pole on your left), the tunnel, the jump (hop over the bar), the A-frame and the seesaw in order, then over the finish line. A floating number shows what's next, and the judge by the centre pole turns to watch you.
@@ -69,6 +76,7 @@
 - The pet shop's inside, its back door with the cat flap, Duchess (awake and curled up asleep) and a pile of pellets.
 - A leaf raft and a giant weeping willow.
 - The striped agility tent, outside and in, and its course pieces: a hoop, weave poles, a tunnel, a jump, an A-frame and a seesaw.
+- The Hollow Oak, outside and in, the owl (eyes open and shut, wings that flap) and her nest of shiny things.
 - 16 new Blender-built models: rose hips, raspberry leaves, romaine, a watermelon slice, watercress, a corn husk, an apple slice and sunflower seeds, plus a snowdrift, a bramble, a market stall, a picnic basket, a watercress bed, a feed trough, an apple tree and a fallen sunflower head.
 
 ## v0.2.0 (2026-09-29)
