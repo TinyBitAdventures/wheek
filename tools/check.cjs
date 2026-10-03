@@ -1,6 +1,6 @@
 // World checks: loads the game in a tiny headless window and tests the world's logic through window.__game.
 // Usage: PW=/path/to/node_modules/playwright node tools/check.cjs [check ...]
-//   checks: reach warren night chaos eat treats goals music gnaw barn shop swap raft agility oak mill saves touch pad memory (default: all). URL defaults to the local dev site.
+//   checks: reach warren night chaos eat treats goals music gnaw barn shop swap raft agility oak mill cave saves touch pad memory (default: all). URL defaults to the local dev site.
 // Prints a report and exits 1 if anything failed.
 const { chromium } = require(process.env.PW || 'playwright');
 const URL = process.env.URL || 'https://wheek.localhost/';
@@ -446,6 +446,36 @@ const frames = (page, n) => page.evaluate(n => new Promise(r => { let k = 0; (fu
     const out = await page.evaluate(() => { const g = window.__game, h = g.Z().mill.holes[0]; return !g.G.inside && Math.hypot(g.pig.pos.x - h.ex, g.pig.pos.z - h.ez) < .3 });
     report('old windmill', placed && inside && phys.swept && phys.blocked && phys.onRamp && phys.loft && caught.started && caught.best > 3 && caught.runs === 1 && view.mazeView === 1 && view.ends && sack && out,
       `placed ${placed} · inside ${inside} · swept by the arm ${phys.swept} · blocked by the ramp's foot ${phys.blocked} · hop onto it ${phys.onRamp} · up to the loft ${phys.loft} (y ${phys.y}) · caught ${caught.best} seeds (${caught.seeds} handfuls) · maze view ${view.mazeView}, route ${view.route} cells ${view.ends} · spilled sack ${sack} · back outside ${out}`);
+  }
+
+  // 5i. the sea cave: flooded at high tide, in at low tide, shells, a crab pinch, the bottle, out in time; then washed out
+  if (pick('cave')) {
+    const act = async (place, text) => { await page.evaluate(place); return page.waitForFunction(([place, text]) => { eval(place); return (window.__game.G.acts || []).some(a => a.label.includes(text)) }, [place, text], { timeout: 60000, polling: 250 }).then(() => true, () => false) };
+    await page.evaluate(() => { const g = window.__game; g.G.time = 17; if (g.G.inside) g.exitBarn(); g.visit('beach', 0, 0, 0); g.G.hp = 100; g.G.energy = 100 });
+    const placed = await page.evaluate(() => !!window.__game.Z().cave);
+    const door = `{const g=window.__game,h=g.Z().cave.holes[0];g.pig.pos.set(h.ex,g.heightAt(h.ex,h.ez),h.ez)}`;
+    const flooded = placed && await act(door + ';window.__game.G.time=17', 'flooded at high tide');
+    const inOk = placed && await act(door + ';window.__game.G.time=11', 'Scurry into the sea cave');
+    if (inOk) { await page.keyboard.press('KeyE'); await frames(page, 4) }
+    const inside = await page.evaluate(() => window.__game.G.inside?.kind === 'cave');
+    const run = inside && await page.evaluate(async () => { const g = window.__game, B = g.G.inside, P = g.pig.pos;
+      const fr = n => new Promise(res => { let k = 0; (function f() { if (k++ >= n) res(); else requestAnimationFrame(f) })() });
+      const shells = B.finds.filter(f => f.kind === 'Shell'), hp0 = g.G.hp;
+      for (const f of shells) { P.set(f.x, 0, f.z); await fr(2) }
+      const bottle = B.finds.find(f => f.kind === 'Bottle'); if (bottle) { P.set(bottle.x, 0, bottle.z); await fr(2) }
+      const c = B.crabs[1]; let pinched = false; for (let k = 0; k < 40 && !pinched; k++) { P.set(c.x, 0, c.z); await fr(1); if (g.G.hp < hp0) pinched = true }
+      return { got: B.got.shells, total: shells.length, bottle: g.G.bottle, pinched } });
+    const outOk = inside && await act(`{const g=window.__game,h=g.G.inside.holes[0];g.pig.pos.set(h.x,0,h.z)}`, 'Scurry out');
+    if (outOk) { await page.keyboard.press('KeyE'); await frames(page, 3) }
+    const out = await page.evaluate(() => { const g = window.__game, h = g.Z().cave.holes[0]; return { out: !g.G.inside && Math.hypot(g.pig.pos.x - h.ex, g.pig.pos.z - h.ez) < .3, tideRun: g.G.tideRun } });
+    // back in, and stay too long: the tide washes you out
+    const in2 = await act(door + ';window.__game.G.time=11', 'Scurry into the sea cave');
+    if (in2) { await page.keyboard.press('KeyE'); await frames(page, 4) }
+    const washed = in2 && await page.evaluate(async () => { const g = window.__game, B = g.G.inside; if (!B || B.kind !== 'cave') return false; const e0 = g.G.energy; B.t = g.CAVE.tideT - .2;
+      const fr = n => new Promise(res => { let k = 0; (function f() { if (k++ >= n) res(); else requestAnimationFrame(f) })() });
+      for (let k = 0; k < 30 && g.G.inside; k++) await fr(1); return !g.G.inside && g.G.energy < e0 });
+    report('sea cave', placed && flooded && inside && run.got === run.total && run.got === 8 && run.bottle === 1 && run.pinched && out.out && out.tideRun === 1 && washed,
+      `placed ${placed} · flooded at high tide ${flooded} · in at low tide ${inside} · shells ${run.got}/${run.total} · bottle ${run.bottle} · crab pinch ${run.pinched} · out in time ${out.out} (tide runner ${out.tideRun}) · washed out when late ${washed}`);
   }
 
   // 5e. the barns: in through a hole, munch the hay, burrow onto every hidden treat, pop out, out through the other hole

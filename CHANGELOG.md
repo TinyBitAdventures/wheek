@@ -8,6 +8,13 @@
 - The humans in Downtown, Sandy Cove, Critter Corner and on the farm sometimes toss you their zone's treat.
 - The Deep Wood's brambles are thorny cover: the hawk can't reach you in one.
 
+### The sea cave
+- A rock headland sits at the waterline in 🏖️ Sandy Cove with a cave at its foot (sniff to find it). The sea floods it at high tide: the tide's out from 8 to 2, morning and night, and you can watch the water rise and fall in front of the mouth.
+- Inside, the tide is already turning: you have 50 seconds. Scoop up the shells and the sea glass scattered over the sand (a fresh lot every time), and dodge the crabs scuttling sideways across the cave: they pinch. When the water starts creeping in it slows you down, and if you're still inside when it arrives it washes you out onto the beach.
+- Right at the back by the rock pool waits a message in a bottle (after that, the tide brings starfish). Your herd waits on the beach.
+- New goals: Message in a Bottle and Tide Runner (every shell, and out in time). Sandy Cove's checklist includes the bottle.
+- Fixed: the progress bar on the leaf raft (and now the agility, windmill and sea cave timers) only ever filled a sliver of its track.
+
 ### The old windmill
 - An old tower mill stands on the highest hill in 🌻 Sunflower Fields, its sails turning. There's a mouse hole at the foot of its door (sniff to find it).
 - Inside, the millstones grind and a sweep arm goes round and round the floor, pushing you along if you get in its way. Hop up onto the ramp of planks that winds round the wall and climb to the loft. Your herd waits outside.
@@ -85,6 +92,7 @@
 - The striped agility tent, outside and in, and its course pieces: a hoop, weave poles, a tunnel, a jump, an A-frame and a seesaw.
 - The Hollow Oak, outside and in, the owl (eyes open and shut, wings that flap) and her nest of shiny things.
 - The old windmill with turning sails, its ground floor from inside, and its machinery: millstones in their tun, the drive shaft, the sweep arm, the hopper and sacks of grain.
+- The sea cave's rock headland and its inside, a shore crab, and beachcombing finds: a scallop shell, sea glass, a message in a bottle and a starfish.
 - 16 new Blender-built models: rose hips, raspberry leaves, romaine, a watermelon slice, watercress, a corn husk, an apple slice and sunflower seeds, plus a snowdrift, a bramble, a market stall, a picnic basket, a watercress bed, a feed trough, an apple tree and a fallen sunflower head.
 
 ## v0.2.0 (2026-09-29)

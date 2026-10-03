@@ -73,7 +73,7 @@ const furNoise=(()=>{const n=256,d=new Uint8Array(n*n*4);for(let i=0;i<n*n;i++){
 const MODELS=['Birch','Blanket','Burrow','Bush','Carrot','Clover','Clover4','Dandelion','Fence','Fern','FlowerPurple','FlowerWhite','Fox','GardenBed','Grass','GuineaPig','Hawk','Hay','House','Human','LeafPile','Log','LushGrass','MushroomBrown','MushroomRed','Oak','Oak2','Pepper','Pine','Rock','Rock2','Strawberry',
   'Sunflower','Barn','Shop','LampPost','Bench','Goat','Sheep','Duck','Car','Cattail','Umbrella','Sandcastle','Scarecrow','Fountain',
   'RoseHip','RaspLeaf','Lettuce','Watermelon','Cress','Corn','Apple','Seeds','Snowdrift','Bramble','MarketStall','Basket','CressBed','Trough','AppleTree','SunflowerHead',
-  'BarnInside','HayPile','BarnHole','Twig','PetShopInside','CatFlap','Cat','CatLoaf','Pellets','LeafRaft','Willow','AgilityTent','AgilityInside','AgilityKit','HollowOak','OakInside','Owl','OwlNest','Windmill','MillInside','MillKit'];
+  'BarnInside','HayPile','BarnHole','Twig','PetShopInside','CatFlap','Cat','CatLoaf','Pellets','LeafRaft','Willow','AgilityTent','AgilityInside','AgilityKit','HollowOak','OakInside','Owl','OwlNest','Windmill','MillInside','MillKit','SeaCave','SeaCaveInside','Crab','BeachKit'];
 const M={};
 const DOUBLE=new Set(['Grass','Plant','Leaves','DryLeaves','Petal','Needles','Cloth','Skin','Flesh']);
 async function loadAssets(progress){
@@ -219,6 +219,7 @@ function buildZone(z){
   if(z.id==='zoo')setupAgility(z);
   if(z.id==='deepwood')setupHollowOak(z);
   if(z.id==='sunflowers')setupWindmill(z);
+  if(z.id==='beach')setupSeaCave(z);
   placeTwigs(z);
   // a plant that ended up inside a rock or trunk can never be eaten: leave it out (without touching the seeded layout)
   for(const ps of z.pickSets)for(const it of ps.items)if(z.colliders.some(c=>Math.hypot(c.x-it.x,c.z-it.z)<c.r)||insideBox(it.x,it.z)){it.alive=false;it.respawn=Infinity;ps.set.setMatrix(it.i,ZERO)}
@@ -306,7 +307,7 @@ const RANKS=[[0,'Nibbler'],[4,'Sniffer'],[12,'Rummager'],[25,'Master Forager'],[
 const G={started:false,paused:false,over:false,modal:false,inTunnel:false,
   hp:100,full:80,vitc:75,energy:100,happy:50,score:0,best:lsGet('wheek-best',0),
   day:1,time:7.0,combo:0,comboT:0,forages:0,pets:0,petStreak:0,lastPetHuman:null,petStreakT:0,
-  found:{},curios:{},tunnels:0,zfound:{},visited:{park:1},met:{},pals:[],placesDone:{},goals:{},bestStreak:0,hawkDodged:0,foxEscapes:0,mazePrize:0,heard:{},given:{},barns:{},hayFinds:0,teethT:0,gnaws:0,cleanGnaws:0,shop:0,fullHerd:0,island:0,rafts:0,cleanRaft:0,agility:0,rosette:0,agilityBest:0,agilityRuns:0,oak:0,lookout:0,quietClimb:0,owlSwoops:0,mill:0,mazeView:0,seedBest:0,millCatch:0,luckT:0,giftT:40,huddle:false,wheekT:0,sniffCD:0,popcornCD:0,cause:'',nightsSurvived:0,eaten:0};
+  found:{},curios:{},tunnels:0,zfound:{},visited:{park:1},met:{},pals:[],placesDone:{},goals:{},bestStreak:0,hawkDodged:0,foxEscapes:0,mazePrize:0,heard:{},given:{},barns:{},hayFinds:0,teethT:0,gnaws:0,cleanGnaws:0,shop:0,fullHerd:0,island:0,rafts:0,cleanRaft:0,agility:0,rosette:0,agilityBest:0,agilityRuns:0,oak:0,lookout:0,quietClimb:0,owlSwoops:0,mill:0,mazeView:0,seedBest:0,millCatch:0,cave:0,shells:0,seaglass:0,bottle:0,tideRun:0,luckT:0,giftT:40,huddle:false,wheekT:0,sniffCD:0,popcornCD:0,cause:'',nightsSurvived:0,eaten:0};
 const pig={pos:new THREE.Vector3(2.5,0,-1.5),vel:new THREE.Vector3(),heading:Math.PI,vy:0,air:false,phase:0,obj:null,parts:{},eating:0,foraging:0,knock:0,popSpin:0,fur:[]};
 (()=>{const s=lsGet('wheek-pig',null);const b=s&&BREEDS[s.breed]?s.breed:'american';G.breed=b;G.coat=s&&BREEDS[b].coats.includes(s.coat)?s.coat:BREEDS[b].coats[0];G.name=(s&&s.name)||PIG_NAMES[Math.floor(Math.random()*PIG_NAMES.length)];G.perk=perksFor(b)})();
 const keys={};
@@ -1084,6 +1085,7 @@ function currentActions(){
   const m=mouthPos();
   for(const b of Z.barns)for(const h of b.holes)if(Math.hypot(h.ex-pig.pos.x,h.ez-pig.pos.z)<.45)acts.push({k:'E',label:'Squeeze into the barn',do:()=>enterInside(b,h)});
   if(Z.raft&&Math.hypot(Z.raft.ex-pig.pos.x,Z.raft.ez-pig.pos.z)<.65)acts.push({k:'E',label:'Hop on the leaf raft',do:startRaft});
+  if(Z.cave){const b=Z.cave,h=b.holes[0];if(Math.hypot(h.ex-pig.pos.x,h.ez-pig.pos.z)<.55){const lv=tideLevel();acts.push(tideOpen()?{k:'E',label:`Scurry into the sea cave (low tide${lv>-.4?', turning soon':''})`,do:()=>enterInside(b,h)}:{k:'E',label:`Sea cave · flooded at high tide (the tide's out from ${hourLabel(G.time<8||G.time>=20?8:20)})`,disabled:true})}}
   if(Z.mill){const b=Z.mill,h=b.holes[0];if(Math.hypot(h.ex-pig.pos.x,h.ez-pig.pos.z)<.5)acts.push({k:'E',label:'Squeeze through the mouse hole',do:()=>enterInside(b,h)})}
   if(Z.oak){const b=Z.oak,h=b.holes[0];if(Math.hypot(h.ex-pig.pos.x,h.ez-pig.pos.z)<.5)acts.push({k:'E',label:'Squeeze into the knothole',do:()=>enterInside(b,h)})}
   if(Z.agility){const b=Z.agility,h=b.holes[0];if(Math.hypot(h.ex-pig.pos.x,h.ez-pig.pos.z)<.5)acts.push({k:'E',label:'Duck under the tent flap',do:()=>enterInside(b,h)})}
@@ -1195,7 +1197,7 @@ function updateDrops(dt){for(let i=drops.length-1;i>=0;i--){const d=drops[i];if(
 
 // sniff
 // the little ways in to each zone's big discovery, for the outdoor sniff
-const SNIFF_WAYS_IN=[['mill','a mouse hole in the windmill door 🌻',0xffd060],['oak','a knothole in the giant oak 🌳',0x9fe88a],['agility','a gap under the tent flap 🏅',0xffd060]];
+const SNIFF_WAYS_IN=[['cave','a cave in the rocks by the water 🌊',0x7fd0ff],['mill','a mouse hole in the windmill door 🌻',0xffd060],['oak','a knothole in the giant oak 🌳',0x9fe88a],['agility','a gap under the tent flap 🏅',0xffd060]];
 function sniff(){if(G.sniffCD>0){toast(`Your nose needs a moment (${Math.ceil(G.sniffCD)}s)`);return}G.sniffCD=10;SFX.sniff();if(G.under){sniffWarren();return}let n=0,t=0;
   for(const s of spots){if(!s.ready)continue;const d=Math.hypot(s.x-pig.pos.x,s.z-pig.pos.z);if(d<22){marker(s.x,heightAt(s.x,s.z)+.2,s.z,0xffd060);n++}}
   for(const tu of tunnels){const d=Math.hypot(tu.x-pig.pos.x,tu.z-pig.pos.z);if(d<32){marker(tu.ex,heightAt(tu.ex,tu.ez)+.35,tu.ez,tu.found?0x7fd0ff:0x9a7bff);if(!tu.found)t++}}
@@ -1587,11 +1589,11 @@ function insideCollide(P,pr,free){const B=G.inside;
     if(d<m&&d>1e-5){P.x=qx+ox/d*m;P.z=qz+oz/d*m}}
   for(const c of B.cols){const dx=P.x-c.x,dz=P.z-c.z,d=Math.hypot(dx,dz);if(d<c.r+pr&&d>1e-5){P.x=c.x+dx/d*(c.r+pr);P.z=c.z+dz/d*(c.r+pr)}}
   for(const b of B.boxes){const qx=clamp(P.x,b.cx-b.hx,b.cx+b.hx),qz=clamp(P.z,b.cz-b.hz,b.cz+b.hz),dx=P.x-qx,dz=P.z-qz,d=Math.hypot(dx,dz);if(d<pr&&d>1e-5){P.x=qx+dx/d*pr;P.z=qz+dz/d*pr}}
-  P.x=clamp(P.x,-B.hx,B.hx);P.z=clamp(P.z,-B.hz,B.hz);if(B.radius){const r=Math.hypot(P.x,P.z);if(r>B.radius){P.x*=B.radius/r;P.z*=B.radius/r}}}
+  P.x=clamp(P.x,-B.hx,B.hx);P.z=clamp(P.z,-B.hz,B.hz);if(B.ellipse){const e=Math.hypot(P.x/B.ellipse[0],P.z/B.ellipse[1]);if(e>1){P.x/=e;P.z/=e}}if(B.radius){const r=Math.hypot(P.x,P.z);if(r>B.radius){P.x*=B.radius/r;P.z*=B.radius/r}}}
 // hidden treats, fresh every day
 function hideTreats(B){B.day=G.day;B.found=0;B.treats=[];for(let i=0;i<4;i++){const a=Math.random()*Math.PI*2,r=Math.sqrt(Math.random())*B.pile.R*.8;B.treats.push({x:B.pile.x+Math.cos(a)*r,z:B.pile.z+Math.sin(a)*r,type:pick(HAYLOOT),got:false})}}
 // in through a hole (or a cat flap): the inside is its own scene; each kind (barn, shop) adds its own actions and update
-function enterInside(b,hole){G.acts=null;iScene.background=new THREE.Color(0x140c06);iScene.fog=null;if(!b.inside)({shop:buildShopInside,island:buildIslandInside,agility:buildAgilityInside,oak:buildOakInside,mill:buildMillInside}[b.kind]||buildBarnInside)(b);const B=b.inside;iScene.clear();iScene.add(B.group);G.inside=B;G.insideHole=hole;B.from=b;G.hidden=true;forageState=null;$('forage').style.display='none';
+function enterInside(b,hole){G.acts=null;iScene.background=new THREE.Color(0x140c06);iScene.fog=null;if(!b.inside)({shop:buildShopInside,island:buildIslandInside,agility:buildAgilityInside,oak:buildOakInside,mill:buildMillInside,cave:buildCaveInside}[b.kind]||buildBarnInside)(b);const B=b.inside;iScene.clear();iScene.add(B.group);G.inside=B;G.insideHole=hole;B.from=b;G.hidden=true;forageState=null;$('forage').style.display='none';
   SFX.rustle();flash('rgba(0,0,0,1)',1);swapScene(pig.obj,iScene);swapScene(pts,iScene);pig.blob.visible=false;pig.light.intensity=0;pig.air=false;pig.vy=0;
   const h=B.holes[Math.max(0,b.holes.indexOf(hole))];pig.pos.set(h.x,0,h.z);pig.vel.set(0,0,0);pig.heading=h.heading;G.camYaw=h.heading+Math.PI;W.trail.length=0;W.trail.push({x:pig.pos.x,z:pig.pos.z});
   if(!B.noHerd)herd.forEach(f=>{swapScene(f.obj,iScene);f.blob.visible=false;f.pos.set(h.x,0,h.z);f.vel.set(0,0,0);f.air=false;f.vy=0});friends.forEach(f=>f.tag.style.display='none');snapCamera();
@@ -2240,6 +2242,71 @@ function millUpdate(B,dt,t){const day=clamp(sun.intensity/2.9,0,1);B.lightMat&&B
 function sniffMill(B){marker(Math.sin(MILL.rampA0+.1)*1.45,millRampH(MILL.rampA0+.1)+.2,Math.cos(MILL.rampA0+.1)*1.45,0x9fe88a,B.group);marker(B.hopperAt.x,MILL.loftH+.3,B.hopperAt.z,0xffd060,B.group);marker(B.window.x,MILL.loftH+.45,B.window.z,0x7fd0ff,B.group);
   toast('👃 Sniff sniff… flour dust, the foot of the ramp, seeds up in the loft and fresh air from the window.')}
 
+// ============================================================ the sea cave (Sandy Cove)
+// A rock headland at the waterline with a cave at its foot. The sea floods it at high tide; from 8 to 2 (morning and
+// night) the tide is out and you can get in. Inside, the tide is already turning: scoop up the shells and the sea glass
+// (and the message in a bottle at the very back), dodge the scuttling crabs, and get out before the water comes in.
+const CAVE={RX:3.4,RZ:4.2,H:2.2,door:2.15,trunk:2,tideT:50,rise:18,shells:8,glass:3};
+const tideLevel=()=>-Math.cos((G.time-11)/12*TAU),tideOpen=()=>tideLevel()<0;   // low tide at 11 and 23; open while the sea is below half tide
+const CAVE_ROCKS=[[-1.3,2,.5],[1.35,1.1,.55],[-1,-.3,.5],[1.15,-1.5,.6],[-1.6,-2.3,.45],[2.3,-.2,.35],[-2.4,.9,.4]];
+const CAVE_CRABS=[{z:2.9,amp:1.3},{z:.55,amp:1.5},{z:-1,amp:1.2},{z:-2.6,amp:1.4}];
+function setupSeaCave(z){const cs=25.5*Math.SQRT1_2,cands=[];for(let u=-34;u<=34;u+=2)cands.push([cs+u*Math.SQRT1_2,cs-u*Math.SQRT1_2,Math.abs(u)]);cands.sort((a,b)=>a[2]-b[2]);
+  const fits=(x,zz)=>Math.hypot(x,zz)<EDGE-5&&!colliders.some(c=>Math.hypot(c.x-x,c.z-zz)<c.r+3)&&!boxes.some(b=>Math.abs(b.cx-x)<b.hx+3&&Math.abs(b.cz-zz)<b.hz+3)&&!spots.some(s=>Math.hypot(s.x-x,s.z-zz)<3.4)&&!tunnels.some(t=>Math.hypot(t.x-x,t.z-zz)<4)&&Math.hypot(x-11.5,zz-5)>6;
+  const at=cands.find(([x,zz])=>fits(x,zz));if(!at)return;const [x,zz]=at,rot=Math.atan2(-1,-1),nx=Math.sin(rot),nz=Math.cos(rot);   // the mouth faces up the beach
+  const o=M.SeaCave.clone(true);o.traverse(m=>{if(m.isMesh&&m.material.name==='Stone'){m.material=m.material.clone();m.material.color.setScalar(1.5)}});o.position.set(x,heightAt(x+nx*1.6,zz+nz*1.6)-.05,zz);o.rotation.y=rot;z.group.add(o);addCollider(x,zz,CAVE.trunk);addCollider(x+nx*.9-nz*1.1,zz+nz*.9+nx*1.1,.75);addCollider(x+nx*.9+nz*1.1,zz+nz*.9-nx*1.1,.75);
+  // a pool of sea in front of the mouth that rises and falls with the tide
+  const mx=x+nx*1.9,mz=zz+nz*1.9,gy=heightAt(mx,mz),pool=new THREE.Mesh(new THREE.CircleGeometry(1.5,32),waterMat);pool.rotation.x=-Math.PI/2;pool.position.set(mx,gy-.1,mz);z.group.add(pool);
+  z.cave={obj:o,kind:'cave',scale:1,x,z:zz,pool,poolY:gy,holes:[{ex:x+nx*CAVE.door,ez:zz+nz*CAVE.door,out:rot,h:{x:0,z:CAVE.door}}]}}
+function updateTideOutside(){const c=Z.cave,k=(tideLevel()+1)/2;c.pool.position.y=c.poolY-.1+k*.34;c.pool.visible=k>.15}
+const hourLabel=h=>{h=((Math.round(h)%24)+24)%24;return h===0?'midnight':h===12?'noon':h<12?h+' AM':(h-12)+' PM'};
+function buildCaveInside(b){const g=new THREE.Group(),B={kind:'cave',title:'🌊 The Sea Cave',noHerd:true,onEnter:caveEnter,onExit:caveExit,actions:caveActions,update:caveUpdate,sniff:sniffCave,hud:caveHud,
+    group:g,s:1,hx:CAVE.RX,hz:CAVE.RZ,ceil:CAVE.H,loftX:Infinity,cols:[],boxes:[],ellipse:[CAVE.RX-.32,CAVE.RZ-.32],slow:()=>B.water>.02?.55:1,water:-.3,finds:[],
+    ceilAt:(x,z)=>CAVE.H*Math.sqrt(Math.max(0,1-(x/CAVE.RX)**2-(z/CAVE.RZ)**2))-.25};
+  const room=M.SeaCaveInside.clone(true);g.add(room);
+  room.traverse(m=>{if(m.isMesh&&m.material.name==='HoleDark'){m.material=new THREE.MeshBasicMaterial({color:0xe8f4ff});B.lightMat=m.material}});
+  for(const [x,z,r] of CAVE_ROCKS){const o=M[(x*7|0)%2?'Rock':'Rock2'].clone(true);o.scale.setScalar(r/.95);o.position.set(x,-.04,z);o.rotation.y=x*3+z;g.add(o);B.cols.push({x,z,r})}
+  B.cols.push({x:.4,z:-3,r:.95});   // the rock pool
+  const pool=new THREE.Mesh(new THREE.CircleGeometry(1,32),waterMat);pool.rotation.x=-Math.PI/2;pool.scale.set(1.1,.82,1);pool.position.set(.4,-.05,-3);g.add(pool);
+  B.sea=new THREE.Mesh(new THREE.CircleGeometry(1,48),waterMat);B.sea.rotation.x=-Math.PI/2;B.sea.scale.set(CAVE.RX,CAVE.RZ,1);B.sea.position.y=-.3;g.add(B.sea);
+  B.crabs=CAVE_CRABS.map((c,i)=>{const o=M.Crab.clone(true);g.add(o);return {...c,o,ph:i*1.7,sp:.9+i*.15,x:0}});
+  B.hemi=new THREE.HemisphereLight(0xcfe8ff,0x5a5040,1.3);g.add(B.hemi);B.amb=new THREE.AmbientLight(0xd8ecff,.5);g.add(B.amb);
+  room.traverse(m=>{if(m.isMesh&&m.material.name==='Stone'){m.material=m.material.clone();m.material.color.setScalar(1.35)}});
+  B.sun=new THREE.DirectionalLight(0xfff4e0,1.2);B.sun.position.set(0,1.2,6);B.sun.target.position.set(0,0,0);g.add(B.sun,B.sun.target);
+  B.shimmer=new THREE.PointLight(0x7fd8ff,1,4,1.5);B.shimmer.position.set(.4,.6,-3);g.add(B.shimmer);
+  B.holes=[{x:0,z:CAVE.RZ-.45,heading:Math.PI,i:0}];
+  b.inside=B}
+// a fresh scatter of finds each time the tide goes out
+function caveScatter(B){for(const f of B.finds)f.obj.removeFromParent();B.finds=[];const free=(x,z)=>Math.hypot(x/(CAVE.RX-.5),z/(CAVE.RZ-.5))<1&&!B.cols.some(c=>Math.hypot(c.x-x,c.z-z)<c.r+.2)&&z<CAVE.RZ-1&&!B.finds.some(f=>Math.hypot(f.x-x,f.z-z)<.5);
+  const put=(kind,n,zmax=9)=>{for(let k=0,t=0;k<n&&t<500;t++){const x=R(-CAVE.RX,CAVE.RX),z=R(-CAVE.RZ,Math.min(zmax,CAVE.RZ));if(!free(x,z))continue;const o=M.BeachKit.getObjectByName(kind).clone(true);o.position.set(x,0,z);o.rotation.y=Math.random()*TAU;
+    if(kind==='SeaGlass')o.traverse(m=>{if(m.isMesh){m.material=m.material.clone();m.material.transparent=true;m.material.opacity=.75;m.material.emissive=new THREE.Color(0x1a5a3a)}});B.group.add(o);B.finds.push({kind,x,z,obj:o,got:false});k++}};
+  put('Shell',CAVE.shells);put('SeaGlass',CAVE.glass,-.5);
+  const bx=-1.1,bz=-3.55,o=M.BeachKit.getObjectByName(G.bottle?'Starfish':'Bottle').clone(true);o.position.set(bx,0,bz);o.rotation.y=.4;B.group.add(o);B.finds.push({kind:G.bottle?'Starfish':'Bottle',x:bx,z:bz,obj:o,got:false})}
+function caveEnter(B){B.t=0;B.got={shells:0,glass:0};B.washed=false;B.water=-.3;caveScatter(B);
+  if(!G.cave){G.cave=1;SFX.find('rare');callout('rare','🌊 The Sea Cave',150);addScore(150,'new place!','#7fd0ff');
+    toast(`🌊 <b>The sea cave!</b> The tide's already turning: you have about ${CAVE.tideT} seconds. Scoop up the shells and the sea glass, and look right at the back. Mind the crabs: they pinch! Get out before the water comes in. Your herd waits on the beach.`,'gold',10)}
+  else toast(`🌊 Into the sea cave. ${CAVE.tideT} seconds till the tide comes in!`,'',4)}
+function caveExit(B){for(const c of B.crabs)c.pinch=0;if(B.washed)return;const all=B.got.shells>=CAVE.shells;
+  if(B.t<CAVE.tideT){toast(`🌊 Out just ahead of the tide!${B.got.shells||B.got.glass?` 🐚 ${B.got.shells} shell${B.got.shells===1?'':'s'}${B.got.glass?`, 💎 ${B.got.glass} sea glass`:''}.`:''}${all?' Every shell in the cave! +100':''}`,'good',5);if(all){G.tideRun=(G.tideRun||0)+1;addScore(100,'tide runner!','#ffd23f')}}}
+function caveActions(B){return exitActs(B,'Scurry out of the sea cave')}
+function caveHud(B){const left=Math.max(0,CAVE.tideT-B.t);return {html:`🌊 Tide coming in · ${Math.ceil(left)} s · 🐚 ${B.got.shells}/${CAVE.shells}${B.got.glass?` · 💎 ${B.got.glass}`:''}`,pct:left/CAVE.tideT*100}}
+function caveUpdate(B,dt,t){const day=clamp(sun.intensity/2.9,0,1);B.lightMat&&B.lightMat.color.copy(skyMat.uniforms.hor.value).multiplyScalar(.7+day*.7);B.sun.intensity=.2+day*1.1;B.hemi.intensity=.7+day*.7;B.shimmer.intensity=.8+Math.sin(t*2.3)*.25+Math.sin(t*5.1)*.12;
+  B.t+=dt;const rise=clamp((B.t-(CAVE.tideT-CAVE.rise))/CAVE.rise,0,1);B.water=-.3+rise*.42;B.sea.position.y=B.water;
+  if(rise>0&&!B.warned){B.warned=true;toast('🌊 <b>The water\'s coming in!</b> Time to go!','bad',4);SFX.whoosh()}
+  if(B.t>=CAVE.tideT){B.washed=true;SFX.whoosh();exitInside();G.energy=Math.max(0,G.energy-12);emit(pig.pos.x,pig.pos.y+.1,pig.pos.z,50,{col:[.85,.93,1],spread:1.2,up:1.8,size:.02,life:1});
+    toast(`🌊 <b>Splosh!</b> The tide rushes in and washes you out onto the beach, soggy but safe.${B.got.shells?` You kept your 🐚 ${B.got.shells} shell${B.got.shells>1?'s':''}.`:''}`,'bad',6);return}
+  // crabs scuttle sideways across the cave, back and forth
+  for(const c of B.crabs){c.pinch=Math.max(0,(c.pinch||0)-dt);const s=Math.sin(t*c.sp+c.ph);c.x=s*c.amp;c.o.position.set(c.x,Math.abs(Math.sin(t*c.sp*8))*.006+(B.water>0?B.water:0),c.z);c.o.rotation.z=Math.sin(t*c.sp*8)*.06;
+    if(c.pinch<=0&&Math.hypot(pig.pos.x-c.x,pig.pos.z-c.z)<.17&&pig.pos.y<.1){c.pinch=1.5;damage(4,'got pinched by a crab');floaty('pinch!','#ff9a7a');const a=Math.atan2(pig.pos.x-c.x,pig.pos.z-c.z);pig.vel.set(Math.sin(a)*2.5,0,Math.cos(a)*2.5);pig.pos.x+=Math.sin(a)*.08;pig.pos.z+=Math.cos(a)*.08}}
+  // scoop up what you walk over
+  for(const f of B.finds){if(f.got)continue;f.obj.position.y=Math.max(0,B.water>0?B.water-.01:0);if(Math.hypot(f.x-pig.pos.x,f.z-pig.pos.z)>.2)continue;f.got=true;f.obj.removeFromParent();emit(f.x,.08,f.z,14,{col:[1,.92,.8],spread:.5,up:1,size:.014,life:.7});
+    if(f.kind==='Shell'){B.got.shells++;G.shells=(G.shells||0)+1;SFX.pop();addScore(15,'shell','#ffd8c0')}
+    else if(f.kind==='SeaGlass'){B.got.glass++;G.seaglass=(G.seaglass||0)+1;SFX.find('rare');addScore(60,'sea glass!','#9fe8c0')}
+    else if(f.kind==='Bottle'){G.bottle=1;SFX.find('epic');callout('epic','🍾 Message in a bottle',300);addScore(300,'','#c98bff');
+      toast('🍾 <b>A message in a bottle!</b> You nose out the note: <i>"Ahoy, whoever finds this! The best dandelions grow on the hill by the old windmill. Wheek wheek! (signed) Captain Whiskers, Guinea Pig of the Seven Seas"</i>','gold',12)}
+    else{SFX.find('uncommon');addScore(40,'starfish!','#ffb080');toast('⭐ A starfish, washed in by the tide. Pretty!','good',3)}}}
+function sniffCave(B){for(const f of B.finds)if(!f.got)marker(f.x,.15,f.z,f.kind==='Shell'?0xffd8c0:f.kind==='SeaGlass'?0x9fe8c0:0xc98bff,B.group);for(const c of B.crabs)marker(c.x,.15,c.z,0xff7a5a,B.group);
+  toast(`👃 Sniff sniff… salt, seaweed, ${B.finds.filter(f=>!f.got).length} things to find and ${B.crabs.length} crabs.`)}
+
 // ---- requests: some humans have lost a little thing, and it turned up down in the warren. Bring it back for a thank-you
 const REQUESTS={
   marble:{who:'Maya',zone:'park',ask:'I lost my favourite blue marble down a hole in the woods. If you ever find it…',thanks:'My marble! You clever little thing!',gift:['strawberry','strawberry'],pts:200},
@@ -2513,7 +2580,7 @@ function updatePig(dt,t){
   const yaw=G.camYaw;const fx=-Math.sin(yaw),fz=-Math.cos(yaw),rx=Math.cos(yaw),rz=-Math.sin(yaw);
   let mx=fx*iz+rx*ix,mz=fz*iz+rz*ix;
   const sprint=(keys.ShiftLeft||keys.ShiftRight)&&G.energy>12&&len>0;
-  let sp=(sprint?3.1:1.45)*G.perk.speed;if(G.energy<12)sp*=.7;if(G.full<8)sp*=.85;if(busy&&!pig.air)sp*=.15;if(G.wade&&!G.under&&!G.inside)sp*=.55;
+  let sp=(sprint?3.1:1.45)*G.perk.speed;if(G.energy<12)sp*=.7;if(G.full<8)sp*=.85;if(busy&&!pig.air)sp*=.15;if(G.wade&&!G.under&&!G.inside)sp*=.55;if(G.inside&&G.inside.slow)sp*=G.inside.slow();
   const ice=!G.under&&!G.inside&&Z.ice&&Z.ice(pig.pos.x,pig.pos.z);const tx=mx*sp,tz=mz*sp;const acc=pig.air?2:ice?1.1:12;
   pig.vel.x=lerp(pig.vel.x,tx,Math.min(1,dt*acc));pig.vel.z=lerp(pig.vel.z,tz,Math.min(1,dt*acc));
   if(len>.1){const h=Math.atan2(mx,mz);pig.heading+=angDiff(pig.heading,h)*Math.min(1,dt*10);
@@ -2585,7 +2652,7 @@ function updateCamera(dt){
     const reach=p=>{aim(p,d);for(let s=1;s<=12;s++){const q=s/12;if(wSdf(lerp(camTgt.x,want.x,q),lerp(camTgt.y,want.y,q),lerp(camTgt.z,want.z,q),false)>-.1)return (s-1)/12}return 1};
     let best=p,bk=reach(p);for(const q of [.7,.95,1.2]){if(bk>=.6||q<=p)continue;const k=reach(q);if(k>bk+.1){bk=k;best=q}}
     aim(best,d*Math.max(.15,bk))}
-  else if(G.inside){const B=G.inside;if(B.tube)aim(.6,.75);else{const cp=B.camPitch&&B.camPitch();aim(cp??p,B.camDist?B.camDist():Math.min(d,B.camMax||(B.radius?4:2.6)))}if(B.waterY!==undefined)want.y=Math.max(want.y,B.waterY+.12);want.x=clamp(want.x,-B.hx-.05,B.hx+.05);want.z=clamp(want.z,-B.hz-.05,B.hz+.05);want.y=clamp(want.y,insideHeight(want.x,want.z)+.08,B.ceilAt?B.ceilAt(want.x,want.z):want.x>B.loftX-.15?B.loftY-.15:B.ceil-.25)}
+  else if(G.inside){const B=G.inside;if(B.tube)aim(.6,.75);else{const cp=B.camPitch&&B.camPitch();aim(cp??p,B.camDist?B.camDist():Math.min(d,B.camMax||(B.radius?4:2.6)))}if(B.waterY!==undefined)want.y=Math.max(want.y,B.waterY+.12);want.x=clamp(want.x,-B.hx-.05,B.hx+.05);want.z=clamp(want.z,-B.hz-.05,B.hz+.05);if(B.ellipse){const e=Math.hypot(want.x/B.ellipse[0],want.z/B.ellipse[1]);if(e>1){want.x/=e;want.z/=e}}want.y=clamp(want.y,insideHeight(want.x,want.z)+.08,B.ceilAt?B.ceilAt(want.x,want.z):want.x>B.loftX-.15?B.loftY-.15:B.ceil-.25)}
   else if(G.raft){const c=creekAt(G.raft.s-2.1);want.set(c.x+c.nx*G.raft.lat*.6,-.12+.78,c.z+c.nz*G.raft.lat*.6)}   // behind you along the creek's curve, over the water
   else{aim(p,d);const gy=heightAt(want.x,want.z)+.07;if(want.y<gy)want.y=gy}
   camPos.lerp(want,Math.min(1,dt*8));if(G.under&&wSdf(camPos.x,camPos.y,camPos.z,false)>-.05)camPos.copy(want);camera.position.copy(camPos);camera.lookAt(camTgt);
@@ -2671,6 +2738,8 @@ const GOALS=[
   {id:'quietclimb',icon:'🦉',name:'Light Paws',desc:'Climb the Hollow Oak to the lookout without waking the owl',test:()=>G.quietClimb>=1,pts:250},
   {id:'seeds',icon:'🌻',name:'Seed Catcher',desc:'Catch 30 seeds in one go under the old windmill\'s hopper',test:()=>G.seedBest>=30,pts:250},
   {id:'mazeview',icon:'🗺',name:'Bird\'s Eye',desc:'Look out over the sunflower maze from the old windmill\'s loft',test:()=>G.mazeView>=1,pts:150},
+  {id:'bottle',icon:'🍾',name:'Message in a Bottle',desc:'Find the message in a bottle at the back of the sea cave in Sandy Cove (low tide only)',test:()=>G.bottle>=1,pts:300},
+  {id:'tiderun',icon:'🐚',name:'Tide Runner',desc:'Scoop up every shell in the sea cave and get out before the tide comes in',test:()=>G.tideRun>=1,pts:250},
   {id:'shop',icon:'🐾',name:'After Hours',desc:'Sneak into the pet shop at night and make friends with Butterscotch',test:()=>G.pals.includes(friends.findIndex(f=>f.shopPig)),pts:300},
   {id:'gnaw',icon:'🦷',name:'Tidy Teeth',desc:'Gnaw a twig down without a single miss',test:()=>G.cleanGnaws>=1,pts:150},
   {id:'hay',icon:'🌾',name:'Hay Diver',desc:"Squeeze into a barn, burrow into its hay and find 3 hidden treats",test:()=>G.hayFinds>=3,pts:200},
@@ -2786,6 +2855,7 @@ function placeStatus(z){const items=[],nf=(G.zfound[z.id]||[]).length,nb=z===PAR
   if(z.id==='farm'||z.id==='zoo')items.push({icon:'🛖',label:'Squeezed into the barn',done:!!G.barns[z.id]});
   if(z.id==='town')items.push({icon:'🐾',label:'Snuck into the pet shop',done:!!G.shop});
   if(z.id==='creek')items.push({icon:'🍃',label:'Rode the leaf raft to Willow Island',done:!!G.island});
+  if(z.id==='beach')items.push({icon:'🍾',label:'Found the message in a bottle in the sea cave',done:!!G.bottle});
   if(z.id==='sunflowers')items.push({icon:'🌻',label:'Caught seeds in the old windmill',done:G.millCatch>=1});
   if(z.id==='deepwood')items.push({icon:'🔭',label:'Climbed the Hollow Oak to the lookout',done:!!G.lookout});
   if(z.id==='zoo')items.push({icon:'🏅',label:'Won a rosette in the agility tent',done:G.rosette>=1});
@@ -2805,7 +2875,7 @@ function gameOver(){G.over=true;const best=Math.max(G.best,G.score);lsSet('wheek
 // Three slots in localStorage. The world is seeded (the same every game), so a save only keeps what changed:
 // the stats, what's been found, the herd (by friend index) and the warren's explored passages.
 const SLOTS=3,slotKey=i=>'wheek-slot-'+i;
-const SAVE_G=['hp','full','vitc','energy','happy','score','day','time','forages','pets','found','curios','nightsSurvived','eaten','luckT','warrenTip','zfound','visited','met','pals','placesDone','goals','bestStreak','hawkDodged','foxEscapes','mazePrize','heard','given','barns','hayFinds','teethT','gnaws','cleanGnaws','shop','fullHerd','island','rafts','cleanRaft','agility','rosette','agilityBest','agilityRuns','oak','lookout','quietClimb','owlSwoops','mill','mazeView','seedBest','millCatch'];
+const SAVE_G=['hp','full','vitc','energy','happy','score','day','time','forages','pets','found','curios','nightsSurvived','eaten','luckT','warrenTip','zfound','visited','met','pals','placesDone','goals','bestStreak','hawkDodged','foxEscapes','mazePrize','heard','given','barns','hayFinds','teethT','gnaws','cleanGnaws','shop','fullHerd','island','rafts','cleanRaft','agility','rosette','agilityBest','agilityRuns','oak','lookout','quietClimb','owlSwoops','mill','mazeView','seedBest','millCatch','cave','shells','seaglass','bottle','tideRun'];
 function snapshot(){const g={};for(const k of SAVE_G)g[k]=G[k];const ix=(a,f)=>a.flatMap((x,i)=>f(x)?[i]:[]);
   return {v:1,saved:Date.now(),name:G.name,breed:G.breed,coat:G.coat,G:g,
     zone:Z.id,pig:G.raft?{x:+Z.raft.ex.toFixed(2),z:+Z.raft.ez.toFixed(2),h:+Z.raft.out.toFixed(2)}:G.inside?{x:+G.insideHole.ex.toFixed(2),z:+G.insideHole.ez.toFixed(2),h:+G.insideHole.out.toFixed(2)}:{x:+pig.pos.x.toFixed(2),z:+pig.pos.z.toFixed(2),h:+pig.heading.toFixed(2)},under:G.under?PARK.tunnels.indexOf(W.from):-1,herd:herd.map(f=>friends.indexOf(f)),names:friends.map(f=>f.name),known:ix(friends,f=>f.known),
@@ -2963,7 +3033,7 @@ function loop(){
     if(G.raft)updateRaft(dt,t);else updatePig(dt,t);
     const hold=(keys.KeyE)&&!G.inTunnel?(G.acts||[]).find(a=>a.k==='E'&&a.hold):null;if(hold)holdEat(dt,hold);
     updateForage(dt);updateGnaw(dt);updateSurvival(dt);updateHumans(dt);updateFriends(dt,t);updateHawk(dt,t);updateFoxes(dt,t);updateDay(dt);updateReveals(dt);updateDrops(dt);
-    if(Z.critters.length)updateCritters(dt,t);if(Z.cars.length)updateCars(dt);if(Z.mill&&Z.mill.sails)Z.mill.sails.rotation.z+=dt*.55}
+    if(Z.critters.length)updateCritters(dt,t);if(Z.cars.length)updateCars(dt);if(Z.mill&&Z.mill.sails)Z.mill.sails.rotation.z+=dt*.55;if(Z.cave)updateTideOutside()}
   }else if(!G.started){ // title orbit / breed preview
     if(G.selecting)G.camYaw+=angDiff(G.camYaw,pig.heading+.5+Math.sin(t*.3)*.9)*Math.min(1,dt*2);else G.camYaw+=dt*.08;updateDay(0);updatePig(dt,t);updateFriends(dt,t);
   }
@@ -2999,5 +3069,5 @@ function loop(){
   $('setBtn').onclick=openSettings;$('setBtn2').onclick=openSettings;$('setClose').onclick=closeSettings;applyQuality();
   $('resumeBtn').onclick=()=>togglePause(false);$('saveBtn').onclick=()=>saveGame();$('quitBtn').onclick=()=>{saveGame(true);location.reload()};$('jclose').onclick=closeJournal;$('againBtn').onclick=()=>location.reload();
   $('retryBtn').onclick=()=>{try{sessionStorage.setItem('wheek-continue',G.slot)}catch(e){}location.reload()};
-  window.__game={G,W,WS,ZONE,PARK,EDGE,ITEMS,MILL,MAZE,angNorm,millSurf,millBlocked,mazeRoute,AGI,AGI_COURSE,WEAVE_X,WEAVE_Z,OAK,OAK_SHELVES,oakSurf,oakBlocked,owlNoise,startRaft,creekAt,offerSwap,insideCollide,TUBE_NODES,startGnaw,gnawHit,enterBarn:enterInside,exitBarn:exitInside,enterInside,exitInside,enterTube:n=>enterTube(n),catNoise:n=>catNoise(n),startBurrow,popOut,insideHeight,revealItem,setInput,SET,sun,music:()=>({now:musicNow&&musicNow.k,gain:musicGain&&musicGain.gain.value,tracks:Object.fromEntries(Object.entries(MUSIC).map(([k,m])=>[k,m.buf?{dur:+m.buf.duration.toFixed(4),start:m.start,len:m.len}:null]))}),wSdf,neighbour,freeAt,Z:()=>Z,visit:(id,x=0,z=0,h=0)=>arriveZone(ZONE[id],0,{x,z,h}),enterWarren,exitWarren,pig,friends,herd,joinHerd,keys,applyLook,humans,tunnels,spots,hawk,foxes,heightAt,renderer,scene,camera};
+  window.__game={G,W,WS,ZONE,PARK,EDGE,ITEMS,CAVE,tideOpen,tideLevel,MILL,MAZE,angNorm,millSurf,millBlocked,mazeRoute,AGI,AGI_COURSE,WEAVE_X,WEAVE_Z,OAK,OAK_SHELVES,oakSurf,oakBlocked,owlNoise,startRaft,creekAt,offerSwap,insideCollide,TUBE_NODES,startGnaw,gnawHit,enterBarn:enterInside,exitBarn:exitInside,enterInside,exitInside,enterTube:n=>enterTube(n),catNoise:n=>catNoise(n),startBurrow,popOut,insideHeight,revealItem,setInput,SET,sun,music:()=>({now:musicNow&&musicNow.k,gain:musicGain&&musicGain.gain.value,tracks:Object.fromEntries(Object.entries(MUSIC).map(([k,m])=>[k,m.buf?{dur:+m.buf.duration.toFixed(4),start:m.start,len:m.len}:null]))}),wSdf,neighbour,freeAt,Z:()=>Z,visit:(id,x=0,z=0,h=0)=>arriveZone(ZONE[id],0,{x,z,h}),enterWarren,exitWarren,pig,friends,herd,joinHerd,keys,applyLook,humans,tunnels,spots,hawk,foxes,heightAt,renderer,scene,camera};
 })().catch(e=>{console.error(e);$('loading').textContent='Failed to load: '+e.message});

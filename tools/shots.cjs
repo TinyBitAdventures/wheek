@@ -208,6 +208,22 @@ scenes.millcatch = async page => {
   await page.evaluate(() => { const g = window.__game, B = g.G.inside; g.pig.pos.y = g.MILL.loftH; g.pig.air = false; B.actions(B).find(a => a.label.includes('seeds')).do() });
   await page.waitForFunction(() => { const C = window.__game.G.inside.catch; return C && C.items.length >= 3 }, null, { timeout: 120000, polling: 250 });
 };
+scenes.caveout = async page => {
+  await setup(page, `G.time=10.5;if(G.inside)g.exitBarn();g.visit('beach',0,0,0);const h=g.Z().cave.holes[0];pig.pos.set(h.ex+Math.sin(h.out)*1.6,0,h.ez+Math.cos(h.out)*1.6);pig.heading=h.out+Math.PI`);
+  await camera(page, 'window.__game.pig.heading+Math.PI+.5', 4.5, .25);
+  await page.waitForFunction(() => { const g = window.__game, d = g.camera.position.distanceTo(g.pig.pos); return Math.abs(d - g.G.camDist) < .3 }, null, { timeout: 120000, polling: 500 });
+};
+scenes.cave = async page => {
+  await setup(page, `G.time=11;if(G.inside)g.exitBarn();if(g.Z().id!=='beach')g.visit('beach',0,0,0);const b=g.Z().cave;g.enterInside(b,b.holes[0]);pig.pos.set(.3,0,1.2);pig.heading=Math.PI;window.__f0=g.renderer.info.render.frame`);
+  await page.evaluate(() => { window.__game.pig.pos.y = 0 });
+  await page.waitForFunction(() => window.__game.renderer.info.render.frame - window.__f0 > 4, null, { timeout: 180000, polling: 500 });
+  await camera(page, '.25', 2.4, .42);
+};
+scenes.cavewater = async page => {
+  await setup(page, `const B=G.inside;B.t=g.CAVE.tideT-6;pig.pos.set(-.4,0,-1.9);pig.heading=Math.PI*.8`);
+  await page.evaluate(() => { window.__game.pig.pos.y = 0 });
+  await page.waitForTimeout(1500);
+};
 scenes.raftstart = async page => {
   await setup(page, `document.getElementById('mapwrap').classList.remove('big');G.time=10.5;if(G.inside)g.exitBarn();g.visit('creek',0,0,0);const R=g.Z().raft;pig.pos.set(R.ex+Math.sin(R.out+Math.PI)*-.5,0,R.ez+Math.cos(R.out+Math.PI)*-.5);pig.heading=R.out`);
   await camera(page, 'window.__game.pig.heading+Math.PI+.6', 2.2, .32);

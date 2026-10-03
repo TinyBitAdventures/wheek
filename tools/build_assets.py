@@ -3551,6 +3551,180 @@ def build_mill_kit():
     paint(tio, solid((0.55, 0.42, 0.25)))
     export("MillKit")
 
+# ================================================================ the sea cave (Sandy Cove)
+def sea_rock_color(p, n):
+    c = mix((0.42, 0.4, 0.37), (0.58, 0.55, 0.5), noise.noise(p * 2.5) * 0.5 + 0.5)
+    c = mix(c, (0.5, 0.44, 0.36), smooth(0.3, 0.7, noise.noise(p * 1.2 + Vector((4, 4, 4))) * 0.5 + 0.5) * 0.5)
+    wet = smooth(0.55, 0.15, p.z)
+    c = mix(c, scl(c, 0.55), wet)
+    weed = wet * smooth(0.1, 0.5, noise.noise(p * 4 + Vector((9, 1, 3))))
+    c = mix(c, (0.2, 0.36, 0.14), weed * 0.8)
+    if p.z < 0.7 and noise.noise(p * 40) > 0.55:
+        c = (0.86, 0.84, 0.78)   # barnacles
+    return c
+
+def build_sea_cave():
+    """A craggy rock headland at the waterline for Sandy Cove: about 5 m across and 3 m high, wet and weedy round its foot,
+    barnacles, with the sea cave's mouth at its foot facing -Y (a guinea-pig-sized arch, 0.6 wide)."""
+    clear()
+    random.seed(411)
+    rt = root("SeaCave")
+    blobs = []
+    for (x, y, z, r, sq) in ((0, 0.6, 0.7, 1.9, 0.75), (-1.5, 0.9, 0.5, 1.4, 0.8), (1.6, 0.7, 0.6, 1.45, 0.75), (0.2, 1.7, 1.4, 1.5, 0.7),
+                             (-1.15, -0.85, 0.45, 0.95, 0.8), (1.15, -0.85, 0.45, 0.95, 0.8), (0, 0.4, 2.0, 1.0, 0.8), (-2.4, 0.2, 0.2, 0.8, 0.7), (2.5, 0.5, 0.2, 0.7, 0.7)):
+        b = blob_bm(r, 3, 0.3, 1.4, seed=x * 3 + y * 7 + z, squash=sq)
+        xform(b, Matrix.Translation((x, y, z)))
+        blobs.append(b)
+    ro = from_bm(merge_bms(blobs), "Rock", material("Stone", rough=0.9), parent=rt)
+    paint(ro, sea_rock_color)
+    # the mouth: a dark arch in the recess between the two front boulders, with a hollow behind it
+    mouth = knothole_bm(-math.pi / 2, -0.02, 0.62, 0.56, 1.42, 0.0)
+    mo = from_bm(mouth, "CaveMouth", material("HoleDark", rough=1.0), parent=rt, smooth_shade=False)
+    paint(mo, solid((0.02, 0.025, 0.03)))
+    sand = sphere_bm(1, 20, 10)
+    deform(sand, lambda v: Vector((v.x * 0.8, v.y * 0.55 - 1.75, max(v.z, 0) * 0.05 - 0.02)))
+    so = from_bm(sand, "WetSand", material("Sand", rough=0.6), parent=rt)
+    paint(so, solid((0.55, 0.47, 0.34)))
+    export("SeaCave")
+
+def build_sea_cave_inside():
+    """The sea cave from inside: an oval of wet sand 6.8 x 8.4 m (deep along Y), a low rocky dome 2.2 m high, a rock pool
+    at the back, the bright mouth at the front (-Y). The boulders and the water are added by the game."""
+    clear()
+    random.seed(412)
+    rt = root("SeaCaveInside")
+    RX, RY, H = 3.4, 4.2, 2.2
+    fl = bmesh.new()
+    bmesh.ops.create_circle(fl, cap_ends=True, radius=1, segments=48)
+    bmesh.ops.subdivide_edges(fl, edges=fl.edges, cuts=10, use_grid_fill=True)
+    def floor_f(v):
+        x, y = v.x * (RX + 0.2), v.y * (RY + 0.2)
+        pool = math.hypot((x - 0.4) / 1.1, (y - 3.0) / 0.8)
+        z = 0.012 * noise.noise(Vector((x * 2, y * 2, 0))) - 0.14 * max(0.0, 1 - pool) ** 0.7
+        return Vector((x, y, z))
+    deform(fl, floor_f)
+    flo = from_bm(fl, "Floor", material("Sand", rough=0.7), parent=rt, smooth_shade=True)
+    def sand(p, n):
+        c = mix((0.62, 0.54, 0.4), (0.74, 0.66, 0.5), noise.noise(p * 3) * 0.5 + 0.5)
+        c = mix(c, (0.46, 0.4, 0.3), smooth(0.2, 0.7, noise.noise(p * 0.8 + Vector((3, 3, 3))) * 0.5 + 0.5) * 0.6)
+        return mix(c, (0.32, 0.36, 0.3), smooth(0.0, -0.08, p.z))
+    paint(flo, sand)
+    dm = bmesh.new()
+    rows = []
+    for i in range(13):
+        el = i / 12 * math.pi / 2
+        rows.append([dm.verts.new(Vector((math.cos(a) * math.cos(el) * RX, math.sin(a) * math.cos(el) * RY, math.sin(el) * H - 0.05)) + 0.12 * Vector((noise.noise(Vector((math.cos(a) * 3, math.sin(a) * 3, el * 3))),) * 2 + (0,)) * math.cos(el)) for a in [j / 48 * math.tau for j in range(48)]])
+    for i in range(12):
+        for j in range(48):
+            dm.faces.new((rows[i][j], rows[i + 1][j], rows[i + 1][(j + 1) % 48], rows[i][(j + 1) % 48]))
+    for v in dm.verts:
+        v.co += v.co.normalized() * 0.1 * noise.noise(v.co * 1.8)
+    do = from_bm(dm, "Dome", material("Stone", rough=0.9), parent=rt)
+    paint(do, lambda p, n: scl(sea_rock_color(p * 1.3 + Vector((0, 0, 0.2)), n), 0.9))
+    # the mouth's daylight (the game tints it to the sky) and a rim of rocks round the pool
+    mouth = knothole_bm(math.pi / 2, 0.0, 0.62, 0.56, -(RY - 0.12), 0.0)
+    bmesh.ops.reverse_faces(mouth, faces=mouth.faces)
+    mo = from_bm(mouth, "Daylight", material("HoleDark", rough=1.0), parent=rt, smooth_shade=False)
+    paint(mo, solid((0.9, 0.95, 1.0)))
+    rocks = []
+    for k in range(14):
+        a = k / 14 * math.tau
+        x, y = 0.4 + math.cos(a) * 1.25, 3.0 + math.sin(a) * 0.95
+        if y < 2.3 and abs(x - 0.4) < 0.5:
+            continue   # a gap to reach the water
+        b = blob_bm(random.uniform(0.12, 0.22), 2, 0.35, 1.5, seed=k * 1.7, squash=0.6)
+        xform(b, Matrix.Translation((x, y, 0.02)))
+        rocks.append(b)
+    rko = from_bm(merge_bms(rocks), "PoolRocks", material("Stone", rough=0.9), parent=rt)
+    paint(rko, sea_rock_color)
+    export("SeaCaveInside")
+
+def build_crab():
+    """A little shore crab, 0.13 across: a red-orange shell, eyes on stalks, two claws, six legs. Faces -Y; scuttles along X."""
+    clear()
+    rt = root("Crab")
+    sh = sphere_bm(1, 20, 12)
+    deform(sh, lambda v: Vector((v.x * 0.065, v.y * 0.048, v.z * 0.026 + 0.04)))
+    so = from_bm(sh, "Shell", material("CrabShell", rough=0.45, spec=0.5), parent=rt)
+    paint(so, lambda p, n: mix((0.78, 0.22, 0.1), (0.92, 0.42, 0.18), noise.noise(p * 60) * 0.5 + 0.5) if n.z > -0.3 else (0.95, 0.8, 0.62))
+    parts = []
+    for sx in (-1, 1):
+        parts.append(limb_bm((sx * 0.012, -0.03, 0.05), (sx * 0.016, -0.04, 0.075), 0.004, 0.004, 6))
+        parts.append(limb_bm((sx * 0.05, -0.03, 0.04), (sx * 0.075, -0.06, 0.045), 0.009, 0.008, 8))
+        cl = sphere_bm(1, 12, 8)
+        deform(cl, lambda v, sx=sx: Vector((v.x * 0.022 + sx * 0.085, v.y * 0.03 - 0.08, v.z * 0.015 + 0.045)))
+        parts.append(cl)
+        for k in range(3):
+            y0 = -0.015 + k * 0.022
+            parts.append(limb_bm((sx * 0.055, y0, 0.035), (sx * 0.085, y0 + 0.006, 0.045), 0.005, 0.004, 5, caps=False))
+            parts.append(limb_bm((sx * 0.085, y0 + 0.006, 0.045), (sx * 0.1, y0 + 0.01, 0.0), 0.004, 0.003, 5))
+    po = from_bm(merge_bms(parts), "Limbs", material("CrabShell", rough=0.45, spec=0.5), parent=rt)
+    paint(po, solid((0.86, 0.32, 0.14)))
+    ey = []
+    for sx in (-1, 1):
+        e = sphere_bm(0.006, 8, 6)
+        xform(e, Matrix.Translation((sx * 0.016, -0.04, 0.078)))
+        ey.append(e)
+    eo = from_bm(merge_bms(ey), "Eyes", material("Eye", rough=0.3), parent=rt)
+    paint(eo, solid((0.03, 0.03, 0.03)))
+    export("Crab")
+
+def build_beach_kit():
+    """Beachcombing finds, each its own child for the game to clone: Shell (a ribbed scallop), SeaGlass (a frosted
+    pebble of green glass), Bottle (a corked bottle with a rolled note inside, lying down along X), Starfish."""
+    clear()
+    random.seed(413)
+    rt = root("BeachKit")
+    def piece(name):
+        e = bpy.data.objects.new(name, None)
+        bpy.context.scene.collection.objects.link(e)
+        e.parent = rt
+        return e
+    sp = piece("Shell")
+    fan = bmesh.new()
+    rows = []
+    for i in range(9):
+        r = 0.005 + 0.045 * i / 8
+        rows.append([fan.verts.new((math.cos(a) * r, -math.sin(a) * r * 0.9 + 0.02, 0.006 + 0.012 * (1 - (i / 8) ** 2) + 0.003 * (math.cos(a * 18) ** 2) * i / 8)) for a in [math.pi * (0.1 + 0.8 * k / 24) for k in range(25)]])
+    for i in range(8):
+        for k in range(24):
+            fan.faces.new((rows[i][k], rows[i + 1][k], rows[i + 1][k + 1], rows[i][k + 1]))
+    so = from_bm(fan, "ShellFan", material("Shell", rough=0.5, spec=0.5), parent=sp)
+    paint(so, lambda p, n: mix((0.95, 0.72, 0.62), (1.0, 0.88, 0.8), 0.5 + 0.5 * math.cos(math.atan2(-(p.y - 0.02), p.x) * 18)))
+    sg = piece("SeaGlass")
+    g = ico_bm(1, 2)
+    deform(g, lambda v: Vector((v.x * 0.028, v.y * 0.02, v.z * 0.012 + 0.011)) * (1 + 0.15 * noise.noise(v * 3)))
+    go = from_bm(g, "Glass", material("SeaGlass", rough=0.35, spec=0.6), parent=sg)
+    paint(go, solid((0.45, 0.85, 0.6)))
+    bt = piece("Bottle")
+    prof = [(0.0, 0.0), (0.03, 0.0), (0.032, 0.01), (0.032, 0.11), (0.026, 0.13), (0.012, 0.15), (0.011, 0.19), (0.0, 0.19)]
+    body = revolve_bm(prof, 0, math.tau, 20)
+    xform(body, Matrix.Translation((-0.095, 0, 0.032)) @ Matrix.Rotation(math.pi / 2, 4, 'Y'))
+    bo = from_bm(body, "BottleGlass", material("BottleGlass", rough=0.2, spec=0.7), parent=bt)
+    paint(bo, solid((0.55, 0.78, 0.6)))
+    cork = limb_bm((0.09, 0, 0.032), (0.11, 0, 0.032), 0.011, 0.012, 10)
+    co = from_bm(cork, "Cork", material("Wood", rough=0.9), parent=bt)
+    paint(co, solid((0.62, 0.45, 0.28)))
+    note = limb_bm((-0.06, 0, 0.03), (0.04, 0, 0.03), 0.014, 0.014, 10)
+    no = from_bm(note, "Note", material("Paper", rough=0.9), parent=bt)
+    paint(no, solid((0.95, 0.9, 0.75)))
+    st = piece("Starfish")
+    sf = bmesh.new()
+    c = sf.verts.new((0, 0, 0.014))
+    ring = []
+    for k in range(10):
+        a = k / 10 * math.tau
+        r = 0.055 if k % 2 == 0 else 0.018
+        ring.append(sf.verts.new((math.cos(a) * r, math.sin(a) * r, 0.004 if k % 2 == 0 else 0.008)))
+    for k in range(10):
+        sf.faces.new((c, ring[k], ring[(k + 1) % 10]))
+    bot = sf.verts.new((0, 0, 0.0))
+    for k in range(10):
+        sf.faces.new((bot, ring[(k + 1) % 10], ring[k]))
+    sfo = from_bm(sf, "Star", material("Starfish", rough=0.7), parent=st, smooth_shade=False)
+    paint(sfo, lambda p, n: mix((0.92, 0.42, 0.15), (0.98, 0.62, 0.25), noise.noise(p * 80) * 0.5 + 0.5))
+    export("BeachKit")
+
 jobs = {
     "GuineaPig": build_guinea_pig, "Human": build_human, "Oak": lambda: build_oak("Oak", 1),
     "Oak2": lambda: build_oak("Oak2", 9), "Pine": build_pine, "Birch": build_birch, "Bush": build_bush,
@@ -3580,6 +3754,7 @@ jobs = {
     "AgilityTent": build_agility_tent, "AgilityInside": build_agility_inside, "AgilityKit": build_agility_kit,
     "HollowOak": build_hollow_oak, "OakInside": build_oak_inside, "Owl": build_owl, "OwlNest": build_owl_nest,
     "Windmill": build_windmill, "MillInside": build_mill_inside, "MillKit": build_mill_kit,
+    "SeaCave": build_sea_cave, "SeaCaveInside": build_sea_cave_inside, "Crab": build_crab, "BeachKit": build_beach_kit,
 }
 for k, fn in jobs.items():
     if only and k not in only:
