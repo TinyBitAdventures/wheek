@@ -8,6 +8,12 @@
 - The humans in Downtown, Sandy Cove, Critter Corner and on the farm sometimes toss you their zone's treat.
 - The Deep Wood's brambles are thorny cover: the hawk can't reach you in one.
 
+### The agility tent
+- A striped marquee with a "Piggy Agility" sign stands by the visitor path in 🐐 Critter Corner. The door flaps don't quite meet the ground: duck under.
+- Inside, a little agility course in the sawdust, because guinea pig agility is a real thing. Step on the green start mat, wait for the judge's whistle, and run the hoop, the weave poles (in and out, first pole on your left), the tunnel, the jump (hop over the bar), the A-frame and the seesaw in order, then over the finish line. A floating number shows what's next, and the judge by the centre pole turns to watch you.
+- A knocked bar adds 5 seconds and each missed weave pole 2 (miss more than two and you weave again). Finish under 10 seconds for a gold rosette, under 15 for silver, and any clear run wins bronze. The scoreboard keeps your best time. Your herd follows you round.
+- New goals: Clear Round and Best in Show (gold). Critter Corner's checklist includes a rosette.
+
 ### The leaf raft and Willow Island
 - A big leaf lies on the bank at the top of Willow Creek, beside a little "Leaf rides!" sign (sniff to find it). Hop on and the current carries you all the way down the creek: steer left and right, push forward to paddle, pull back to slow down.
 - The stepping-stone fords are rapids now: the water speeds up and you thread between the stones. Fallen branches reach out from the banks, ducks paddle in your way, and treats float by to scoop up. Three bumps and you tip off into the shallows and scramble ashore.
@@ -62,6 +68,7 @@
 - The barn's inside, a hay pile, the holes in the barn walls and a fallen twig, built in Blender like everything else.
 - The pet shop's inside, its back door with the cat flap, Duchess (awake and curled up asleep) and a pile of pellets.
 - A leaf raft and a giant weeping willow.
+- The striped agility tent, outside and in, and its course pieces: a hoop, weave poles, a tunnel, a jump, an A-frame and a seesaw.
 - 16 new Blender-built models: rose hips, raspberry leaves, romaine, a watermelon slice, watercress, a corn husk, an apple slice and sunflower seeds, plus a snowdrift, a bramble, a market stall, a picnic basket, a watercress bed, a feed trough, an apple tree and a fallen sunflower head.
 
 ## v0.2.0 (2026-09-29)

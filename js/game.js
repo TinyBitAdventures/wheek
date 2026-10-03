@@ -73,7 +73,7 @@ const furNoise=(()=>{const n=256,d=new Uint8Array(n*n*4);for(let i=0;i<n*n;i++){
 const MODELS=['Birch','Blanket','Burrow','Bush','Carrot','Clover','Clover4','Dandelion','Fence','Fern','FlowerPurple','FlowerWhite','Fox','GardenBed','Grass','GuineaPig','Hawk','Hay','House','Human','LeafPile','Log','LushGrass','MushroomBrown','MushroomRed','Oak','Oak2','Pepper','Pine','Rock','Rock2','Strawberry',
   'Sunflower','Barn','Shop','LampPost','Bench','Goat','Sheep','Duck','Car','Cattail','Umbrella','Sandcastle','Scarecrow','Fountain',
   'RoseHip','RaspLeaf','Lettuce','Watermelon','Cress','Corn','Apple','Seeds','Snowdrift','Bramble','MarketStall','Basket','CressBed','Trough','AppleTree','SunflowerHead',
-  'BarnInside','HayPile','BarnHole','Twig','PetShopInside','CatFlap','Cat','CatLoaf','Pellets','LeafRaft','Willow'];
+  'BarnInside','HayPile','BarnHole','Twig','PetShopInside','CatFlap','Cat','CatLoaf','Pellets','LeafRaft','Willow','AgilityTent','AgilityInside','AgilityKit'];
 const M={};
 const DOUBLE=new Set(['Grass','Plant','Leaves','DryLeaves','Petal','Needles','Cloth','Skin','Flesh']);
 async function loadAssets(progress){
@@ -216,6 +216,7 @@ function buildZone(z){
   for(const b of z.barns)setupBarn(b);
   if(z.id==='town')setupPetShop(z);
   if(z.id==='creek')setupRaft(z);
+  if(z.id==='zoo')setupAgility(z);
   placeTwigs(z);
   // a plant that ended up inside a rock or trunk can never be eaten: leave it out (without touching the seeded layout)
   for(const ps of z.pickSets)for(const it of ps.items)if(z.colliders.some(c=>Math.hypot(c.x-it.x,c.z-it.z)<c.r)||insideBox(it.x,it.z)){it.alive=false;it.respawn=Infinity;ps.set.setMatrix(it.i,ZERO)}
@@ -301,7 +302,7 @@ const RANKS=[[0,'Nibbler'],[4,'Sniffer'],[12,'Rummager'],[25,'Master Forager'],[
 const G={started:false,paused:false,over:false,modal:false,inTunnel:false,
   hp:100,full:80,vitc:75,energy:100,happy:50,score:0,best:lsGet('wheek-best',0),
   day:1,time:7.0,combo:0,comboT:0,forages:0,pets:0,petStreak:0,lastPetHuman:null,petStreakT:0,
-  found:{},curios:{},tunnels:0,zfound:{},visited:{park:1},met:{},pals:[],placesDone:{},goals:{},bestStreak:0,hawkDodged:0,foxEscapes:0,mazePrize:0,heard:{},given:{},barns:{},hayFinds:0,teethT:0,gnaws:0,cleanGnaws:0,shop:0,fullHerd:0,island:0,rafts:0,cleanRaft:0,luckT:0,giftT:40,huddle:false,wheekT:0,sniffCD:0,popcornCD:0,cause:'',nightsSurvived:0,eaten:0};
+  found:{},curios:{},tunnels:0,zfound:{},visited:{park:1},met:{},pals:[],placesDone:{},goals:{},bestStreak:0,hawkDodged:0,foxEscapes:0,mazePrize:0,heard:{},given:{},barns:{},hayFinds:0,teethT:0,gnaws:0,cleanGnaws:0,shop:0,fullHerd:0,island:0,rafts:0,cleanRaft:0,agility:0,rosette:0,agilityBest:0,agilityRuns:0,luckT:0,giftT:40,huddle:false,wheekT:0,sniffCD:0,popcornCD:0,cause:'',nightsSurvived:0,eaten:0};
 const pig={pos:new THREE.Vector3(2.5,0,-1.5),vel:new THREE.Vector3(),heading:Math.PI,vy:0,air:false,phase:0,obj:null,parts:{},eating:0,foraging:0,knock:0,popSpin:0,fur:[]};
 (()=>{const s=lsGet('wheek-pig',null);const b=s&&BREEDS[s.breed]?s.breed:'american';G.breed=b;G.coat=s&&BREEDS[b].coats.includes(s.coat)?s.coat:BREEDS[b].coats[0];G.name=(s&&s.name)||PIG_NAMES[Math.floor(Math.random()*PIG_NAMES.length)];G.perk=perksFor(b)})();
 const keys={};
@@ -1078,6 +1079,7 @@ function currentActions(){
   const m=mouthPos();
   for(const b of Z.barns)for(const h of b.holes)if(Math.hypot(h.ex-pig.pos.x,h.ez-pig.pos.z)<.45)acts.push({k:'E',label:'Squeeze into the barn',do:()=>enterInside(b,h)});
   if(Z.raft&&Math.hypot(Z.raft.ex-pig.pos.x,Z.raft.ez-pig.pos.z)<.65)acts.push({k:'E',label:'Hop on the leaf raft',do:startRaft});
+  if(Z.agility){const b=Z.agility,h=b.holes[0];if(Math.hypot(h.ex-pig.pos.x,h.ez-pig.pos.z)<.5)acts.push({k:'E',label:'Duck under the tent flap',do:()=>enterInside(b,h)})}
   if(Z.shop){const b=Z.shop,h=b.holes[0];if(Math.hypot(h.ex-pig.pos.x,h.ez-pig.pos.z)<.5){const open=shopOpen();
     acts.push(b.flapCD>0?{k:'E',label:`Duchess is watching the cat flap (${Math.ceil(b.flapCD)}s)`,disabled:true}:open?{k:'E',label:'Push through the cat flap',do:()=>enterInside(b,h)}:{k:'E',label:'Cat flap · locked while the shop is open (after 6 PM)',disabled:true})}}
   const gh=humans.find(h=>h.visible&&Math.hypot(h.obj.position.x-pig.pos.x,h.obj.position.z-pig.pos.z)<1.6);const gk=gh&&requestOf(gh);
@@ -1579,7 +1581,7 @@ function insideCollide(P,pr,free){const B=G.inside;
 // hidden treats, fresh every day
 function hideTreats(B){B.day=G.day;B.found=0;B.treats=[];for(let i=0;i<4;i++){const a=Math.random()*Math.PI*2,r=Math.sqrt(Math.random())*B.pile.R*.8;B.treats.push({x:B.pile.x+Math.cos(a)*r,z:B.pile.z+Math.sin(a)*r,type:pick(HAYLOOT),got:false})}}
 // in through a hole (or a cat flap): the inside is its own scene; each kind (barn, shop) adds its own actions and update
-function enterInside(b,hole){G.acts=null;iScene.background=new THREE.Color(0x140c06);iScene.fog=null;if(!b.inside)({shop:buildShopInside,island:buildIslandInside}[b.kind]||buildBarnInside)(b);const B=b.inside;iScene.clear();iScene.add(B.group);G.inside=B;G.insideHole=hole;B.from=b;G.hidden=true;forageState=null;$('forage').style.display='none';
+function enterInside(b,hole){G.acts=null;iScene.background=new THREE.Color(0x140c06);iScene.fog=null;if(!b.inside)({shop:buildShopInside,island:buildIslandInside,agility:buildAgilityInside}[b.kind]||buildBarnInside)(b);const B=b.inside;iScene.clear();iScene.add(B.group);G.inside=B;G.insideHole=hole;B.from=b;G.hidden=true;forageState=null;$('forage').style.display='none';
   SFX.rustle();flash('rgba(0,0,0,1)',1);swapScene(pig.obj,iScene);swapScene(pts,iScene);pig.blob.visible=false;pig.light.intensity=0;pig.air=false;pig.vy=0;
   const h=B.holes[Math.max(0,b.holes.indexOf(hole))];pig.pos.set(h.x,0,h.z);pig.vel.set(0,0,0);pig.heading=h.heading;G.camYaw=h.heading+Math.PI;W.trail.length=0;W.trail.push({x:pig.pos.x,z:pig.pos.z});
   if(!B.noHerd)herd.forEach(f=>{swapScene(f.obj,iScene);f.blob.visible=false;f.pos.set(h.x,0,h.z);f.vel.set(0,0,0);f.air=false;f.vy=0});friends.forEach(f=>f.tag.style.display='none');snapCamera();
@@ -1919,6 +1921,122 @@ function islandUpdate(B,dt,t){for(const sp of B.spots)if(!sp.ready){sp.cd-=dt;if
   iScene.background=skyMat.uniforms.hor.value;if(!iScene.fog)iScene.fog=new THREE.Fog(0xcfe3ee,20,70);iScene.fog.color.copy(scene.fog.color)}
 function sniffIsland(B){for(const sp of B.spots)if(sp.ready)marker(sp.x,islandHeight(sp.x,sp.z)+.25,sp.z,0xffd060,B.group);marker(B.hollow.x,.45,B.hollow.z,0x7fd0ff,B.group);
   toast('👃 Sniff sniff… driftwood, watercress, and the cosy hollow under the willow.')}
+
+// ============================================================ the agility tent (Critter Corner)
+// Guinea pig agility is a real thing. A striped marquee by the visitor path; duck under the door flap and there's a little
+// course in the sawdust: step on the start mat, then the hoop, the weave poles, the tunnel, the jump, the A-frame and the
+// seesaw in order, and over the finish line. A knocked bar or a missed weave pole adds seconds. Rosettes go by time.
+const AGI={W:6.4,D:5,GOLD:10,SILVER:15,START:{x:.65,z:1.7}};
+const AGI_COURSE=[
+  {name:'Hoop',x:1.5,z:1.7,nx:1,nz:0,half:.15},
+  {name:'Weave poles',x:2.4,z:-.6,nx:0,nz:-1,half:.6,weave:true},
+  {name:'Tunnel',x:.4,z:-1.8,nx:-1,nz:0,half:.14},
+  {name:'Jump',x:-.5,z:-1.8,nx:-1,nz:0,half:.24,jump:true},
+  {name:'A-frame',x:-2.3,z:-.2,nx:0,nz:1,half:.18,minY:.2},
+  {name:'Seesaw',x:-.85,z:1.65,nx:1,nz:0,half:.16,minY:.03},
+  {name:'Finish',x:-.3,z:1.65,nx:1,nz:0,half:.45}];
+const WEAVE_X=2.4,WEAVE_Z=[1,.68,.36,.04,-.28,-.6],SEESAW={x:-1.3,z:1.65,L:.7,h:.14,tilt:.172},AFRAME={x:-2.3,z:-.2,L:.8,h:.3,w:.18};
+const ROSETTE=['','🥉 bronze','🥈 silver','🥇 gold'];
+function boardSign(o,w,h,draw,lx,ly,lz,edge=0x2a5a50){const tex=canvasTex(512,Math.round(512*h/w),draw),mesh=new THREE.Mesh(new THREE.BoxGeometry(w,h,.04),[0,0,0,0,1,1].map(k=>k?new THREE.MeshStandardMaterial({map:tex,roughness:.7}):new THREE.MeshStandardMaterial({color:edge,roughness:.7})));
+  o.updateMatrixWorld(true);mesh.position.copy(o.localToWorld(new THREE.Vector3(lx,ly,lz)));mesh.rotation.y=o.rotation.y;mesh.castShadow=true;return mesh}
+// the tent goes in the first clear spot beside the visitor path, its door turned to face the path (squared up, so its box collides)
+function setupAgility(z){const fits=(cx,cz,sw)=>{const hx=(sw?AGI.D:AGI.W)/2+.7,hz=(sw?AGI.W:AGI.D)/2+.7;let lo=Infinity,hi=-Infinity;
+    for(let x=cx-hx;x<=cx+hx;x+=.5)for(let zz=cz-hz;zz<=cz+hz;zz+=.5){if(!freeAt(x,zz,.15)||distToPath(x,zz)<.9||Math.hypot(x,zz)>EDGE-5)return false;
+      if(PENS.some(([px,pz,w,h])=>Math.abs(x-px)<w/2+1&&Math.abs(zz-pz)<h/2+1))return false;const y=heightAt(x,zz);lo=Math.min(lo,y);hi=Math.max(hi,y)}
+    return hi-lo<.7};
+  const cands=[];for(let i=0;i<ZOO_LOOP.length-1;i++){const [ax,az]=ZOO_LOOP[i],[bx,bz]=ZOO_LOOP[i+1],L=Math.hypot(bx-ax,bz-az);
+    for(let k=.1;k<=.91;k+=.1)for(const sd of [1,-1]){const nx=-(bz-az)/L*sd,nz=(bx-ax)/L*sd,rot=Math.round(Math.atan2(-nx,-nz)/(Math.PI/2))*Math.PI/2,sw=Math.abs(Math.sin(rot))>.5;
+      const off=(sw?AGI.W:AGI.D)/2+2,cx=ax+(bx-ax)*k+nx*off,cz=az+(bz-az)*k+nz*off;cands.push({cx,cz,rot,sw})}}
+  cands.sort((a,b)=>Math.hypot(a.cx,a.cz)-Math.hypot(b.cx,b.cz));const at=cands.find(c=>fits(c.cx,c.cz,c.sw));   // nearest the middle of the zoo
+  if(!at)return;const {cx,cz,rot,sw}=at,hx=(sw?AGI.D:AGI.W)/2,hz=(sw?AGI.W:AGI.D)/2;
+  const y=Math.min(heightAt(cx-hx,cz-hz),heightAt(cx+hx,cz-hz),heightAt(cx-hx,cz+hz),heightAt(cx+hx,cz+hz),heightAt(cx,cz))-.04;
+  const o=M.AgilityTent.clone(true);o.position.set(cx,y,cz);o.rotation.y=rot;z.group.add(o);boxes.push({cx,cz,hx,hz});
+  const a=rot,nx=Math.sin(a),nz=Math.cos(a);o.updateMatrixWorld(true);const p=o.localToWorld(new THREE.Vector3(0,0,AGI.D/2));
+  z.group.add(boardSign(o,1.5,.42,(c,w,h)=>{c.fillStyle='#fff6e0';c.fillRect(0,0,w,h);c.strokeStyle='#c8281e';c.lineWidth=12;c.strokeRect(8,8,w-16,h-16);c.fillStyle='#c8281e';c.font='700 62px Fredoka, sans-serif';c.textAlign='center';c.textBaseline='middle';c.fillText('🏅 PIGGY AGILITY',w/2,h*.4);c.fillStyle='#3a6ab0';c.font='600 34px Fredoka, sans-serif';c.fillText('clear rounds daily · all breeds',w/2,h*.76)},0,1.05,AGI.D/2+.06,0xc8281e));
+  z.agility={obj:o,kind:'agility',scale:1,holes:[{ex:p.x+nx*.5,ez:p.z+nz*.5,out:a,h:{x:0,z:AGI.D/2}}]}}
+function agiHeight(x,z){const B=G.inside;
+  const fx=Math.abs(x-AFRAME.x),fz=Math.abs(z-AFRAME.z);if(fx<AFRAME.w&&fz<AFRAME.L)return AFRAME.h*(1-fz/AFRAME.L)+.012;
+  const sx=x-SEESAW.x;if(Math.abs(sx)<SEESAW.L&&Math.abs(z-SEESAW.z)<.15)return Math.max(0,SEESAW.h+.0125+sx*Math.sin(B?B.tilt:SEESAW.tilt));
+  return 0}
+function buildAgilityInside(b){const g=new THREE.Group(),B={kind:'agility',title:'🏅 The Agility Tent',onEnter:agiEnter,onExit:agiExit,actions:agiActions,update:agiUpdate,sniff:sniffAgility,hud:agiHud,
+    group:g,s:1,hx:AGI.W/2-.13,hz:AGI.D/2-.13,ceil:1.75,loftX:Infinity,cols:[],boxes:[],height:agiHeight,camMax:3.4,ceilAt:(x,z)=>1.5+1.4*(1-Math.max(Math.abs(x)/(AGI.W/2),Math.abs(z)/(AGI.D/2)))-.2,tilt:SEESAW.tilt,tiltTo:SEESAW.tilt,run:null};
+  const room=M.AgilityInside.clone(true);g.add(room);
+  room.traverse(m=>{if(m.isMesh&&m.material.name==='HoleDark'){m.material=new THREE.MeshBasicMaterial({color:0xfff0d0});B.gapMat=m.material}});
+  const piece=(name,x,z,ry=0)=>{const o=M.AgilityKit.getObjectByName(name).clone(true);o.position.set(x,0,z);o.rotation.y=ry;g.add(o);return o};
+  B.cols.push({x:0,z:0,r:.09});   // the centre pole
+  for(const [x,z,sw] of [[-2.75,-2.05,0],[-2.2,-2.2,0],[2.75,-2.05,0],[2.75,2.05,0],[-2.75,1.25,1]])B.boxes.push({cx:x,cz:z,hx:sw?.16:.25,hz:sw?.25:.16});   // straw bales
+  const C=AGI_COURSE;piece('Hoop',C[0].x,C[0].z,Math.PI/2);for(const s of [-1,1])B.cols.push({x:C[0].x,z:C[0].z+s*.24,r:.03});
+  for(const z of WEAVE_Z){piece('Pole',WEAVE_X,z);B.cols.push({x:WEAVE_X,z,r:.025})}
+  B.tunnel=piece('Tunnel',1,-1.8);for(const s of [-1,1])B.boxes.push({cx:1,cz:-1.8+s*.2,hx:.6,hz:.02});
+  B.tunnel.traverse(m=>{if(m.isMesh&&m.material.name==='Cloth'){m.material=m.material.clone();m.material.transparent=true;B.tunnelMat=m.material}});
+  B.jump=piece('Jump',C[3].x,C[3].z,Math.PI/2);B.bar=B.jump.getObjectByName('Bar');for(const s of [-1,1])B.cols.push({x:C[3].x,z:C[3].z+s*.27,r:.03},{x:C[3].x,z:C[3].z+s*.36,r:.05});
+  piece('Ramp',AFRAME.x,AFRAME.z,Math.PI/2);
+  B.seesaw=piece('Seesaw',SEESAW.x,SEESAW.z);B.plank=B.seesaw.getObjectByName('Plank');B.plank.rotation.z=SEESAW.tilt;
+  // the start mat and a chalk finish line
+  const mat=new THREE.Mesh(new THREE.PlaneGeometry(.42,.32),new THREE.MeshStandardMaterial({map:canvasTex(128,96,(c,w,h)=>{c.fillStyle='#3a8a4a';c.fillRect(0,0,w,h);c.fillStyle='#fff';c.font='700 30px Fredoka, sans-serif';c.textAlign='center';c.textBaseline='middle';c.fillText('START',w/2,h/2)}),roughness:.9}));
+  mat.rotation.x=-Math.PI/2;mat.position.set(AGI.START.x,.006,AGI.START.z);g.add(mat);
+  const fin=new THREE.Mesh(new THREE.PlaneGeometry(.06,.9),new THREE.MeshStandardMaterial({map:canvasTex(16,128,(c,w,h)=>{for(let i=0;i<8;i++){c.fillStyle=i%2?'#222':'#fff';c.fillRect(0,i*16,w,16)}}),roughness:.9}));
+  fin.rotation.x=-Math.PI/2;fin.position.set(C[6].x,.006,C[6].z);g.add(fin);
+  // the judge by the centre pole, and the scoreboard on the back wall
+  const j=M.Human.clone(true);j.traverse(m=>{if(m.isMesh){const n=m.material.name;if(['Shirt','Pants','Hair','HumanSkin'].includes(n)){m.material=m.material.clone();m.material.color.set({Shirt:0x2a4a8a,Pants:0xd8d0c0,Hair:0x9a9088,HumanSkin:0xe8b890}[n])}}});
+  j.position.set(.42,0,.32);g.add(j);B.judge=j;B.judgeArm=j.getObjectByName('ArmR');B.cols.push({x:.42,z:.32,r:.3});
+  B.board=new THREE.Mesh(new THREE.PlaneGeometry(1.3,.56),new THREE.MeshBasicMaterial({color:0xffffff}));B.board.position.set(-1.25,.95,-AGI.D/2+.06);g.add(B.board);agiBoard(B);
+  // the number of the obstacle to run next, floating over it
+  B.badges=C.map((c,i)=>new THREE.SpriteMaterial({map:canvasTex(96,96,(g2,w,h)=>{g2.fillStyle=i===6?'#2a2a2a':'#ffd23f';g2.beginPath();g2.arc(48,48,44,0,7);g2.fill();g2.lineWidth=6;g2.strokeStyle='#fff';g2.stroke();g2.fillStyle=i===6?'#fff':'#5a3a10';g2.font='700 52px Fredoka, sans-serif';g2.textAlign='center';g2.textBaseline='middle';g2.fillText(i===6?'🏁':String(i+1),48,52)}),depthTest:false}));
+  B.badge=new THREE.Sprite(B.badges[0]);B.badge.scale.setScalar(.2);B.badge.visible=false;B.badge.renderOrder=5;g.add(B.badge);
+  B.hemi=new THREE.HemisphereLight(0xfff0e8,0x8a6a40,1.2);g.add(B.hemi);B.sun=new THREE.DirectionalLight(0xffe8e0,1.2);B.sun.position.set(-2,6,3);g.add(B.sun);B.amb=new THREE.AmbientLight(0xffe0d8,.8);g.add(B.amb);   // sunlight glowing through the canvas
+  B.lamp=new THREE.PointLight(0xffd8a0,1.2,9,1.2);B.lamp.position.set(0,2.2,0);g.add(B.lamp);
+  B.holes=[{x:0,z:AGI.D/2-.35,heading:Math.PI,i:0}];
+  b.inside=B}
+function agiBoard(B){const best=G.agilityBest;B.board.material.map?.dispose();
+  B.board.material.map=canvasTex(512,220,(c,w,h)=>{c.fillStyle='#fff6e0';c.fillRect(0,0,w,h);c.strokeStyle='#c8281e';c.lineWidth=10;c.strokeRect(5,5,w-10,h-10);c.textAlign='center';c.fillStyle='#c8281e';c.font='700 40px Fredoka, sans-serif';c.fillText('🏅 PIGGY AGILITY',w/2,52);
+    c.fillStyle='#3a2a1a';c.font='600 30px Fredoka, sans-serif';c.fillText(`🥇 under ${AGI.GOLD} s   🥈 under ${AGI.SILVER} s   🥉 any clear run`,w/2,108);
+    c.fillText(best?`Best: ${best.toFixed(1)} s ${ROSETTE[G.rosette].split(' ')[0]}`:'No runs yet. Start on the green mat!',w/2,160);c.font='500 22px Fredoka, sans-serif';c.fillText('knocked bar +5 s · missed weave pole +2 s',w/2,196)});B.board.material.needsUpdate=true}
+function agiEnter(B){B.run=null;B.badge.visible=false;
+  if(!G.agility){G.agility=1;SFX.find('rare');callout('rare','🏅 The Agility Tent',150);addScore(150,'new place!','#7fd0ff');
+    toast(`🏅 <b>The agility tent!</b> A little course in the sawdust: step on the green START mat and press ${kb('E')} to run it. Hoop, weave poles (first pole on your left), tunnel, jump (hop over the bar!), A-frame, seesaw, then the finish line. Fast and clean wins a rosette.`,'gold',11)}
+  else toast('🏅 Into the agility tent')}
+function agiExit(B){if(B.run){B.run=null;toast('🏅 Run abandoned. The judge sighs.')}B.badge.visible=false;if(B.tunnelMat)B.tunnelMat.opacity=1}
+function agiActions(B){const acts=B.run?[]:exitActs(B,'Duck back out under the flap');
+  if(!B.run&&Math.hypot(pig.pos.x-AGI.START.x,pig.pos.z-AGI.START.z)<.32)acts.push({k:'E',label:G.agilityRuns?`Start a run (best ${G.agilityBest.toFixed(1)} s)`:'Start a run!',do:()=>agiStart(B)});
+  if(B.run&&B.run.t>0)acts.push({k:'E',label:'Give up this run',do:()=>{B.run=null;B.badge.visible=false;toast('🏅 Run stopped. Back to the mat whenever you like.')}});
+  return acts}
+function agiStart(B){B.run={next:0,t:-1,faults:0,weave:{k:0,miss:0,armed:false},px:pig.pos.x,pz:pig.pos.z};B.bar.position.y=0;B.bar.rotation.set(0,0,0);B.barDown=false;G.acts=null;
+  tone('square',1800,1750,.12,.08);toast('🏅 Ready…','',1.2);B.badge.material=B.badges[0];B.badge.visible=true}
+function agiHud(B){const r=B.run;if(!r)return null;const c=AGI_COURSE[r.next];
+  return {html:r.t<0?'🏅 Ready…':`🏅 ${r.t.toFixed(1)} s${r.faults?` <span style="color:#ff9a7a">+${r.faults} s</span>`:''} · next: ${r.next<6?(r.next+1)+' '+c.name:'🏁 Finish'}`,pct:r.next/AGI_COURSE.length*100}}
+function agiUpdate(B,dt,t){const day=clamp(sun.intensity/2.9,0,1);B.hemi.intensity=.7+day*.7;B.sun.intensity=.3+day*1.1;B.amb.intensity=.25+day*.9;B.lamp.intensity=isNight()?2:1;if(B.gapMat)B.gapMat.color.copy(skyMat.uniforms.hor.value).multiplyScalar(.6+day*.8);
+  // the seesaw tips over once you're past the middle, and back when you get off
+  const onPlank=Math.abs(pig.pos.x-SEESAW.x)<SEESAW.L&&Math.abs(pig.pos.z-SEESAW.z)<.15&&pig.pos.y>.01;
+  B.tiltTo=onPlank?(pig.pos.x>SEESAW.x+.04?-SEESAW.tilt:B.tiltTo):SEESAW.tilt;const was=B.tilt;B.tilt+=clamp(B.tiltTo-B.tilt,-dt*1.4,dt*1.4);B.plank.rotation.z=B.tilt;
+  if(Math.abs(was-B.tiltTo)>.01&&Math.abs(B.tilt-B.tiltTo)<=.01){tone('triangle',140,90,.12,.25);emit(SEESAW.x+(B.tiltTo<0?.65:-.65),.03,SEESAW.z,10,{col:[.85,.72,.48],spread:.4,up:.6,size:.012,life:.5,grav:3})}
+  if(B.barDown&&B.bar.position.y>-.075){B.bar.position.y=Math.max(-.075,B.bar.position.y-dt*.6);B.bar.rotation.x=Math.min(.5,B.bar.rotation.x+dt*3)}
+  if(B.tunnelMat)B.tunnelMat.opacity=lerp(B.tunnelMat.opacity,Math.abs(pig.pos.x-1)<.65&&Math.abs(pig.pos.z+1.8)<.2?.4:1,Math.min(1,dt*8));
+  // the judge watches you
+  const ja=Math.atan2(pig.pos.x-B.judge.position.x,pig.pos.z-B.judge.position.z);B.judge.rotation.y+=angDiff(B.judge.rotation.y,ja)*Math.min(1,dt*3);
+  if(B.judgeArm)B.judgeArm.rotation.x=lerp(B.judgeArm.rotation.x,B.cheer>0?-2.4+Math.sin(t*12)*.3:0,Math.min(1,dt*8));B.cheer=Math.max(0,(B.cheer||0)-dt);
+  const r=B.run;if(!r)return;
+  if(r.t<0){r.t+=dt*1.6;if(r.t>=0){r.t=0;tone('square',2200,2150,.25,.1);toast('🏅 <b>Go!</b>','good',1.2)}r.px=pig.pos.x;r.pz=pig.pos.z;return}
+  r.t+=dt;const c=AGI_COURSE[r.next],px=pig.pos.x,pz=pig.pos.z;
+  B.badge.position.set(c.x,(c.minY||0)+.5+Math.sin(t*3)*.03,c.z);
+  if(c.weave){const w=r.weave;if(!w.armed){if(pz>WEAVE_Z[0]+.05&&Math.abs(px-WEAVE_X)<.6)w.armed=true}
+    else while(w.k<6&&pz<WEAVE_Z[w.k]){const lat=px-WEAVE_X,want=w.k%2===0?1:-1;if(Math.abs(lat)>.45||Math.sign(lat)!==want){w.miss++;floaty('missed a pole','#ff9a7a')}else SFX.pop();w.k++}
+    if(w.k>=6){if(w.miss<=2){r.faults+=w.miss*2;agiCleared(B,r,w.miss?`+${w.miss*2} s`:'weave!')}else{toast('🏅 <b>Missed the weave!</b> Back to the top and weave in and out: first pole on your left.','bad',4);r.weave={k:0,miss:0,armed:false}}}}
+  else{const d0=(r.px-c.x)*c.nx+(r.pz-c.z)*c.nz,d1=(px-c.x)*c.nx+(pz-c.z)*c.nz,lat=Math.abs(-(px-c.x)*c.nz+(pz-c.z)*c.nx);
+    if(d0<0&&d1>=0&&lat<c.half){
+      if(c.jump){if(pig.pos.y<.07){r.faults+=5;B.barDown=true;tone('triangle',300,180,.2,.2);floaty('knocked the bar! +5 s','#ff9a7a');agiCleared(B,r,'')}else agiCleared(B,r,'clear!')}
+      else if(c.minY&&pig.pos.y<c.minY){}   // went past beside it, not over it
+      else if(r.next===6)agiFinish(B,r);else agiCleared(B,r,c.name==='Tunnel'?'whoosh!':c.name==='Seesaw'?'wobble!':'nice!')}}
+  r.px=px;r.pz=pz}
+function agiCleared(B,r,say){r.next++;if(say)floaty(say,'#ffe9a0');SFX.pop();B.cheer=.6;B.badge.material=B.badges[r.next]}
+function agiFinish(B,r){const total=r.t+r.faults,rs=total<=AGI.GOLD?3:total<=AGI.SILVER?2:1,newBest=!G.agilityBest||total<G.agilityBest,better=rs>(G.rosette||0);
+  B.run=null;B.badge.visible=false;G.agilityRuns=(G.agilityRuns||0)+1;if(newBest)G.agilityBest=+total.toFixed(1);if(better)G.rosette=rs;
+  SFX.levelup();setTimeout(()=>SFX.wheek(),300);B.cheer=2;G.happy=Math.min(100,G.happy+15);herdPopcorn();emit(pig.pos.x,pig.pos.y+.2,pig.pos.z,40,{col:[1,.85,.3],spread:1,up:1.6,size:.02,life:1.1,grav:2});
+  addScore(40+(better?[0,80,150,300][rs]:0)+(newBest&&G.agilityRuns>1?30:0),'clear round!','#ffd23f');
+  if(better)callout(rs===3?'legendary':rs===2?'epic':'rare',`${ROSETTE[rs].split(' ')[0]} ${ROSETTE[rs].split(' ')[1]} rosette`,[0,80,150,300][rs]);
+  toast(`🏁 <b>${total.toFixed(1)} s</b>${r.faults?` (${r.t.toFixed(1)} s + ${r.faults} s faults)`:' · a clean run!'} The judge pins on a <b>${ROSETTE[rs]}</b> rosette${better?'. Your best yet!':''}${newBest&&G.agilityRuns>1?' New personal best!':''}${rs<3?` Gold is under ${AGI.GOLD} s: sprint with Shift.`:''}`,'gold',8);agiBoard(B)}
+function sniffAgility(B){const r=B.run;if(r){const c=AGI_COURSE[r.next];marker(c.x,.3,c.z,0xffd060,B.group);toast(`👃 Next up: ${r.next<6?(r.next+1)+', the '+c.name.toLowerCase():'the finish line'}!`);return}
+  marker(AGI.START.x,.15,AGI.START.z,0x7fd0ff,B.group);toast('👃 Sawdust, canvas and excitement. The green mat is the start.')}
 
 // ---- requests: some humans have lost a little thing, and it turned up down in the warren. Bring it back for a thank-you
 const REQUESTS={
@@ -2263,7 +2381,7 @@ function updateCamera(dt){
     const reach=p=>{aim(p,d);for(let s=1;s<=12;s++){const q=s/12;if(wSdf(lerp(camTgt.x,want.x,q),lerp(camTgt.y,want.y,q),lerp(camTgt.z,want.z,q),false)>-.1)return (s-1)/12}return 1};
     let best=p,bk=reach(p);for(const q of [.7,.95,1.2]){if(bk>=.6||q<=p)continue;const k=reach(q);if(k>bk+.1){bk=k;best=q}}
     aim(best,d*Math.max(.15,bk))}
-  else if(G.inside){const B=G.inside;if(B.tube)aim(.6,.75);else aim(p,Math.min(d,B.radius?4:2.6));if(B.waterY!==undefined)want.y=Math.max(want.y,B.waterY+.12);want.x=clamp(want.x,-B.hx-.05,B.hx+.05);want.z=clamp(want.z,-B.hz-.05,B.hz+.05);want.y=clamp(want.y,insideHeight(want.x,want.z)+.08,want.x>B.loftX-.15?B.loftY-.15:B.ceil-.25)}
+  else if(G.inside){const B=G.inside;if(B.tube)aim(.6,.75);else aim(p,Math.min(d,B.camMax||(B.radius?4:2.6)));if(B.waterY!==undefined)want.y=Math.max(want.y,B.waterY+.12);want.x=clamp(want.x,-B.hx-.05,B.hx+.05);want.z=clamp(want.z,-B.hz-.05,B.hz+.05);want.y=clamp(want.y,insideHeight(want.x,want.z)+.08,B.ceilAt?B.ceilAt(want.x,want.z):want.x>B.loftX-.15?B.loftY-.15:B.ceil-.25)}
   else if(G.raft){const c=creekAt(G.raft.s-2.1);want.set(c.x+c.nx*G.raft.lat*.6,-.12+.78,c.z+c.nz*G.raft.lat*.6)}   // behind you along the creek's curve, over the water
   else{aim(p,d);const gy=heightAt(want.x,want.z)+.07;if(want.y<gy)want.y=gy}
   camPos.lerp(want,Math.min(1,dt*8));if(G.under&&wSdf(camPos.x,camPos.y,camPos.z,false)>-.05)camPos.copy(want);camera.position.copy(camPos);camera.lookAt(camTgt);
@@ -2343,6 +2461,8 @@ const GOALS=[
   {id:'maze',icon:'🌻',name:'Maze Runner',desc:'Forage the prize in the middle of the sunflower maze',test:()=>G.mazePrize>=1,pts:200},
   {id:'raft',icon:'🍃',name:'Raft Rider',desc:'Ride the leaf raft down Willow Creek to Willow Island',test:()=>G.island>=1,pts:250},
   {id:'cleanraft',icon:'🌊',name:'Not a Splash',desc:'Ride the whole creek on the leaf without a single bump',test:()=>G.cleanRaft>=1,pts:250},
+  {id:'agility',icon:'🏅',name:'Clear Round',desc:'Run the agility course in the Critter Corner tent',test:()=>G.agilityRuns>=1,pts:150},
+  {id:'agilitygold',icon:'🥇',name:'Best in Show',desc:`Win a gold rosette on the agility course (under ${AGI.GOLD} s)`,test:()=>G.rosette>=3,pts:300},
   {id:'shop',icon:'🐾',name:'After Hours',desc:'Sneak into the pet shop at night and make friends with Butterscotch',test:()=>G.pals.includes(friends.findIndex(f=>f.shopPig)),pts:300},
   {id:'gnaw',icon:'🦷',name:'Tidy Teeth',desc:'Gnaw a twig down without a single miss',test:()=>G.cleanGnaws>=1,pts:150},
   {id:'hay',icon:'🌾',name:'Hay Diver',desc:"Squeeze into a barn, burrow into its hay and find 3 hidden treats",test:()=>G.hayFinds>=3,pts:200},
@@ -2381,7 +2501,8 @@ function updateHUD(dt){
   $('herdline').innerHTML=`🐹 Herd <b>${herd.length}/${HERD_MAX}</b>${herd.length?' · '+herd.map(f=>esc(f.name)).join(', '):' · befriend piggies with C'}`;
   $('rank').innerHTML=`Forager rank: <b>${RANKS[rankIdx()][1]}</b> · ${G.forages} forages · 🕳 ${tunnels.filter(t=>t.found).length}/${tunnels.length}`;
   // danger
-  const rh=$('raftHud');if(G.raft){const F=G.raft,R=Z.raft;rh.style.display='block';rh.querySelector('.l').innerHTML=`🍃 Leaf raft · ${'❤️'.repeat(F.bal)}${'🤍'.repeat(3-F.bal)} · 🌼 ${F.got}`;rh.querySelector('i').style.width=clamp((F.s-R.s0)/(R.send-R.s0)*100,0,100)+'%'}else rh.style.display='none';
+  const rh=$('raftHud'),ih=G.inside&&G.inside.hud?G.inside.hud(G.inside):null;if(G.raft){const F=G.raft,R=Z.raft;rh.style.display='block';rh.querySelector('.l').innerHTML=`🍃 Leaf raft · ${'❤️'.repeat(F.bal)}${'🤍'.repeat(3-F.bal)} · 🌼 ${F.got}`;rh.querySelector('i').style.width=clamp((F.s-R.s0)/(R.send-R.s0)*100,0,100)+'%'}
+  else if(ih){rh.style.display='block';rh.querySelector('.l').innerHTML=ih.html;rh.querySelector('i').style.width=clamp(ih.pct,0,100)+'%'}else rh.style.display='none';
   const dg=$('danger');
   if(G.inside&&G.inside.cat){const c=G.inside.cat;if(c.state==='sleep'){dg.style.display=c.noise>.04?'block':'none';dg.querySelector('.l').textContent='🐈 Duchess is asleep. Tiptoe…';dg.querySelector('i').style.width=Math.min(100,c.noise*100)+'%'}
     else{dg.style.display='block';dg.querySelector('.l').textContent=c.state==='return'?'🐈 Duchess is going back to sleep…':G.inside.tube?'😼 Duchess is looking for you… stay in the tubes!':'😼 Duchess is awake! Hide in a tube!';dg.querySelector('i').style.width='100%'}}
@@ -2454,6 +2575,7 @@ function placeStatus(z){const items=[],nf=(G.zfound[z.id]||[]).length,nb=z===PAR
   if(z.id==='farm'||z.id==='zoo')items.push({icon:'🛖',label:'Squeezed into the barn',done:!!G.barns[z.id]});
   if(z.id==='town')items.push({icon:'🐾',label:'Snuck into the pet shop',done:!!G.shop});
   if(z.id==='creek')items.push({icon:'🍃',label:'Rode the leaf raft to Willow Island',done:!!G.island});
+  if(z.id==='zoo')items.push({icon:'🏅',label:'Won a rosette in the agility tent',done:G.rosette>=1});
   return {items,done:items.every(i=>i.done)}}
 function placesHTML(){const done=PLACE_ORDER.filter(id=>G.placesDone[id]).length;
   return `<h2 style="margin:18px 0 4px;font-size:20px">🗺 Places · ${Object.keys(G.visited).length}/9 visited · ${done}/9 complete</h2><p style="font-size:13px;margin:0 0 8px">Finish everything in a place for a bonus. They're laid out as they lie on the map.</p><div class="pgrid">`+
@@ -2470,7 +2592,7 @@ function gameOver(){G.over=true;const best=Math.max(G.best,G.score);lsSet('wheek
 // Three slots in localStorage. The world is seeded (the same every game), so a save only keeps what changed:
 // the stats, what's been found, the herd (by friend index) and the warren's explored passages.
 const SLOTS=3,slotKey=i=>'wheek-slot-'+i;
-const SAVE_G=['hp','full','vitc','energy','happy','score','day','time','forages','pets','found','curios','nightsSurvived','eaten','luckT','warrenTip','zfound','visited','met','pals','placesDone','goals','bestStreak','hawkDodged','foxEscapes','mazePrize','heard','given','barns','hayFinds','teethT','gnaws','cleanGnaws','shop','fullHerd','island','rafts','cleanRaft'];
+const SAVE_G=['hp','full','vitc','energy','happy','score','day','time','forages','pets','found','curios','nightsSurvived','eaten','luckT','warrenTip','zfound','visited','met','pals','placesDone','goals','bestStreak','hawkDodged','foxEscapes','mazePrize','heard','given','barns','hayFinds','teethT','gnaws','cleanGnaws','shop','fullHerd','island','rafts','cleanRaft','agility','rosette','agilityBest','agilityRuns'];
 function snapshot(){const g={};for(const k of SAVE_G)g[k]=G[k];const ix=(a,f)=>a.flatMap((x,i)=>f(x)?[i]:[]);
   return {v:1,saved:Date.now(),name:G.name,breed:G.breed,coat:G.coat,G:g,
     zone:Z.id,pig:G.raft?{x:+Z.raft.ex.toFixed(2),z:+Z.raft.ez.toFixed(2),h:+Z.raft.out.toFixed(2)}:G.inside?{x:+G.insideHole.ex.toFixed(2),z:+G.insideHole.ez.toFixed(2),h:+G.insideHole.out.toFixed(2)}:{x:+pig.pos.x.toFixed(2),z:+pig.pos.z.toFixed(2),h:+pig.heading.toFixed(2)},under:G.under?PARK.tunnels.indexOf(W.from):-1,herd:herd.map(f=>friends.indexOf(f)),names:friends.map(f=>f.name),known:ix(friends,f=>f.known),
@@ -2664,5 +2786,5 @@ function loop(){
   $('setBtn').onclick=openSettings;$('setBtn2').onclick=openSettings;$('setClose').onclick=closeSettings;applyQuality();
   $('resumeBtn').onclick=()=>togglePause(false);$('saveBtn').onclick=()=>saveGame();$('quitBtn').onclick=()=>{saveGame(true);location.reload()};$('jclose').onclick=closeJournal;$('againBtn').onclick=()=>location.reload();
   $('retryBtn').onclick=()=>{try{sessionStorage.setItem('wheek-continue',G.slot)}catch(e){}location.reload()};
-  window.__game={G,W,WS,ZONE,PARK,EDGE,ITEMS,startRaft,creekAt,offerSwap,insideCollide,TUBE_NODES,startGnaw,gnawHit,enterBarn:enterInside,exitBarn:exitInside,enterInside,exitInside,enterTube:n=>enterTube(n),catNoise:n=>catNoise(n),startBurrow,popOut,insideHeight,revealItem,setInput,SET,sun,music:()=>({now:musicNow&&musicNow.k,gain:musicGain&&musicGain.gain.value,tracks:Object.fromEntries(Object.entries(MUSIC).map(([k,m])=>[k,m.buf?{dur:+m.buf.duration.toFixed(4),start:m.start,len:m.len}:null]))}),wSdf,neighbour,freeAt,Z:()=>Z,visit:(id,x=0,z=0,h=0)=>arriveZone(ZONE[id],0,{x,z,h}),enterWarren,exitWarren,pig,friends,herd,joinHerd,keys,applyLook,humans,tunnels,spots,hawk,foxes,heightAt,renderer,scene,camera};
+  window.__game={G,W,WS,ZONE,PARK,EDGE,ITEMS,AGI,AGI_COURSE,WEAVE_X,WEAVE_Z,startRaft,creekAt,offerSwap,insideCollide,TUBE_NODES,startGnaw,gnawHit,enterBarn:enterInside,exitBarn:exitInside,enterInside,exitInside,enterTube:n=>enterTube(n),catNoise:n=>catNoise(n),startBurrow,popOut,insideHeight,revealItem,setInput,SET,sun,music:()=>({now:musicNow&&musicNow.k,gain:musicGain&&musicGain.gain.value,tracks:Object.fromEntries(Object.entries(MUSIC).map(([k,m])=>[k,m.buf?{dur:+m.buf.duration.toFixed(4),start:m.start,len:m.len}:null]))}),wSdf,neighbour,freeAt,Z:()=>Z,visit:(id,x=0,z=0,h=0)=>arriveZone(ZONE[id],0,{x,z,h}),enterWarren,exitWarren,pig,friends,herd,joinHerd,keys,applyLook,humans,tunnels,spots,hawk,foxes,heightAt,renderer,scene,camera};
 })().catch(e=>{console.error(e);$('loading').textContent='Failed to load: '+e.message});

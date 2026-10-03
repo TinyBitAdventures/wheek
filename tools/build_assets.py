@@ -184,6 +184,26 @@ def paint(ob, fn):
         pass
     return ob
 
+def paint_faces(ob, fn, by_index=False):
+    """Like paint(), but one colour per face from its centre: crisp stripes and patches. by_index: fn(i, centre, normal)."""
+    me = ob.data
+    ca = me.color_attributes["Col"] if "Col" in me.color_attributes else me.color_attributes.new("Col", 'BYTE_COLOR', 'CORNER')
+    mw = ob.matrix_world
+    nm = mw.to_3x3()
+    for poly in me.polygons:
+        c = fn(poly.index, mw @ poly.center, (nm @ poly.normal).normalized()) if by_index else fn(mw @ poly.center, (nm @ poly.normal).normalized())
+        for li in poly.loop_indices:
+            try:
+                ca.data[li].color_srgb = (c[0], c[1], c[2], 1)
+            except AttributeError:
+                ca.data[li].color = (c[0] ** 2.2, c[1] ** 2.2, c[2] ** 2.2, 1)
+    me.color_attributes.active_color = ca
+    try:
+        me.color_attributes.render_color_index = me.color_attributes.active_color_index
+    except Exception:
+        pass
+    return ob
+
 def solid(c):
     return lambda p, n: c
 
@@ -2681,6 +2701,299 @@ def build_willow():
     paint(lo, leaf_color((0.2, 0.36, 0.1), (0.36, 0.52, 0.16)))
     export("Willow")
 
+# ================================================================ the agility tent (Critter Corner)
+AG_W, AG_D, AG_HW, AG_TOP = 6.4, 5.0, 1.5, 2.9
+AG_RED, AG_WHITE = (0.78, 0.12, 0.1), (0.96, 0.94, 0.88)
+
+def tent_shell_bm(W, D, Hw, top, inward=False, stripe=0.4):
+    """Walls and a four-sided peaked roof, one quad per stripe so the stripes stay crisp. Front is -Y."""
+    bm = bmesh.new()
+    def quad(a, b, c, d):
+        vs = [bm.verts.new(v) for v in (a, b, c, d)]
+        bm.faces.new(vs if not inward else list(reversed(vs)))
+    corners = [(-W / 2, -D / 2), (W / 2, -D / 2), (W / 2, D / 2), (-W / 2, D / 2)]
+    for (ax, ay), (bx, by) in zip(corners, corners[1:] + corners[:1]):
+        L = math.hypot(bx - ax, by - ay)
+        n = max(1, round(L / stripe))
+        for i in range(n):
+            t0, t1 = i / n, (i + 1) / n
+            x0, y0, x1, y1 = ax + (bx - ax) * t0, ay + (by - ay) * t0, ax + (bx - ax) * t1, ay + (by - ay) * t1
+            quad((x0, y0, 0), (x1, y1, 0), (x1, y1, Hw), (x0, y0, Hw))
+            # the roof above this stripe: a wedge up to the peak
+            o = 0.18 if not inward else 0.0
+            ex0, ey0 = x0 * (1 + o / (W / 2)), y0 * (1 + o / (D / 2))
+            ex1, ey1 = x1 * (1 + o / (W / 2)), y1 * (1 + o / (D / 2))
+            vs = [bm.verts.new(v) for v in ((ex0, ey0, Hw - (0.06 if not inward else 0)), (ex1, ey1, Hw - (0.06 if not inward else 0)), (0, 0, top))]
+            bm.faces.new(vs if not inward else list(reversed(vs)))
+    return bm
+
+def shell_stripes(k=1.0):
+    """Colours for tent_shell_bm's faces, made wall quad then roof wedge for each stripe in turn: alternate red and white."""
+    return lambda i, p, n: scl(AG_RED if (i // 2) % 2 == 0 else AG_WHITE, k * (0.95 if i % 2 else 0.92 + 0.08 * noise.noise(p * 3)))
+
+def bunting_bm(pts, size=0.14, gap=0.22, sag=0.12):
+    """Little triangle flags along a sagging string through pts; one face per flag."""
+    bm = bmesh.new()
+    for a, b in zip(pts, pts[1:]):
+        a, b = Vector(a), Vector(b)
+        L = (b - a).length
+        n = max(1, int(L / gap))
+        d = (b - a).normalized()
+        for i in range(n):
+            t = (i + 0.5) / n
+            p = a.lerp(b, t) - Vector((0, 0, sag * 4 * t * (1 - t)))
+            h = Vector((d.x, d.y, 0)).normalized() * size * 0.5 if (d.x or d.y) else Vector((size * 0.5, 0, 0))
+            vs = [bm.verts.new(p - h), bm.verts.new(p + h), bm.verts.new(p - Vector((0, 0, size)))]
+            bm.faces.new(vs)
+    return bm
+
+FLAGS = [(0.95, 0.75, 0.1), (0.2, 0.55, 0.9), (0.3, 0.72, 0.3), (0.9, 0.3, 0.5), (0.6, 0.35, 0.85), (0.95, 0.5, 0.15)]
+
+def flag_cols(p, n):
+    k = int(abs(p.x * 7.1 + p.y * 5.3 + p.z * 3.7) * 1.7)
+    return FLAGS[k % len(FLAGS)]
+
+def build_agility_tent():
+    """A striped marquee for the agility course: 6.4 x 5 m, walls 1.5 m, a peak at 2.9 m with a pennant, bunting from the
+    peak to the corners, canvas door flaps at the front (-Y) that don't quite meet the ground: a guinea pig can duck under."""
+    clear()
+    rt = root("AgilityTent")
+    W, D, Hw, top = AG_W, AG_D, AG_HW, AG_TOP
+    sh = from_bm(tent_shell_bm(W, D, Hw, top), "Canvas", material("Canvas", rough=0.9), parent=rt, smooth_shade=False)
+    paint_faces(sh, shell_stripes(), by_index=True)
+    # the scalloped valance round the roof's edge
+    val = bmesh.new()
+    per = [((-W / 2 - 0.18, -D / 2 - 0.18), (W / 2 + 0.18, -D / 2 - 0.18)), ((W / 2 + 0.18, -D / 2 - 0.18), (W / 2 + 0.18, D / 2 + 0.18)),
+           ((W / 2 + 0.18, D / 2 + 0.18), (-W / 2 - 0.18, D / 2 + 0.18)), ((-W / 2 - 0.18, D / 2 + 0.18), (-W / 2 - 0.18, -D / 2 - 0.18))]
+    for (ax, ay), (bx, by) in per:
+        L = math.hypot(bx - ax, by - ay)
+        n = round(L / 0.4)
+        for i in range(n):
+            for j in range(6):
+                t0, t1 = (i + j / 6) / n, (i + (j + 1) / 6) / n
+                d0, d1 = math.sin(math.pi * j / 6) * 0.14, math.sin(math.pi * (j + 1) / 6) * 0.14
+                p0, p1 = (ax + (bx - ax) * t0, ay + (by - ay) * t0), (ax + (bx - ax) * t1, ay + (by - ay) * t1)
+                vs = [val.verts.new((p0[0], p0[1], Hw - 0.06)), val.verts.new((p1[0], p1[1], Hw - 0.06)),
+                      val.verts.new((p1[0], p1[1], Hw - 0.2 - d1)), val.verts.new((p0[0], p0[1], Hw - 0.2 - d0))]
+                val.faces.new(vs)
+    vo = from_bm(val, "Valance", material("Cloth", rough=0.9), parent=rt, smooth_shade=False)
+    paint_faces(vo, lambda i, p, n: AG_RED if (i // 6) % 2 == 0 else AG_WHITE, by_index=True)
+    # door flaps: two panels meeting at the middle of the front, tied back at the top corners, a dark gap at their foot
+    fl = bmesh.new()
+    for s in (-1, 1):
+        vs = [fl.verts.new(v) for v in ((s * 0.02, -D / 2 - 0.03, 0.2), (s * 0.75, -D / 2 - 0.03, 0.0), (s * 0.75, -D / 2 - 0.03, Hw - 0.1), (s * 0.12, -D / 2 - 0.03, Hw - 0.1))]
+        fl.faces.new(vs if s > 0 else list(reversed(vs)))
+    bmesh.ops.subdivide_edges(fl, edges=fl.edges, cuts=4, use_grid_fill=True)
+    fo = from_bm(fl, "DoorFlaps", material("Cloth", rough=0.9), parent=rt, smooth_shade=False)
+    paint(fo, lambda p, n: scl(AG_WHITE, 0.88 + 0.06 * math.sin(p.z * 20)))
+    gap = bmesh.new()
+    vs = [gap.verts.new(v) for v in ((-0.2, -D / 2 - 0.02, 0.0), (0.2, -D / 2 - 0.02, 0.0), (0.0, -D / 2 - 0.02, 0.24))]
+    gap.faces.new(vs)
+    go = from_bm(gap, "TentGap", material("HoleDark", rough=1.0), parent=rt, smooth_shade=False)
+    paint(go, solid((0.05, 0.03, 0.02)))
+    # guy ropes and pegs at the corners, the pole through the peak and its pennant
+    rope = []
+    for sx in (-1, 1):
+        for sy in (-1, 1):
+            a = Vector((sx * (W / 2 + 0.18), sy * (D / 2 + 0.18), Hw - 0.06))
+            b = Vector((sx * (W / 2 + 0.9), sy * (D / 2 + 0.9), 0.0))
+            rope.append(limb_bm(a, b, 0.008, 0.008, 5, caps=False))
+            rope.append(cone_bm(0.025, 0.015, 0.12, 6))
+            xform(rope[-1], Matrix.Translation(b + Vector((0, 0, 0.04))))
+    ro = from_bm(merge_bms(rope), "Ropes", material("Rope", rough=0.9), parent=rt)
+    paint(ro, solid((0.82, 0.74, 0.55)))
+    po = from_bm(limb_bm((0, 0, top - 0.1), (0, 0, top + 0.55), 0.03, 0.025, 8), "Pole", material("Wood", rough=0.7), parent=rt)
+    paint(po, solid((0.55, 0.38, 0.22)))
+    pen = bmesh.new()
+    vs = [pen.verts.new(v) for v in ((0, 0, top + 0.52), (0.42, 0.02, top + 0.44), (0, 0, top + 0.34))]
+    pen.faces.new(vs)
+    pe = from_bm(pen, "Pennant", material("Cloth", rough=0.9), parent=rt, smooth_shade=False)
+    paint(pe, solid((0.95, 0.78, 0.12)))
+    pts = [(0, 0, top - 0.05)]
+    bu = []
+    for sx, sy in ((-1, -1), (1, -1), (1, 1), (-1, 1)):
+        bu.append(bunting_bm([(0, 0, top + 0.3), (sx * (W / 2 + 0.18), sy * (D / 2 + 0.18), Hw - 0.05)], 0.16, 0.26, 0.08))
+    bo = from_bm(merge_bms(bu), "Bunting", material("Cloth", rough=0.9), parent=rt, smooth_shade=False)
+    paint_faces(bo, flag_cols)
+    export("AgilityTent")
+
+def build_agility_inside():
+    """The tent from inside at its own size: a sawdust floor, striped canvas walls and roof seen from within, the centre pole,
+    bunting strung across, straw bales in the corners for the crowd."""
+    clear()
+    rt = root("AgilityInside")
+    W, D, Hw, top = AG_W, AG_D, AG_HW, AG_TOP
+    fl = from_bm(box_bm(W, D, 0.04, (0, 0, -0.02)), "Floor", material("Sawdust", rough=1.0), parent=rt, smooth_shade=False)
+    subdivide(fl, 24)
+    def sawdust(p, n):
+        k = noise.noise(p * 9) * 0.5 + 0.5
+        c = mix((0.78, 0.62, 0.38), (0.9, 0.76, 0.5), k)
+        # a darker trodden ring round the course
+        r = math.hypot(p.x / 2.3, p.y / 1.75)
+        return scl(c, 1 - 0.12 * max(0.0, 1 - abs(r - 1) * 3))
+    paint(fl, sawdust)
+    sh = from_bm(tent_shell_bm(W, D, Hw, top, inward=True), "CanvasIn", material("Canvas", rough=0.9), parent=rt, smooth_shade=False)
+    paint_faces(sh, shell_stripes(0.85), by_index=True)
+    # the door flaps from inside, with the gap at their foot letting daylight in
+    fl2 = bmesh.new()
+    for s in (-1, 1):
+        vs = [fl2.verts.new(v) for v in ((s * 0.02, -D / 2 + 0.03, 0.2), (s * 0.75, -D / 2 + 0.03, 0.0), (s * 0.75, -D / 2 + 0.03, Hw - 0.1), (s * 0.12, -D / 2 + 0.03, Hw - 0.1))]
+        fl2.faces.new(list(reversed(vs)) if s > 0 else vs)
+    fo = from_bm(fl2, "DoorFlapsIn", material("Cloth", rough=0.9), parent=rt, smooth_shade=False)
+    paint(fo, solid(scl(AG_WHITE, 0.8)))
+    gap = bmesh.new()
+    vs = [gap.verts.new(v) for v in ((0.2, -D / 2 + 0.02, 0.0), (-0.2, -D / 2 + 0.02, 0.0), (0.0, -D / 2 + 0.02, 0.24))]
+    gap.faces.new(vs)
+    go = from_bm(gap, "TentGapIn", material("HoleDark", rough=1.0), parent=rt, smooth_shade=False)
+    paint(go, solid((0.9, 0.9, 0.85)))
+    po = from_bm(limb_bm((0, 0, 0), (0, 0, top), 0.07, 0.05, 12), "CentrePole", material("Wood", rough=0.7), parent=rt)
+    paint(po, lambda p, n: scl((0.6, 0.42, 0.25), 0.85 + 0.15 * math.sin(p.z * 40)))
+    bu = []
+    for sx, sy in ((-1, -1), (1, -1), (1, 1), (-1, 1)):
+        bu.append(bunting_bm([(0, 0, top - 0.25), (sx * (W / 2 - 0.05), sy * (D / 2 - 0.05), Hw - 0.05)], 0.14, 0.24, 0.12))
+    bu.append(bunting_bm([(-W / 2 + 0.05, 0, Hw + 0.2), (W / 2 - 0.05, 0, Hw + 0.2)], 0.12, 0.22, 0.2))
+    bo = from_bm(merge_bms(bu), "BuntingIn", material("Cloth", rough=0.9), parent=rt, smooth_shade=False)
+    paint_faces(bo, flag_cols)
+    # straw bales in the corners
+    bales = []
+    for x, y, rz in ((-2.75, 2.05, 0.0), (-2.2, 2.2, 0.0), (2.75, 2.05, 0.0), (2.75, -2.05, 0.0), (-2.75, -1.25, math.pi / 2)):
+        b = rbox_bm(0.5, 0.32, 0.28, (0, 0, 0.14), e=0.25)
+        xform(b, Matrix.Translation((x, y, 0)) @ Matrix.Rotation(rz, 4, 'Z'))
+        bales.append(b)
+    ba = from_bm(merge_bms(bales), "Bales", material("Hay", rough=1.0), parent=rt)
+    paint(ba, lambda p, n: scl((0.86, 0.74, 0.4), 0.85 + 0.15 * noise.noise(p * 30)))
+    export("AgilityInside")
+
+def build_agility_kit():
+    """The agility course pieces, each its own child at the origin (the game clones them by name):
+    Hoop (a hoop on a stand, across X), Pole (one weave pole), Tunnel (along X, 1.2 long), Ramp (an A-frame along X, 1.6 long,
+    0.3 high), Seesaw (a fulcrum, with a Plank child 1.4 long pivoting at 0.14), Jump (two wings across X with a Bar child at 0.08)."""
+    clear()
+    rt = root("AgilityKit")
+    def piece(name):
+        e = bpy.data.objects.new(name, None)
+        bpy.context.scene.collection.objects.link(e)
+        e.parent = rt
+        return e
+    # Hoop: the ring stands across the X axis (you run through it along Y)
+    hp = piece("Hoop")
+    tor = bmesh.new()
+    bmesh.ops.create_circle(tor, cap_ends=False, radius=1, segments=32)
+    ring = bmesh.new()
+    R, r = 0.19, 0.022
+    for i in range(32):
+        a = i / 32 * math.tau
+        for j in range(8):
+            b = j / 8 * math.tau
+            ring.verts.new(((R + r * math.cos(b)) * math.cos(a), r * math.sin(b), 0.22 + (R + r * math.cos(b)) * math.sin(a)))
+    ring.verts.ensure_lookup_table()
+    for i in range(32):
+        for j in range(8):
+            a0, a1, b0, b1 = i * 8 + j, ((i + 1) % 32) * 8 + j, i * 8 + (j + 1) % 8, ((i + 1) % 32) * 8 + (j + 1) % 8
+            ring.faces.new((ring.verts[a0], ring.verts[a1], ring.verts[b1], ring.verts[b0]))
+    tor.free()
+    ho = from_bm(ring, "HoopRing", material("Plastic", rough=0.45, spec=0.5), parent=hp)
+    paint(ho, lambda p, n: (0.95, 0.2, 0.15) if int((math.atan2(p.z - 0.22, p.x) + math.pi) / (math.tau / 12)) % 2 else (0.98, 0.95, 0.9))
+    st = [limb_bm((sx * 0.24, 0, 0), (sx * 0.24, 0, 0.42), 0.014, 0.012, 8) for sx in (-1, 1)]
+    st += [limb_bm((sx * 0.24, -0.12, 0.01), (sx * 0.24, 0.12, 0.01), 0.014, 0.014, 6) for sx in (-1, 1)]
+    st += [limb_bm((sx * 0.24, 0, 0.22), (sx * 0.205, 0, 0.22), 0.01, 0.01, 6) for sx in (-1, 1)]
+    so = from_bm(merge_bms(st), "HoopStand", material("Metal", rough=0.4, metal=0.6), parent=hp)
+    paint(so, solid((0.82, 0.84, 0.88)))
+    # Pole: one weave pole on a little foot
+    pl = piece("Pole")
+    p1 = limb_bm((0, 0, 0.0), (0, 0, 0.45), 0.012, 0.012, 8)
+    pb = from_bm(p1, "PoleStick", material("Plastic", rough=0.45, spec=0.5), parent=pl)
+    paint(pb, lambda p, n: (0.95, 0.85, 0.15) if int(p.z / 0.075) % 2 else (0.15, 0.45, 0.9))
+    ft = from_bm(cone_bm(0.05, 0.035, 0.025, 12), "PoleFoot", material("Metal", rough=0.4, metal=0.6), parent=pl)
+    ft.location = (0, 0, 0.0125)
+    paint(ft, solid((0.25, 0.25, 0.28)))
+    # Tunnel: a ribbed fabric tube along X, open at both ends
+    tn = piece("Tunnel")
+    L, TR = 1.2, 0.18
+    tb = bmesh.new()
+    rows = []
+    for i in range(41):
+        x = -L / 2 + L * i / 40
+        rib = 1 + 0.06 * (math.cos(i / 40 * math.pi * 24) ** 8)
+        rows.append([tb.verts.new((x, math.cos(a) * TR * rib, TR + math.sin(a) * TR * rib)) for a in [k / 24 * math.tau for k in range(24)]])
+    for i in range(40):
+        for k in range(24):
+            tb.faces.new((rows[i][k], rows[i][(k + 1) % 24], rows[i + 1][(k + 1) % 24], rows[i + 1][k]))
+    # flatten the bottom onto the floor
+    for v in tb.verts:
+        v.co.z = max(v.co.z, 0.004)
+    to = from_bm(tb, "TunnelCloth", material("Cloth", rough=0.85), parent=tn)
+    paint(to, lambda p, n: scl((0.15, 0.42, 0.85), 0.75 + 0.25 * (math.cos((p.x + L / 2) / L * math.pi * 24) ** 8)) if n.length else (0, 0, 0))
+    rims = []
+    for sx in (-1, 1):
+        rr = bmesh.new()
+        ring2 = [rr.verts.new((sx * L / 2, math.cos(a) * (TR + 0.012), TR + math.sin(a) * (TR + 0.012))) for a in [k / 24 * math.tau for k in range(24)]]
+        ring3 = [rr.verts.new((sx * L / 2, math.cos(a) * (TR - 0.012), TR + math.sin(a) * (TR - 0.012))) for a in [k / 24 * math.tau for k in range(24)]]
+        for k in range(24):
+            rr.faces.new((ring2[k], ring2[(k + 1) % 24], ring3[(k + 1) % 24], ring3[k]))
+        rims.append(rr)
+    ri = from_bm(merge_bms(rims), "TunnelRims", material("Plastic", rough=0.5), parent=tn, smooth_shade=False)
+    paint(ri, solid((0.95, 0.8, 0.15)))
+    # Ramp: an A-frame along X, 1.6 long, peak 0.3, 0.36 wide, yellow contact zones at both feet, slats across
+    rp = piece("Ramp")
+    L2, Hp, Wd = 1.6, 0.3, 0.36
+    rb = bmesh.new()
+    for s in (-1, 1):
+        for i in range(10):
+            t0, t1 = i / 10, (i + 1) / 10
+            x0, x1 = s * L2 / 2 * (1 - t0), s * L2 / 2 * (1 - t1)
+            z0, z1 = Hp * t0, Hp * t1
+            vs = [rb.verts.new(v) for v in ((x0, -Wd / 2, z0 + 0.012), (x1, -Wd / 2, z1 + 0.012), (x1, Wd / 2, z1 + 0.012), (x0, Wd / 2, z0 + 0.012))]
+            rb.faces.new(vs if s < 0 else list(reversed(vs)))
+    ro = from_bm(rb, "RampBoard", material("Wood", rough=0.7), parent=rp, smooth_shade=False)
+    paint_faces(ro, lambda p, n: (0.96, 0.8, 0.15) if abs(p.x) > L2 / 2 * 0.62 else (0.2, 0.5, 0.88))
+    sl = []
+    for s in (-1, 1):
+        for i in range(1, 9):
+            t = i / 9
+            sl.append(box_bm(0.018, Wd, 0.012, (s * L2 / 2 * (1 - t), 0, Hp * t + 0.02)))
+        for sy in (-1, 1):
+            sl.append(limb_bm((s * L2 / 2, sy * (Wd / 2 + 0.01), 0.01), (0, sy * (Wd / 2 + 0.01), Hp + 0.008), 0.012, 0.012, 6))
+    so = from_bm(merge_bms(sl), "RampSlats", material("Wood", rough=0.7), parent=rp, smooth_shade=False)
+    paint(so, solid((0.92, 0.92, 0.9)))
+    # Seesaw: a fulcrum and a plank that pivots at the top of it (the game tilts the Plank)
+    ss = piece("Seesaw")
+    fb = bmesh.new()
+    vs = [fb.verts.new(v) for v in ((-0.1, -0.14, 0), (0.1, -0.14, 0), (0, -0.14, 0.13), (-0.1, 0.14, 0), (0.1, 0.14, 0), (0, 0.14, 0.13))]
+    fb.faces.new((vs[0], vs[1], vs[2])); fb.faces.new((vs[5], vs[4], vs[3]))
+    fb.faces.new((vs[0], vs[3], vs[4], vs[1])); fb.faces.new((vs[1], vs[4], vs[5], vs[2])); fb.faces.new((vs[2], vs[5], vs[3], vs[0]))
+    fo = from_bm(fb, "Fulcrum", material("Metal", rough=0.45, metal=0.5), parent=ss, smooth_shade=False)
+    paint(fo, solid((0.35, 0.36, 0.4)))
+    pk = bpy.data.objects.new("Plank", None)
+    bpy.context.scene.collection.objects.link(pk)
+    pk.parent = ss
+    pk.location = (0, 0, 0.14)
+    bpy.context.view_layer.update()
+    pb2 = box_bm(1.4, 0.3, 0.025, (0, 0, 0.0))
+    pbo = from_bm(pb2, "PlankBoard", material("Wood", rough=0.7), parent=pk, smooth_shade=False)
+    subdivide(pbo, 6)
+    pbo.location = (0, 0, 0.14)
+    paint_faces(pbo, lambda p, n: (0.96, 0.8, 0.15) if abs(p.x) > 0.45 else (0.2, 0.5, 0.88))
+    # Jump: two little wings with stripy uprights, and a Bar resting across at 0.08 (the game knocks it off)
+    jp = piece("Jump")
+    wg = []
+    for sx in (-1, 1):
+        wg.append(limb_bm((sx * 0.27, 0, 0), (sx * 0.27, 0, 0.3), 0.016, 0.016, 8))
+        wg.append(limb_bm((sx * 0.27, -0.1, 0.01), (sx * 0.27, 0.1, 0.01), 0.014, 0.014, 6))
+        wg.append(box_bm(0.02, 0.18, 0.2, (sx * 0.36, 0, 0.15)))
+    wo = from_bm(merge_bms(wg), "Wings", material("Wood", rough=0.7), parent=jp, smooth_shade=False)
+    paint(wo, lambda p, n: (0.96, 0.95, 0.9) if int(p.z / 0.05) % 2 else (0.85, 0.15, 0.12))
+    bar = bpy.data.objects.new("Bar", None)
+    bpy.context.scene.collection.objects.link(bar)
+    bar.parent = jp
+    bar.location = (0, 0, 0.08)
+    bpy.context.view_layer.update()
+    bb = limb_bm((-0.27, 0, 0.08), (0.27, 0, 0.08), 0.011, 0.011, 8)
+    bbo = from_bm(bb, "BarStick", material("Plastic", rough=0.45, spec=0.5), parent=bar)
+    bbo.location = (0, 0, 0)
+    paint(bbo, lambda p, n: (0.15, 0.45, 0.9) if int((p.x + 1) / 0.06) % 2 else (0.98, 0.95, 0.9))
+    export("AgilityKit")
+
 jobs = {
     "GuineaPig": build_guinea_pig, "Human": build_human, "Oak": lambda: build_oak("Oak", 1),
     "Oak2": lambda: build_oak("Oak2", 9), "Pine": build_pine, "Birch": build_birch, "Bush": build_bush,
@@ -2707,6 +3020,7 @@ jobs = {
     "BarnInside": build_barn_inside, "HayPile": build_hay_pile, "BarnHole": build_barn_hole, "Twig": build_twig,
     "PetShopInside": build_petshop_inside, "CatFlap": build_cat_flap, "Cat": build_cat, "CatLoaf": build_cat_loaf, "Pellets": build_pellets,
     "LeafRaft": build_leaf_raft, "Willow": build_willow,
+    "AgilityTent": build_agility_tent, "AgilityInside": build_agility_inside, "AgilityKit": build_agility_kit,
 }
 for k, fn in jobs.items():
     if only and k not in only:

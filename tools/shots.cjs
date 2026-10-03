@@ -162,6 +162,20 @@ scenes.butterscotch = async page => {
   await page.waitForFunction(() => { const g = window.__game; return g.camera.position.distanceTo(g.pig.pos) < 1.5 }, null, { timeout: 120000, polling: 250 });
 };
 // Willow Creek's leaf raft: beached at the top of the creek, riding the rapids at a ford, and Willow Island at the end.
+scenes.tentout = async page => {
+  await setup(page, `G.time=10.5;if(G.inside)g.exitBarn();g.visit('zoo',0,0,0);const h=g.Z().agility.holes[0];pig.pos.set(h.ex+Math.sin(h.out)*2.6,0,h.ez+Math.cos(h.out)*2.6);pig.heading=h.out+Math.PI`);
+  await camera(page, 'window.__game.pig.heading+Math.PI+.5', 4.2, .3);
+};
+scenes.agility = async page => {
+  await setup(page, `G.time=11;if(G.inside)g.exitBarn();if(g.Z().id!=='zoo')g.visit('zoo',0,0,0);const b=g.Z().agility;g.enterInside(b,b.holes[0]);pig.pos.set(.3,0,1.75);pig.heading=Math.PI/2;window.__f0=g.renderer.info.render.frame`);
+  await page.waitForFunction(() => window.__game.renderer.info.render.frame - window.__f0 > 4, null, { timeout: 180000, polling: 500 });   // new lights: shaders compile slowly headless
+  await camera(page, 'Math.PI*1.5-.25', 3.2, .55);
+};
+scenes.agility2 = async page => {
+  await setup(page, `const B=G.inside;G.inside.actions(B);(G.acts=null);pig.pos.set(g.AGI.START.x,0,g.AGI.START.z);B.run={next:2,t:6.4,faults:0,weave:{k:6,miss:0,armed:true},px:2.4,pz:-1.2};B.badge.material=B.badges[2];B.badge.visible=true;pig.pos.set(1.85,0,-1.8);pig.heading=-Math.PI/2`);
+  await page.waitForTimeout(400);
+  await camera(page, 'Math.PI/2-.35', 3, .5);
+};
 scenes.raftstart = async page => {
   await setup(page, `document.getElementById('mapwrap').classList.remove('big');G.time=10.5;if(G.inside)g.exitBarn();g.visit('creek',0,0,0);const R=g.Z().raft;pig.pos.set(R.ex+Math.sin(R.out+Math.PI)*-.5,0,R.ez+Math.cos(R.out+Math.PI)*-.5);pig.heading=R.out`);
   await camera(page, 'window.__game.pig.heading+Math.PI+.6', 2.2, .32);

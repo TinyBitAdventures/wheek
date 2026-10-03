@@ -1,6 +1,6 @@
 // World checks: loads the game in a tiny headless window and tests the world's logic through window.__game.
 // Usage: PW=/path/to/node_modules/playwright node tools/check.cjs [check ...]
-//   checks: reach warren night chaos eat treats goals music gnaw barn shop swap raft saves touch pad memory (default: all). URL defaults to the local dev site.
+//   checks: reach warren night chaos eat treats goals music gnaw barn shop swap raft agility saves touch pad memory (default: all). URL defaults to the local dev site.
 // Prints a report and exits 1 if anything failed.
 const { chromium } = require(process.env.PW || 'playwright');
 const URL = process.env.URL || 'https://wheek.localhost/';
@@ -314,6 +314,37 @@ const frames = (page, n) => page.evaluate(n => new Promise(r => { let k = 0; (fu
     const back = await page.evaluate(() => { const g = window.__game, R = g.Z().raft; return { outside: !g.G.inside, atStart: Math.hypot(g.pig.pos.x - R.ex, g.pig.pos.z - R.ez) < .3, leaf: R.leaf.visible } });
     report('leaf raft', ride.boarded && ride.moved > .5 && ride.scooped && ride.bumped && ride.tipped && ride.dry && island.landed && napped && foraged && back.outside && back.atStart && back.leaf,
       `rode ${ride.moved?.toFixed(1)} m · scooped ${ride.scooped} · bump ${ride.bumped} · tipped off onto dry land ${ride.tipped && ride.dry} · reached Willow Island ${island.landed} · nap ${napped} · driftwood ${foraged} · back at the start ${back.atStart}`);
+  }
+
+  // 5f. the agility tent: duck in, start a run, cross every obstacle in order (knocking the bar), finish, rosette, back out
+  if (pick('agility')) {
+    const act = async (place, text) => { await page.evaluate(place); return page.waitForFunction(([place, text]) => { eval(place); return (window.__game.G.acts || []).some(a => a.label.includes(text)) }, [place, text], { timeout: 60000, polling: 250 }).then(() => true, () => false) };
+    await page.evaluate(() => { const g = window.__game; g.G.time = 11; if (g.G.inside) g.exitBarn(); g.visit('zoo', 0, 0, 0); g.G.hp = 100; g.G.energy = 100 });
+    const placed = await page.evaluate(() => !!window.__game.Z().agility);
+    const inOk = placed && await act(`{const g=window.__game,h=g.Z().agility.holes[0];g.pig.pos.set(h.ex,g.heightAt(h.ex,h.ez),h.ez)}`, 'tent flap');
+    if (inOk) { await page.keyboard.press('KeyE'); await frames(page, 4) }
+    const inside = await page.evaluate(() => window.__game.G.inside?.kind === 'agility');
+    const startOk = inside && await act(`{const g=window.__game;g.pig.pos.set(g.AGI.START.x,0,g.AGI.START.z)}`, 'Start a run');
+    if (startOk) { await page.keyboard.press('KeyE'); await frames(page, 3) }
+    const run = await page.evaluate(async () => { const g = window.__game, B = g.G.inside, r = B.run; if (!r) return { started: false };
+      const fr = n => new Promise(res => { let k = 0; (function f() { if (k++ >= n) res(); else requestAnimationFrame(f) })() });
+      for (let k = 0; k < 200 && r.t < 0; k++) await fr(1);
+      const go = async (pts) => { for (const [x, z] of pts) { g.pig.pos.set(x, g.pig.pos.y, z); g.pig.vel.set(0, 0, 0); await fr(2) } };
+      const after = [];
+      await go([[1.3, 1.7], [1.7, 1.7]]); after.push(r.next);
+      await go([[2.55, 1.15], ...g.WEAVE_Z.map((z, k) => [k % 2 ? 2.25 : 2.55, z - .1])]); after.push(r.next);
+      await go([[.6, -1.8], [.2, -1.8]]); after.push(r.next);
+      await go([[-.3, -1.8], [-.7, -1.8]]); after.push(r.next);
+      const barDown = B.barDown, faults = r.faults;
+      await go([[-2.3, -.45], [-2.3, -.4], [-2.3, 0]]); after.push(r.next);
+      await go([[-1.05, 1.65], [-.95, 1.65], [-.75, 1.65]]); after.push(r.next);
+      await go([[-.5, 1.65], [-.1, 1.65]]);
+      return { started: true, after, barDown, faults, weaveMiss: r.weave.miss, finished: !B.run, runs: g.G.agilityRuns, rosette: g.G.rosette, best: g.G.agilityBest, goal: !!g.G.goals.agility } });
+    const outOk = inside && await act(`{const g=window.__game,h=g.G.inside.holes[0];g.pig.pos.set(h.x,0,h.z)}`, 'Duck back out');
+    if (outOk) { await page.keyboard.press('KeyE'); await frames(page, 3) }
+    const out = await page.evaluate(() => { const g = window.__game, h = g.Z().agility.holes[0]; return !g.G.inside && Math.hypot(g.pig.pos.x - h.ex, g.pig.pos.z - h.ez) < .3 });
+    report('agility tent', placed && inside && run.started && run.after?.join() === '1,2,3,4,5,6' && run.barDown && run.faults === 5 && run.weaveMiss === 0 && run.finished && run.runs === 1 && run.rosette >= 1 && out,
+      `placed ${placed} · inside ${inside} · obstacles cleared in order ${run.after?.join(',')} · bar knocked +${run.faults} s · weave misses ${run.weaveMiss} · finished ${run.finished} in ${run.best} s, rosette ${run.rosette} · back outside ${out}`);
   }
 
   // 5e. the barns: in through a hole, munch the hay, burrow onto every hidden treat, pop out, out through the other hole
