@@ -98,7 +98,7 @@ const frames = (page, n) => page.evaluate(n => new Promise(r => { let k = 0; (fu
     await frames(page, 40);
     const r = await page.evaluate(() => { const g = window.__game, Z = g.Z(), ok = v => Number.isFinite(v);
       return { foxes: g.foxes.filter(f => f.active).length, finite: ok(g.pig.pos.x) && ok(g.pig.pos.y) && ok(g.G.hp) && g.foxes.every(f => !f.active || ok(f.pos.x) && ok(f.pos.z)), lamps: Z.lamps.filter(m => m.glow ? m.glow.opacity > 0 : m.emissiveIntensity > 0).length, nLamps: Z.lamps.length, humansIn: Z.humans.every(h => !h.visible) } });
-    report(`night ${id}`, r.finite && r.foxes > 0 && r.lamps === r.nLamps && r.humansIn, `${r.foxes} foxes out · ${r.lamps}/${r.nLamps} lights on · humans inside: ${r.humansIn}${r.finite ? '' : ' · NaN!'}`);
+    report(`night ${id}`, r.finite && (id === 'town' ? r.foxes === 0 : r.foxes > 0) && r.lamps === r.nLamps && r.humansIn, `${r.foxes} foxes out · ${r.lamps}/${r.nLamps} lights on · humans inside: ${r.humansIn}${r.finite ? '' : ' · NaN!'}`);
     await page.evaluate(() => { window.__game.G.time = 11; window.__game.G.hp = 100 });
   }
 
@@ -485,12 +485,12 @@ const frames = (page, n) => page.evaluate(n => new Promise(r => { let k = 0; (fu
       for (const id of Object.keys(want)) { g.visit(id, 0, 0, 0); out[id] = g.mapLandmarks().map(m => m[2]).join('') } return out }, want);
     const missing = Object.keys(want).filter(id => !marks[id].includes(want[id]));
     report('map landmarks', !missing.length, Object.entries(marks).map(([id, m]) => `${id} ${m}`).join(' · ') + (missing.length ? ` · missing ${missing}` : ''));
-    await page.evaluate(() => { const g = window.__game; g.visit('town', 0, 0, 0); g.G.time = 19.4; window.__toastLog = []; new MutationObserver(ms => ms.forEach(m => m.addedNodes.forEach(n => window.__toastLog.push(n.textContent || '')))).observe(document.getElementById('toasts'), { childList: true }) });
+    await page.evaluate(() => { const g = window.__game; g.visit('town', 0, 0, 0); g.G.time = 19.4; for (const h of g.Z().humans) { h.fade = 1; h.visible = true; h.obj.visible = true } window.__duskLog = []; new MutationObserver(ms => ms.forEach(m => m.addedNodes.forEach(n => window.__duskLog.push(n.textContent || '')))).observe(document.getElementById('toasts'), { childList: true }) });
     await page.evaluate(() => { window.__game.G.time = 21.5 });
     const allIn = await page.waitForFunction(() => window.__game.Z().humans.every(h => !h.visible), null, { timeout: 120000, polling: 250 }).then(() => true, () => false);
     await page.waitForTimeout(1500);
     await frames(page, 30);
-    const night = await page.evaluate(() => ({ inside: window.__toastLog.filter(t => t.includes('went inside')).length, foxes: window.__game.foxes.filter(f => f.active).length }));
+    const night = await page.evaluate(() => ({ inside: window.__duskLog.filter(t => t.includes('went inside')).length, foxes: window.__game.foxes.filter(f => f.active).length }));
     report('dusk downtown', allIn && night.inside === 1 && night.foxes === 0, `everyone in ${allIn} · "went inside" toasts ${night.inside} · foxes out ${night.foxes}`);
   }
 
@@ -563,7 +563,7 @@ const frames = (page, n) => page.evaluate(n => new Promise(r => { let k = 0; (fu
     await tp.waitForFunction(() => window.__game && window.__game.G.started, null, { timeout: 60000 });
     const ui = await tp.evaluate(() => ({ touch: document.body.classList.contains('touch'), shown: getComputedStyle(document.getElementById('touchui')).display !== 'none', help: getComputedStyle(document.getElementById('help')).display }));
     // joystick: thumb down on the left, slide up, hold
-    const p0 = await tp.evaluate(() => { const g = window.__game; g.G.time = 11; g.pig.pos.set(4, g.heightAt(4, 4), 4); return [g.pig.pos.x, g.pig.pos.z] });
+    const p0 = await tp.evaluate(() => { const g = window.__game; g.G.time = 11; g.hawk.state = 'away'; g.hawk.t = 1e6; g.pig.pos.set(4, g.heightAt(4, 4), 4); return [g.pig.pos.x, g.pig.pos.z] });
     await touch('touchStart', 120, 280); await frames(tp, 2); await touch('touchMove', 120, 220);
     for (let k = 0; k < 20; k++) { await touch('touchMove', 120, 220 + (k % 2)); await frames(tp, 2) }   // ~40 frames: a couple of seconds of game time
     const ring = await tp.evaluate(() => document.getElementById('joyring').classList.contains('on'));

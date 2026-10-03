@@ -2368,12 +2368,14 @@ function updateHawk(dt,t){
     return}
   if(h.state==='leave'){h.t-=dt;o.position.y+=dt*6;o.position.x+=dt*8;h.wL.rotation.z=-Math.sin(t*12)*.6;h.wR.rotation.z=Math.sin(t*12)*.6;o.lookAt(o.position.x+8,o.position.y+6,o.position.z);if(h.t<=0){h.state='away';h.t=R(45,85)}}
 }
+// the nearest woods to you, out in rings: foxes come out of the woods
+function woodsNear(){for(let r=10;r<=EDGE+6;r+=1)for(let k=0;k<36;k++){const a=k/36*Math.PI*2+r,x=pig.pos.x+Math.cos(a)*r,z=pig.pos.z+Math.sin(a)*r;if(Math.hypot(x,z)<EDGE-1&&forestness(x,z)>=.6)return [x,z]}return null}
 function updateFoxes(dt,t){
   const night=isNight();const want=night?(Z.foxes||(G.day>=3?2:1)):0;
   foxes.forEach((f,i)=>{
     f.retry=Math.max(0,(f.retry||0)-dt);
     if(i<want&&!f.active&&f.retry<=0){let x,z,tries=0;do{const a=rand()*6.28;x=pig.pos.x+Math.cos(a)*24;z=pig.pos.z+Math.sin(a)*24;tries++}while((forestness(x,z)<.6||Math.hypot(x,z)>EDGE)&&tries<40);
-      if(tries>=40&&(forestness(x,z)<.6||Math.hypot(x,z)>EDGE)){f.retry=8;return}
+      if(forestness(x,z)<.6||Math.hypot(x,z)>EDGE){const w=woodsNear();if(!w){f.retry=3;return}[x,z]=w}   // none close by: from the nearest woods instead; no woods in the zone (Downtown), no fox
       f.active=true;f.pos.set(x,heightAt(x,z),z);f.obj.visible=true;f.state='wander';f.target.set(x,0,z);f.t=0;if(i===0)toast('🦊 Night falls… something is prowling the woods.','bad',4)}
     if(!f.active)return;
     if(!night){f.state='leave'}
@@ -2640,7 +2642,7 @@ function arriveZone(nb,ang,at){G.acts=null;if(G.gnaw){const tw=G.gnaw.tw;endGnaw
   if(at){x=at.x;z=at.z}else for(let r=EDGE-2.5;r>6;r-=.5){x=Math.cos(ang)*r;z=Math.sin(ang)*r;if(freeAt(x,z,.3))break}
   pig.pos.set(x,heightAt(x,z),z);pig.vel.set(0,0,0);pig.vy=0;pig.air=false;pig.heading=at?at.h:Math.atan2(-x,-z);G.camYaw=pig.heading+Math.PI;
   herd.forEach(f=>f.zone=nb.id);regroupHerd();snapCamera();
-  foxes.forEach(f=>{f.active=false;f.obj.visible=false;f.state='wander'});if(hawk.state!=='away'){hawk.state='away';hawk.t=R(30,60);hawk.obj.visible=false}
+  foxes.forEach(f=>{f.active=false;f.obj.visible=false;f.state='wander';f.retry=0});if(hawk.state!=='away'){hawk.state='away';hawk.t=R(30,60);hawk.obj.visible=false}
   const night=isNight();humans.forEach(h=>{h.visible=!night;h.fade=night?0:1;h.obj.visible=!night});snowPts.visible=!!nb.snow;
   if(at)return;
   if(!G.visited[nb.id]){G.visited[nb.id]=1;SFX.find('epic');callout('epic',`${nb.icon} ${nb.name}`,200);addScore(200,'new place!','#c98bff');toast(`🗺 <b>${nb.name}.</b> ${nb.blurb||''}`,'gold',7)}
