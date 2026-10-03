@@ -1,6 +1,6 @@
 # Changelog
 
-## Unreleased
+## v0.3.0 (2026-10-03)
 
 ### Every zone has its own treat
 - Each of the eight zones around the park has a signature treat you can only find there, and a new place to forage it: rose hips under the snowdrifts on ❄️ Snowcap Peaks, raspberry leaves in 🌲 The Deep Wood's brambles, romaine from the market crates round 🏙️ Downtown's fountain, watermelon in 🏖️ Sandy Cove's picnic baskets, watercress in 🌊 Willow Creek's shallows (wade in to forage it), corn husks from 🐐 Critter Corner's feed troughs, apple slices under 🚜 Sunny Acres' new apple trees and sunflower seeds from the fallen heads in 🌻 Sunflower Fields.
