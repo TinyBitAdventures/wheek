@@ -1,6 +1,6 @@
 // World checks: loads the game in a tiny headless window and tests the world's logic through window.__game.
 // Usage: PW=/path/to/node_modules/playwright node tools/check.cjs [check ...]
-//   checks: reach warren night chaos eat treats goals music gnaw barn shop swap raft agility oak saves touch pad memory (default: all). URL defaults to the local dev site.
+//   checks: reach warren night chaos eat treats goals music gnaw barn shop swap raft agility oak mill saves touch pad memory (default: all). URL defaults to the local dev site.
 // Prints a report and exits 1 if anything failed.
 const { chromium } = require(process.env.PW || 'playwright');
 const URL = process.env.URL || 'https://wheek.localhost/';
@@ -400,6 +400,52 @@ const frames = (page, n) => page.evaluate(n => new Promise(r => { let k = 0; (fu
     const out = await page.evaluate(() => { const g = window.__game, h = g.Z().oak.holes[0]; return !g.G.inside && Math.hypot(g.pig.pos.x - h.ex, g.pig.pos.z - h.ez) < .3 });
     report('hollow oak', placed && inside && phys.blocked && phys.landed && phys.stood && phys.fell && owl.woke && owl.swooped && owl.down && look.lookout === 1 && look.goal && stash && slid && out,
       `placed ${placed} · inside ${inside} · blocked from below ${phys.blocked} · hop onto a fungus ${phys.landed} · stand on one ${phys.stood} · fall off the edge ${phys.fell} · owl woke ${owl.woke}, flapped you off ${owl.swooped && owl.down} · lookout ${look.lookout} (light paws ${look.quiet}, goal ${look.goal}) · stash ${stash} · slid down ${slid} · back outside ${out}`);
+  }
+
+  // 5h. the old windmill: in through the mouse hole, the sweep arm, onto the ramp and up to the loft, catch seeds, the maze view, out
+  if (pick('mill')) {
+    const act = async (place, text) => { await page.evaluate(place); return page.waitForFunction(([place, text]) => { eval(place); return (window.__game.G.acts || []).some(a => a.label.includes(text)) }, [place, text], { timeout: 60000, polling: 250 }).then(() => true, () => false) };
+    await page.evaluate(() => { const g = window.__game; g.G.time = 11; if (g.G.inside) g.exitBarn(); g.visit('sunflowers', 0, 0, 0); g.G.hp = 100; g.G.energy = 100 });
+    const placed = await page.evaluate(() => !!window.__game.Z().mill);
+    const inOk = placed && await act(`{const g=window.__game,h=g.Z().mill.holes[0];g.pig.pos.set(h.ex,g.heightAt(h.ex,h.ez),h.ez)}`, 'mouse hole');
+    if (inOk) { await page.keyboard.press('KeyE'); await frames(page, 4) }
+    const inside = await page.evaluate(() => window.__game.G.inside?.kind === 'mill');
+    const phys = inside && await page.evaluate(async () => { const g = window.__game, B = g.G.inside, P = g.pig.pos, M = g.MILL, at = (ph, r) => [Math.sin(ph) * r, Math.cos(ph) * r];
+      const fr = n => new Promise(res => { let k = 0; (function f() { if (k++ >= n) res(); else requestAnimationFrame(f) })() });
+      B.sweepA = 0; const arm = () => B.sweepA + Math.PI / 2;
+      // the sweep arm: stand just ahead of it and it pushes you round
+      let ph = arm() + .3; let [x, z] = at(ph, 1.1); P.set(x, 0, z); g.pig.air = false; B.hitCD = 0; let swept = false;
+      for (let k = 0; k < 120 && !swept; k++) { await fr(1); if (B.hitCD > 0) swept = true }
+      // walking from the floor into the foot of the ramp is blocked; a hop gets you onto it
+      B.sweepA = M.rampA0 + 2; const foot = M.rampA0 + .12, ux = Math.cos(foot), uz = -Math.sin(foot);
+      [x, z] = at(foot - .35, 1.45); P.set(x, 0, z); g.pig.air = false; await fr(2);
+      for (let k = 0; k < 25; k++) { g.pig.vel.set(ux * 1.4, 0, uz * 1.4); await fr(1) }
+      const blocked = P.y < .02 && g.angNorm(Math.atan2(P.x, P.z)) < M.rampA0 + .02;
+      g.pig.vy = M.jump; g.pig.air = true; let onRamp = false;
+      for (let k = 0; k < 60 && !onRamp; k++) { g.pig.vel.set(ux * 1.4, 0, uz * 1.4); await fr(1); if (!g.pig.air && P.y > .15) onRamp = true }
+      // walk on up the ramp to the loft
+      let loft = false;
+      for (let k = 0; k < 400 && !loft; k++) { const a = Math.atan2(P.x, P.z), r = Math.hypot(P.x, P.z), k2 = (1.45 - r) * 2; g.pig.vel.set(Math.cos(a) * 1.4 + Math.sin(a) * k2, 0, -Math.sin(a) * 1.4 + Math.cos(a) * k2); await fr(1); if (P.y > M.loftH - .02 && g.angNorm(a) > M.loftA0 + .1) loft = true }
+      return { swept, blocked, onRamp, loft, y: +P.y.toFixed(2) } });
+    // catch seeds (a short round), following the seeds and dodging the pebbles
+    const catchOk = inside && await act(`{const g=window.__game,B=g.G.inside;g.pig.pos.set(B.hopperAt.x,g.MILL.loftH,B.hopperAt.z);g.pig.air=false}`, 'Catch the falling seeds');
+    if (catchOk) { await page.evaluate(() => { window.__game.MILL.catchT = 7 }); await page.keyboard.press('KeyE'); await frames(page, 2) }
+    const caught = await page.evaluate(async () => { const g = window.__game, B = g.G.inside; if (!B.catch) return { started: false };
+      const fr = n => new Promise(res => { let k = 0; (function f() { if (k++ >= n) res(); else requestAnimationFrame(f) })() });
+      while (B.catch) { const C = B.catch, it = C.items.filter(i => !i.done && i.kind !== 'pebble').sort((a, b) => a.y - b.y)[0]; if (it) C.lat = it.lat; await fr(1) }
+      g.MILL.catchT = 25; return { started: true, best: g.G.seedBest, runs: g.G.millCatch, seeds: g.G.found.seeds || 0 } });
+    const winOk = inside && await act(`{const g=window.__game,B=g.G.inside;g.pig.pos.set(B.window.x,g.MILL.loftH,B.window.z);g.pig.air=false}`, 'Look out over the maze');
+    if (winOk) { await page.keyboard.press('KeyE'); await frames(page, 3) }
+    const view = await page.evaluate(() => { const g = window.__game, rt = g.mazeRoute(), n = g.MAZE.n; return { mazeView: g.G.mazeView, route: rt ? rt.length : 0, ends: !!rt && rt[0][0] === n - 1 && rt[rt.length - 1][0] === Math.floor(n / 2) } });
+    await page.evaluate(() => { const g = window.__game, B = g.G.inside, sp = B.spots[0]; window.__sp = sp; g.pig.pos.set(sp.x, 0, sp.z); g.pig.air = false; g.G.acts = null });
+    await page.keyboard.down('KeyF');
+    const sack = await page.waitForFunction(() => { const g = window.__game, sp = window.__sp; g.G.inside.sweepA = 2.6; if (sp.ready) { g.pig.pos.set(sp.x, 0, sp.z); if (!document.getElementById('forage').style.display.includes('block')) document.dispatchEvent(new KeyboardEvent('keydown', { code: 'KeyF' })) } return !sp.ready }, null, { timeout: 120000, polling: 250 }).then(() => true, () => false);
+    await page.keyboard.up('KeyF');
+    const outOk = inside && await act(`{const g=window.__game,h=g.G.inside.holes[0];g.G.inside.sweepA=2.6;g.pig.pos.set(h.x,0,h.z);g.pig.air=false}`, 'mouse hole');
+    if (outOk) { await page.keyboard.press('KeyE'); await frames(page, 3) }
+    const out = await page.evaluate(() => { const g = window.__game, h = g.Z().mill.holes[0]; return !g.G.inside && Math.hypot(g.pig.pos.x - h.ex, g.pig.pos.z - h.ez) < .3 });
+    report('old windmill', placed && inside && phys.swept && phys.blocked && phys.onRamp && phys.loft && caught.started && caught.best > 3 && caught.runs === 1 && view.mazeView === 1 && view.ends && sack && out,
+      `placed ${placed} · inside ${inside} · swept by the arm ${phys.swept} · blocked by the ramp's foot ${phys.blocked} · hop onto it ${phys.onRamp} · up to the loft ${phys.loft} (y ${phys.y}) · caught ${caught.best} seeds (${caught.seeds} handfuls) · maze view ${view.mazeView}, route ${view.route} cells ${view.ends} · spilled sack ${sack} · back outside ${out}`);
   }
 
   // 5e. the barns: in through a hole, munch the hay, burrow onto every hidden treat, pop out, out through the other hole

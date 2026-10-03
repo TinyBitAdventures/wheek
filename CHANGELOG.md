@@ -8,6 +8,13 @@
 - The humans in Downtown, Sandy Cove, Critter Corner and on the farm sometimes toss you their zone's treat.
 - The Deep Wood's brambles are thorny cover: the hawk can't reach you in one.
 
+### The old windmill
+- An old tower mill stands on the highest hill in 🌻 Sunflower Fields, its sails turning. There's a mouse hole at the foot of its door (sniff to find it).
+- Inside, the millstones grind and a sweep arm goes round and round the floor, pushing you along if you get in its way. Hop up onto the ramp of planks that winds round the wall and climb to the loft. Your herd waits outside.
+- Under the hopper, catch the sunflower seeds that spill from its chute as it jiggles from side to side: scurry left and right for 25 seconds, grab the golden ones, and don't catch the pebbles. Every ten seeds is a cheekful for you.
+- Look out of the loft window and you can see the whole maze: the way through to the middle goes on your map as a golden line. A spilled sack on the floor is good for a forage.
+- New goals: Seed Catcher (30 seeds in one go) and Bird's Eye. Sunflower Fields' checklist includes catching seeds in the windmill.
+
 ### The Hollow Oak
 - In a glade in 🌲 The Deep Wood stands an enormous ancient oak, three and a half metres across, with a knothole between its roots (sniff to find it). Squeeze in: the trunk is hollow all the way up.
 - Bracket fungi spiral up the inside of the trunk. Hop from one to the next (hops go higher in here) to climb to the window at the top; slip off the inside edge and you drop back down to the roots. The camera looks out at you from the middle of the trunk. Your herd waits outside.
@@ -77,6 +84,7 @@
 - A leaf raft and a giant weeping willow.
 - The striped agility tent, outside and in, and its course pieces: a hoop, weave poles, a tunnel, a jump, an A-frame and a seesaw.
 - The Hollow Oak, outside and in, the owl (eyes open and shut, wings that flap) and her nest of shiny things.
+- The old windmill with turning sails, its ground floor from inside, and its machinery: millstones in their tun, the drive shaft, the sweep arm, the hopper and sacks of grain.
 - 16 new Blender-built models: rose hips, raspberry leaves, romaine, a watermelon slice, watercress, a corn husk, an apple slice and sunflower seeds, plus a snowdrift, a bramble, a market stall, a picnic basket, a watercress bed, a feed trough, an apple tree and a fallen sunflower head.
 
 ## v0.2.0 (2026-09-29)

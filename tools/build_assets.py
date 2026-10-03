@@ -3285,6 +3285,272 @@ def build_owl_nest():
     paint(ko, solid((0.85, 0.68, 0.25)))
     export("OwlNest")
 
+# ================================================================ the Old Windmill (Sunflower Fields)
+MILL_R0, MILL_R1, MILL_H = 1.95, 1.4, 5.4     # tower radius at the foot and the top, wall height
+MILL_IN = 1.75                                # the inside radius on the ground floor
+
+def build_windmill():
+    """An old tower mill on a hill: a tapered whitewashed tower, a wooden cap, four lattice Sails turning on a shaft at the
+    front (-Y; the Sails child pivots at the hub), a door with a mouse hole at its foot and a window above it."""
+    clear()
+    random.seed(311)
+    rt = root("Windmill")
+    seg, rings = 40, 16
+    bm = bmesh.new()
+    rows = []
+    for i in range(rings + 1):
+        t = i / rings
+        z = -0.3 + (MILL_H + 0.3) * t
+        r = MILL_R0 + (MILL_R1 - MILL_R0) * max(0.0, z) / MILL_H
+        rows.append([bm.verts.new((math.cos(a) * r, math.sin(a) * r, z)) for a in [j / seg * math.tau for j in range(seg)]])
+    for i in range(rings):
+        for j in range(seg):
+            bm.faces.new((rows[i][j], rows[i][(j + 1) % seg], rows[i + 1][(j + 1) % seg], rows[i + 1][j]))
+    to = from_bm(bm, "Tower", material("Plaster", rough=0.9), parent=rt)
+    def plaster(p, n):
+        stone = abs(math.sin(p.z * 9 + noise.noise(p * 3))) < 0.08 or abs(math.sin(math.atan2(p.y, p.x) * 14 + math.floor(p.z * 9 / math.pi) * 1.3)) < 0.05
+        c = mix((0.88, 0.86, 0.8), (0.95, 0.94, 0.9), noise.noise(p * 4) * 0.5 + 0.5)
+        c = mix(c, (0.6, 0.58, 0.52), smooth(0.4, -0.3, p.z))   # grubby at the foot
+        return scl(c, 0.85) if stone and p.z < 0.8 else c
+    paint(to, plaster)
+    # the cap: a squat cone of shingles with a ridge
+    cap = cone_bm(MILL_R1 + 0.25, 0.25, 1.4, 32)
+    xform(cap, Matrix.Translation((0, 0, MILL_H + 0.7)))
+    co = from_bm(cap, "Cap", material("Roof", rough=0.8), parent=rt, smooth_shade=False)
+    paint(co, lambda p, n: scl((0.42, 0.26, 0.16), 0.75 + 0.25 * (0.5 + 0.5 * math.sin(p.z * 26))))
+    rim = cone_bm(MILL_R1 + 0.3, MILL_R1 + 0.3, 0.12, 32)
+    xform(rim, Matrix.Translation((0, 0, MILL_H + 0.02)))
+    ri = from_bm(rim, "CapRim", material("Wood", rough=0.7), parent=rt)
+    paint(ri, solid((0.36, 0.22, 0.13)))
+    # the windshaft poking out of the cap at the front, and the turning sails on it
+    hub_y, hub_z = -(MILL_R1 + 0.55), MILL_H + 0.55
+    sh = limb_bm((0, -MILL_R1 + 0.2, hub_z), (0, hub_y + 0.05, hub_z), 0.12, 0.12, 12)
+    so = from_bm(sh, "Windshaft", material("Wood", rough=0.7), parent=rt)
+    paint(so, solid((0.3, 0.2, 0.12)))
+    piv = bpy.data.objects.new("Sails", None)
+    bpy.context.scene.collection.objects.link(piv)
+    piv.parent = rt
+    piv.location = (0, hub_y, hub_z)
+    bpy.context.view_layer.update()
+    stocks, lat, cloth = [], [], []
+    L = 3.6
+    for k in range(4):
+        a = k * math.pi / 2 + 0.3
+        d = Vector((math.cos(a), 0, math.sin(a)))
+        side = Vector((-math.sin(a), 0, math.cos(a)))
+        c = Vector((0, hub_y - 0.08, hub_z))
+        stocks.append(limb_bm(c, c + d * L, 0.07, 0.05, 8))
+        for i in range(8):
+            u = 0.7 + (L - 0.75) * i / 7
+            p0 = c + d * u
+            lat.append(limb_bm(p0, p0 + side * 0.62, 0.018, 0.018, 5, caps=False))
+        for sx in (0.0, 0.62):
+            lat.append(limb_bm(c + d * 0.7 + side * sx, c + d * L + side * sx, 0.02, 0.02, 5, caps=False))
+        q = [c + d * 0.72 + side * 0.04, c + d * (L - 0.05) + side * 0.04, c + d * (L - 0.05) + side * 0.58, c + d * 0.72 + side * 0.58]
+        cb = bmesh.new()
+        vs = [cb.verts.new(v + Vector((0, 0.03, 0))) for v in q]
+        cb.faces.new(vs)
+        bmesh.ops.subdivide_edges(cb, edges=cb.edges, cuts=3, use_grid_fill=True)
+        cloth.append(cb)
+    hub = sphere_bm(0.2, 14, 10)
+    xform(hub, Matrix.Translation((0, hub_y - 0.1, hub_z)))
+    st = from_bm(merge_bms(stocks + [hub]), "SailStocks", material("Wood", rough=0.7), parent=piv)
+    paint(st, solid((0.36, 0.24, 0.15)))
+    lo = from_bm(merge_bms(lat), "SailLattice", material("Wood", rough=0.7), parent=piv)
+    paint(lo, solid((0.85, 0.82, 0.74)))
+    cl = from_bm(merge_bms(cloth), "SailCloth", material("Cloth", rough=0.9), parent=piv, smooth_shade=False)
+    paint(cl, lambda p, n: scl((0.93, 0.88, 0.76), 0.92 + 0.08 * noise.noise(p * 3)))
+    # the door, its mouse hole, and the window above it (all at the front, -Y)
+    front = -math.pi / 2
+    rd = MILL_R0 - 0.02
+    dr = bmesh.new()
+    for i in range(10):
+        x0, x1 = -0.5 + i * 0.1, -0.5 + (i + 1) * 0.1
+        vs = [dr.verts.new(v) for v in ((x0, -rd - 0.04, 0.0), (x1, -rd - 0.04, 0.0), (x1, -rd - 0.04, 1.25 + 0.1 * math.cos(x1 * 2.2)), (x0, -rd - 0.04, 1.25 + 0.1 * math.cos(x0 * 2.2)))]
+        dr.faces.new(vs)
+    do = from_bm(dr, "Door", material("Wood", rough=0.7), parent=rt, smooth_shade=False)
+    paint_faces(do, lambda i, p, n: scl((0.42, 0.26, 0.14), 0.85 + 0.15 * ((i * 7) % 3) / 2), by_index=True)
+    hole = knothole_bm(front, 0.0, 0.22, 0.2, rd + 0.02, 0.03)
+    ho = from_bm(hole, "MouseHole", material("HoleDark", rough=1.0), parent=rt, smooth_shade=False)
+    paint(ho, solid((0.03, 0.02, 0.015)))
+    win = bmesh.new()
+    wr = MILL_R0 + (MILL_R1 - MILL_R0) * 1.75 / MILL_H
+    vs = [win.verts.new(v) for v in ((-0.22, -wr - 0.02, 1.55), (0.22, -wr - 0.02, 1.55), (0.22, -wr - 0.02, 1.95), (-0.22, -wr - 0.02, 1.95))]
+    win.faces.new(vs)
+    wo = from_bm(win, "Window", material("HoleDark", rough=1.0), parent=rt, smooth_shade=False)
+    paint(wo, solid((0.06, 0.05, 0.04)))
+    trim = [box_bm(0.52, 0.06, 0.06, (0, -wr - 0.04, 1.53)), box_bm(0.52, 0.06, 0.06, (0, -wr - 0.04, 1.97)),
+            box_bm(0.06, 0.06, 0.46, (-0.25, -wr - 0.04, 1.75)), box_bm(0.06, 0.06, 0.46, (0.25, -wr - 0.04, 1.75)), box_bm(0.03, 0.05, 0.4, (0, -wr - 0.05, 1.75))]
+    tro = from_bm(merge_bms(trim), "WindowFrame", material("Wood", rough=0.7), parent=rt, smooth_shade=False)
+    paint(tro, solid((0.3, 0.42, 0.3)))
+    export("Windmill")
+
+def build_mill_inside():
+    """The windmill's ground floor from inside: whitewashed stone wall 1.75 m round, flagstones, a plank ceiling at 3.3 m,
+    two little windows letting sunbeams in, the door with its mouse hole (front, -Y) and the lookout window above it.
+    The ramp, the loft and the machinery are added by the game."""
+    clear()
+    random.seed(312)
+    rt = root("MillInside")
+    R, H, seg, rings = MILL_IN, 3.3, 48, 14
+    bm = bmesh.new()
+    rows = []
+    for i in range(rings + 1):
+        z = -0.05 + (H + 0.05) * i / rings
+        rows.append([bm.verts.new((math.cos(a) * (R + 0.03 * noise.noise(Vector((math.cos(a) * 4, math.sin(a) * 4, z * 2)))), math.sin(a) * (R + 0.03 * noise.noise(Vector((math.cos(a) * 4, math.sin(a) * 4, z * 2)))), z)) for a in [j / seg * math.tau for j in range(seg)]])
+    for i in range(rings):
+        for j in range(seg):
+            bm.faces.new((rows[i][j], rows[i + 1][j], rows[i + 1][(j + 1) % seg], rows[i][(j + 1) % seg]))
+    wo = from_bm(bm, "Wall", material("Plaster", rough=0.9), parent=rt)
+    def wall(p, n):
+        c = mix((0.82, 0.8, 0.74), (0.92, 0.9, 0.84), noise.noise(p * 5) * 0.5 + 0.5)
+        if abs(math.sin(p.z * 8 + noise.noise(p * 2))) < 0.06:
+            c = scl(c, 0.86)
+        return mix(c, (0.62, 0.58, 0.5), smooth(0.35, 0.0, p.z))
+    paint(wo, wall)
+    fl = bmesh.new()
+    bmesh.ops.create_circle(fl, cap_ends=True, radius=R + 0.1, segments=48)
+    bmesh.ops.subdivide_edges(fl, edges=fl.edges, cuts=8, use_grid_fill=True)
+    flo = from_bm(fl, "Floor", material("Stone", rough=0.95), parent=rt, smooth_shade=False)
+    def flags(p, n):
+        u, v = math.floor(p.x / 0.42 + 0.5 * math.floor(p.y / 0.42)), math.floor(p.y / 0.42)
+        k = noise.noise(Vector((u * 1.7, v * 2.3, 0.5))) * 0.5 + 0.5
+        edge = min(abs((p.x / 0.42 + 0.5 * math.floor(p.y / 0.42)) % 1 - 0.5), abs((p.y / 0.42) % 1 - 0.5)) > 0.45
+        c = mix((0.5, 0.47, 0.42), (0.66, 0.63, 0.56), k)
+        return scl(c, 0.7) if edge else c
+    paint(flo, flags)
+    ce = bmesh.new()
+    bmesh.ops.create_circle(ce, cap_ends=True, radius=R + 0.1, segments=48)
+    bmesh.ops.reverse_faces(ce, faces=ce.faces)
+    xform(ce, Matrix.Translation((0, 0, H)))
+    bmesh.ops.subdivide_edges(ce, edges=ce.edges, cuts=6, use_grid_fill=True)
+    ceo = from_bm(ce, "Ceiling", material("Wood", rough=0.8), parent=rt, smooth_shade=False)
+    paint(ceo, lambda p, n: scl((0.45, 0.3, 0.18), 0.8 + 0.2 * (0.5 + 0.5 * math.sin(p.x * 18))))
+    beams = []
+    for a in (0.0, math.pi / 2):
+        b = box_bm(2 * R, 0.14, 0.16, (0, 0, H - 0.08))
+        xform(b, Matrix.Rotation(a, 4, 'Z'))
+        beams.append(b)
+    bo = from_bm(merge_bms(beams), "Beams", material("Wood", rough=0.8), parent=rt, smooth_shade=False)
+    paint(bo, solid((0.32, 0.2, 0.12)))
+    # light: the mouse hole and the door's cracks at the front, the lookout window above it, two little side windows
+    lights = []
+    lights.append(knothole_bm(math.pi / 2, 0.0, 0.22, 0.2, -(R - 0.02), 0.0))
+    for a, z0, w, h in ((math.pi / 2, 1.55, 0.44, 0.4), (math.pi / 2 + 2.2, 0.9, 0.3, 0.36), (math.pi / 2 - 2.5, 2.3, 0.3, 0.36)):
+        nx, ny, tx, ty = -math.cos(a), -math.sin(a), -math.sin(a), math.cos(a)
+        r = R - 0.02
+        vs = [(nx * -r + tx * dx, ny * -r + ty * dx, z0 + dz) for dx, dz in ((-w / 2, 0), (w / 2, 0), (w / 2, h), (-w / 2, h))]
+        b = bmesh.new()
+        b.faces.new([b.verts.new(v) for v in vs])
+        lights.append(b)
+    for b in lights:
+        bmesh.ops.recalc_face_normals(b, faces=b.faces)
+    lo = from_bm(merge_bms(lights), "Lights", material("HoleDark", rough=1.0), parent=rt, smooth_shade=False)
+    paint(lo, solid((0.95, 0.95, 0.9)))
+    export("MillInside")
+
+def build_mill_kit():
+    """The mill's machinery, each a child at the origin for the game to clone: Millstones (a wooden tun 1.1 across with the
+    Runner stone child turning on top), Shaft (the upright drive shaft, 3.3 high, with a big gear), Sweep (a floor-level arm
+    1.1 long along X from 0.62 out, that the game turns), Hopper (the wooden funnel and its feed chute, the chute's mouth at
+    0.95 below the top), Sack (a sack of grain)."""
+    clear()
+    random.seed(313)
+    rt = root("MillKit")
+    def piece(name):
+        e = bpy.data.objects.new(name, None)
+        bpy.context.scene.collection.objects.link(e)
+        e.parent = rt
+        return e
+    ms = piece("Millstones")
+    tun = cone_bm(0.56, 0.56, 0.5, 32, caps=False)
+    xform(tun, Matrix.Translation((0, 0, 0.25)))
+    tin = cone_bm(0.5, 0.5, 0.5, 32, caps=False)
+    bmesh.ops.reverse_faces(tin, faces=tin.faces)
+    xform(tin, Matrix.Translation((0, 0, 0.25)))
+    lip = bmesh.new()
+    r0 = [lip.verts.new((math.cos(a) * 0.5, math.sin(a) * 0.5, 0.5)) for a in [k / 32 * math.tau for k in range(32)]]
+    r1 = [lip.verts.new((math.cos(a) * 0.56, math.sin(a) * 0.56, 0.5)) for a in [k / 32 * math.tau for k in range(32)]]
+    for k in range(32):
+        lip.faces.new((r0[k], r1[k], r1[(k + 1) % 32], r0[(k + 1) % 32]))
+    to = from_bm(merge_bms([tun, tin, lip]), "Tun", material("Wood", rough=0.75), parent=ms)
+    paint(to, lambda p, n: scl((0.5, 0.33, 0.19), 0.8 + 0.2 * (0.5 + 0.5 * math.sin(math.atan2(p.y, p.x) * 24))))
+    bed = cone_bm(0.48, 0.48, 0.12, 32)
+    xform(bed, Matrix.Translation((0, 0, 0.36)))
+    bo = from_bm(bed, "BedStone", material("Stone", rough=0.95), parent=ms)
+    paint(bo, lambda p, n: mix((0.52, 0.5, 0.47), (0.66, 0.64, 0.6), noise.noise(p * 14) * 0.5 + 0.5))
+    run = bpy.data.objects.new("Runner", None)
+    bpy.context.scene.collection.objects.link(run)
+    run.parent = ms
+    bpy.context.view_layer.update()
+    rs = cone_bm(0.46, 0.44, 0.14, 32)
+    xform(rs, Matrix.Translation((0, 0, 0.49)))
+    eye = cone_bm(0.08, 0.08, 0.15, 12)
+    xform(eye, Matrix.Translation((0, 0, 0.5)))
+    rso = from_bm(rs, "RunnerStone", material("Stone", rough=0.95), parent=run)
+    def furrows(p, n):
+        a = math.atan2(p.y, p.x)
+        f = abs(math.sin(a * 5 + math.hypot(p.x, p.y) * 6)) < 0.18 and n.z > 0.5
+        c = mix((0.58, 0.56, 0.52), (0.72, 0.7, 0.66), noise.noise(p * 14) * 0.5 + 0.5)
+        return scl(c, 0.7) if f else c
+    paint(rso, furrows)
+    ey = from_bm(eye, "Eye", material("Wood", rough=0.8), parent=run)
+    paint(ey, solid((0.25, 0.16, 0.1)))
+    sf = piece("Shaft")
+    sh = limb_bm((0, 0, 0.5), (0, 0, 3.3), 0.1, 0.1, 10, caps=False)
+    sho = from_bm(sh, "ShaftWood", material("Wood", rough=0.75), parent=sf, smooth_shade=False)
+    paint(sho, lambda p, n: scl((0.42, 0.28, 0.16), 0.85 + 0.15 * math.sin(p.z * 3)))
+    gear = cone_bm(0.55, 0.55, 0.12, 32)
+    xform(gear, Matrix.Translation((0, 0, 2.7)))
+    pegs = []
+    for k in range(24):
+        a = k / 24 * math.tau
+        pegs.append(box_bm(0.08, 0.05, 0.1, (math.cos(a) * 0.58, math.sin(a) * 0.58, 2.7)))
+        xform(pegs[-1], Matrix.Identity(4))
+    go = from_bm(merge_bms([gear] + pegs), "Gear", material("Wood", rough=0.75), parent=sf, smooth_shade=False)
+    paint(go, solid((0.38, 0.24, 0.13)))
+    sw = piece("Sweep")
+    arm = rbox_bm(1.1, 0.07, 0.1, (0.62 + 0.55, 0, 0.065), e=0.3)
+    bristle = box_bm(1.0, 0.03, 0.03, (0.62 + 0.55, 0, 0.012))
+    ao = from_bm(merge_bms([arm]), "SweepArm", material("Wood", rough=0.75), parent=sw)
+    paint(ao, solid((0.55, 0.36, 0.2)))
+    bro = from_bm(bristle, "Bristles", material("Hay", rough=1.0), parent=sw, smooth_shade=False)
+    paint(bro, solid((0.82, 0.7, 0.42)))
+    hp = piece("Hopper")
+    fun = bmesh.new()
+    for d, flip in ((0.0, False), (0.02, True)):   # the outside, and the inside a board's thickness in
+        top = [fun.verts.new((math.cos(a) * (0.48 - d), math.sin(a) * (0.48 - d), 0.0)) for a in [k / 4 * math.tau + math.pi / 4 for k in range(4)]]
+        bot = [fun.verts.new((math.cos(a) * (0.12 - d * 0.5), math.sin(a) * (0.12 - d * 0.5), -0.5)) for a in [k / 4 * math.tau + math.pi / 4 for k in range(4)]]
+        for k in range(4):
+            q = (top[k], top[(k + 1) % 4], bot[(k + 1) % 4], bot[k])
+            fun.faces.new(q if not flip else tuple(reversed(q)))
+    fo = from_bm(fun, "Funnel", material("Wood", rough=0.75), parent=hp, smooth_shade=False)
+    paint(fo, lambda p, n: scl((0.52, 0.34, 0.19), 0.8 + 0.2 * (0.5 + 0.5 * math.sin(p.z * 40))))
+    seeds = sphere_bm(1, 16, 8)
+    deform(seeds, lambda v: Vector((v.x * 0.3, v.y * 0.3, max(v.z, 0) * 0.12 - 0.12)))
+    so2 = from_bm(seeds, "SeedHeap", material("Seed", rough=0.8), parent=hp)
+    paint(so2, lambda p, n: (0.12, 0.1, 0.08) if noise.noise(p * 80) > 0.1 else (0.85, 0.82, 0.72))
+    ch = merge_bms([box_bm(0.16, 0.5, 0.03, (0, -0.25, -0.6)), box_bm(0.03, 0.5, 0.08, (-0.08, -0.25, -0.57)), box_bm(0.03, 0.5, 0.08, (0.08, -0.25, -0.57))])
+    xform(ch, Matrix.Translation((0, 0.02, -0.5)) @ Matrix.Rotation(-0.5, 4, 'X') @ Matrix.Translation((0, 0, 0.5)))
+    cho = from_bm(ch, "Chute", material("Wood", rough=0.75), parent=hp, smooth_shade=False)
+    paint(cho, solid((0.45, 0.3, 0.17)))
+    legs = [limb_bm((sx * 0.4, sy * 0.4, 0.0), (sx * 0.4, sy * 0.4, 1.0), 0.03, 0.03, 6) for sx in (-1, 1) for sy in (-1, 1)]
+    lg = from_bm(merge_bms(legs), "HopperFrame", material("Wood", rough=0.75), parent=hp)
+    paint(lg, solid((0.32, 0.2, 0.12)))
+    sk = piece("Sack")
+    sb = sphere_bm(1, 20, 12)
+    def sack(v):
+        z = v.z
+        w = 1 - 0.25 * max(0.0, z) ** 2
+        return Vector((v.x * 0.17 * w, v.y * 0.13 * w, (z * 0.2 + 0.2) if z < 0.6 else 0.32 + (z - 0.6) * 0.25))
+    deform(sb, sack)
+    sko = from_bm(sb, "SackCloth", material("Cloth", rough=0.95), parent=sk)
+    paint(sko, lambda p, n: scl((0.76, 0.66, 0.48), 0.85 + 0.15 * noise.noise(p * 30)))
+    tie = limb_bm((0, 0, 0.33), (0, 0, 0.36), 0.035, 0.035, 8)
+    tio = from_bm(tie, "SackTie", material("Rope", rough=0.9), parent=sk)
+    paint(tio, solid((0.55, 0.42, 0.25)))
+    export("MillKit")
+
 jobs = {
     "GuineaPig": build_guinea_pig, "Human": build_human, "Oak": lambda: build_oak("Oak", 1),
     "Oak2": lambda: build_oak("Oak2", 9), "Pine": build_pine, "Birch": build_birch, "Bush": build_bush,
@@ -3313,6 +3579,7 @@ jobs = {
     "LeafRaft": build_leaf_raft, "Willow": build_willow,
     "AgilityTent": build_agility_tent, "AgilityInside": build_agility_inside, "AgilityKit": build_agility_kit,
     "HollowOak": build_hollow_oak, "OakInside": build_oak_inside, "Owl": build_owl, "OwlNest": build_owl_nest,
+    "Windmill": build_windmill, "MillInside": build_mill_inside, "MillKit": build_mill_kit,
 }
 for k, fn in jobs.items():
     if only and k not in only:

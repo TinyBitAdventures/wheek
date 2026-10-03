@@ -73,7 +73,7 @@ const furNoise=(()=>{const n=256,d=new Uint8Array(n*n*4);for(let i=0;i<n*n;i++){
 const MODELS=['Birch','Blanket','Burrow','Bush','Carrot','Clover','Clover4','Dandelion','Fence','Fern','FlowerPurple','FlowerWhite','Fox','GardenBed','Grass','GuineaPig','Hawk','Hay','House','Human','LeafPile','Log','LushGrass','MushroomBrown','MushroomRed','Oak','Oak2','Pepper','Pine','Rock','Rock2','Strawberry',
   'Sunflower','Barn','Shop','LampPost','Bench','Goat','Sheep','Duck','Car','Cattail','Umbrella','Sandcastle','Scarecrow','Fountain',
   'RoseHip','RaspLeaf','Lettuce','Watermelon','Cress','Corn','Apple','Seeds','Snowdrift','Bramble','MarketStall','Basket','CressBed','Trough','AppleTree','SunflowerHead',
-  'BarnInside','HayPile','BarnHole','Twig','PetShopInside','CatFlap','Cat','CatLoaf','Pellets','LeafRaft','Willow','AgilityTent','AgilityInside','AgilityKit','HollowOak','OakInside','Owl','OwlNest'];
+  'BarnInside','HayPile','BarnHole','Twig','PetShopInside','CatFlap','Cat','CatLoaf','Pellets','LeafRaft','Willow','AgilityTent','AgilityInside','AgilityKit','HollowOak','OakInside','Owl','OwlNest','Windmill','MillInside','MillKit'];
 const M={};
 const DOUBLE=new Set(['Grass','Plant','Leaves','DryLeaves','Petal','Needles','Cloth','Skin','Flesh']);
 async function loadAssets(progress){
@@ -218,6 +218,7 @@ function buildZone(z){
   if(z.id==='creek')setupRaft(z);
   if(z.id==='zoo')setupAgility(z);
   if(z.id==='deepwood')setupHollowOak(z);
+  if(z.id==='sunflowers')setupWindmill(z);
   placeTwigs(z);
   // a plant that ended up inside a rock or trunk can never be eaten: leave it out (without touching the seeded layout)
   for(const ps of z.pickSets)for(const it of ps.items)if(z.colliders.some(c=>Math.hypot(c.x-it.x,c.z-it.z)<c.r)||insideBox(it.x,it.z)){it.alive=false;it.respawn=Infinity;ps.set.setMatrix(it.i,ZERO)}
@@ -273,11 +274,12 @@ const LOOT={
   seedhead:{seeds:40,daisy:14,violet:12,dandelion:12,clover4:2,goldDandelion:1.5,nothing:18},
   shopspill:{pellets:55,hay:15,carrot:10,clover:10,nothing:10},
   shopbin:{pellets:25,strawberry:18,carrot:15,pepper:14,apple:8,goldCarrot:4,clover4:2,nothing:4},
+  millsack:{seeds:40,cornhusk:12,clover:10,dandelion:10,carrot:8,goldDandelion:2,nothing:10},
   owlstash:{goldDandelion:16,clover4:14,goldCarrot:8,chanterelle:16,raspleaf:14,berries:12,nothing:10},
   islandlog:{watercress:18,berries:15,strawberry:14,chanterelle:12,raspleaf:8,clover4:5,goldDandelion:4,nothing:10},
 };
 const SPOTNAME={leafpile:'Leaf Pile',bush:'Berry Bush',log:'Mossy Log',rock:'Mossy Rock',bed:'Garden Bed',hay:'Hay Bale',prize:'the Maze Prize',
-  drift:'Snowdrift',bramble:'Bramble Patch',stall:'Market Crate',picnic:'Picnic Basket',cress:'Watercress Bed',trough:'Feed Trough',apples:'Windfall Apples',seedhead:'Sunflower Head',shopspill:'Spilled Pellets',shopbin:'Treat Bin',islandlog:'Driftwood',owlstash:'Owl\'s Stash'};
+  drift:'Snowdrift',bramble:'Bramble Patch',stall:'Market Crate',picnic:'Picnic Basket',cress:'Watercress Bed',trough:'Feed Trough',apples:'Windfall Apples',seedhead:'Sunflower Head',shopspill:'Spilled Pellets',shopbin:'Treat Bin',islandlog:'Driftwood',owlstash:'Owl\'s Stash',millsack:'Spilled Sack'};
 // ============================================================ breeds & coats
 const BREEDS={
   american:{name:'American',tag:'Smooth & speedy',desc:'A short, sleek coat. The classic all-rounder.',perk:'🏃 Scurries 12% faster, and sprinting costs less energy',fur:{len:1,droop:1,swirl:0,dens:[340,200],face:.8,layers:16},coats:['tricolor','golden','dutch','agouti','himalayan'],speed:1.12,sprintCost:.75},
@@ -304,7 +306,7 @@ const RANKS=[[0,'Nibbler'],[4,'Sniffer'],[12,'Rummager'],[25,'Master Forager'],[
 const G={started:false,paused:false,over:false,modal:false,inTunnel:false,
   hp:100,full:80,vitc:75,energy:100,happy:50,score:0,best:lsGet('wheek-best',0),
   day:1,time:7.0,combo:0,comboT:0,forages:0,pets:0,petStreak:0,lastPetHuman:null,petStreakT:0,
-  found:{},curios:{},tunnels:0,zfound:{},visited:{park:1},met:{},pals:[],placesDone:{},goals:{},bestStreak:0,hawkDodged:0,foxEscapes:0,mazePrize:0,heard:{},given:{},barns:{},hayFinds:0,teethT:0,gnaws:0,cleanGnaws:0,shop:0,fullHerd:0,island:0,rafts:0,cleanRaft:0,agility:0,rosette:0,agilityBest:0,agilityRuns:0,oak:0,lookout:0,quietClimb:0,owlSwoops:0,luckT:0,giftT:40,huddle:false,wheekT:0,sniffCD:0,popcornCD:0,cause:'',nightsSurvived:0,eaten:0};
+  found:{},curios:{},tunnels:0,zfound:{},visited:{park:1},met:{},pals:[],placesDone:{},goals:{},bestStreak:0,hawkDodged:0,foxEscapes:0,mazePrize:0,heard:{},given:{},barns:{},hayFinds:0,teethT:0,gnaws:0,cleanGnaws:0,shop:0,fullHerd:0,island:0,rafts:0,cleanRaft:0,agility:0,rosette:0,agilityBest:0,agilityRuns:0,oak:0,lookout:0,quietClimb:0,owlSwoops:0,mill:0,mazeView:0,seedBest:0,millCatch:0,luckT:0,giftT:40,huddle:false,wheekT:0,sniffCD:0,popcornCD:0,cause:'',nightsSurvived:0,eaten:0};
 const pig={pos:new THREE.Vector3(2.5,0,-1.5),vel:new THREE.Vector3(),heading:Math.PI,vy:0,air:false,phase:0,obj:null,parts:{},eating:0,foraging:0,knock:0,popSpin:0,fur:[]};
 (()=>{const s=lsGet('wheek-pig',null);const b=s&&BREEDS[s.breed]?s.breed:'american';G.breed=b;G.coat=s&&BREEDS[b].coats.includes(s.coat)?s.coat:BREEDS[b].coats[0];G.name=(s&&s.name)||PIG_NAMES[Math.floor(Math.random()*PIG_NAMES.length)];G.perk=perksFor(b)})();
 const keys={};
@@ -874,6 +876,7 @@ function buildMaze(avoid){const {cx,cz,n,cell}=MAZE,x0=cx-n*cell/2,z0=cz-n*cell/
     if(!opts.length){st.pop();continue}const [dc,dr]=opts[Math.floor(rand()*opts.length)],a=c+dc,b=r+dr;
     if(dr===-1)walls.h[r][c]=0;if(dr===1)walls.h[r+1][c]=0;if(dc===-1)walls.v[c][r]=0;if(dc===1)walls.v[c+1][r]=0;vis[b*n+a]=1;st.push([a,b])}
   walls.v[n][n-1]=0;   // the way in: east side, bottom row
+  Z.maze=walls;
   const fm=[],gm=[],seg=(ax,az,bx,bz)=>{const L=Math.hypot(bx-ax,bz-az),k=Math.round(L/.46);for(let i=0;i<=k;i++){const x=ax+(bx-ax)*i/k+R(-.06,.06),z=az+(bz-az)*i/k+R(-.06,.06);
     fm.push(mat4(x,heightAt(x,z)-.02,z,rand()*6,R(.85,1.2)));addCollider(x,z,.3);gm.push(mat4(x+R(-.15,.15),heightAt(x,z)-.01,z+R(-.15,.15),rand()*6,R(1.2,1.7)))}};
   for(let r=0;r<=n;r++)for(let c=0;c<n;c++)if(walls.h[r][c])seg(x0+c*cell,z0+r*cell,x0+(c+1)*cell,z0+r*cell);
@@ -1081,6 +1084,7 @@ function currentActions(){
   const m=mouthPos();
   for(const b of Z.barns)for(const h of b.holes)if(Math.hypot(h.ex-pig.pos.x,h.ez-pig.pos.z)<.45)acts.push({k:'E',label:'Squeeze into the barn',do:()=>enterInside(b,h)});
   if(Z.raft&&Math.hypot(Z.raft.ex-pig.pos.x,Z.raft.ez-pig.pos.z)<.65)acts.push({k:'E',label:'Hop on the leaf raft',do:startRaft});
+  if(Z.mill){const b=Z.mill,h=b.holes[0];if(Math.hypot(h.ex-pig.pos.x,h.ez-pig.pos.z)<.5)acts.push({k:'E',label:'Squeeze through the mouse hole',do:()=>enterInside(b,h)})}
   if(Z.oak){const b=Z.oak,h=b.holes[0];if(Math.hypot(h.ex-pig.pos.x,h.ez-pig.pos.z)<.5)acts.push({k:'E',label:'Squeeze into the knothole',do:()=>enterInside(b,h)})}
   if(Z.agility){const b=Z.agility,h=b.holes[0];if(Math.hypot(h.ex-pig.pos.x,h.ez-pig.pos.z)<.5)acts.push({k:'E',label:'Duck under the tent flap',do:()=>enterInside(b,h)})}
   if(Z.shop){const b=Z.shop,h=b.holes[0];if(Math.hypot(h.ex-pig.pos.x,h.ez-pig.pos.z)<.5){const open=shopOpen();
@@ -1130,7 +1134,7 @@ function updateForage(dt){
   const f=forageState;if(!f)return;
   if(!keys.KeyF||Math.hypot(f.spot.x-pig.pos.x,f.spot.z-pig.pos.z)>f.spot.r+.45){forageState=null;$('forage').style.display='none';return}
   f.t+=dt;f.rustle-=dt;pig.foraging=.2;
-  if(f.rustle<=0){f.rustle=.14;SFX.rustle();const c={leafpile:[.75,.4,.1],bush:[.2,.45,.12],log:[.45,.32,.2],rock:[.5,.5,.45],bed:[.3,.2,.12],hay:[.8,.7,.35],prize:[1,.85,.3],drift:[.92,.96,1],bramble:[.25,.42,.12],stall:[.45,.72,.28],picnic:[.85,.3,.3],cress:[.7,.88,1],trough:[.8,.7,.35],apples:[.8,.2,.15],seedhead:[1,.8,.2],shopspill:[.5,.55,.25],shopbin:[.95,.75,.3],islandlog:[.55,.45,.35],owlstash:[.85,.78,.55]}[f.spot.type]||[.6,.5,.35];emit(f.spot.x+R(-.15,.15),groundAt(f.spot.x,f.spot.z)+.08,f.spot.z+R(-.15,.15),5,{col:c,spread:.6,up:1.2,size:.018,life:.8,grav:3})}
+  if(f.rustle<=0){f.rustle=.14;SFX.rustle();const c={leafpile:[.75,.4,.1],bush:[.2,.45,.12],log:[.45,.32,.2],rock:[.5,.5,.45],bed:[.3,.2,.12],hay:[.8,.7,.35],prize:[1,.85,.3],drift:[.92,.96,1],bramble:[.25,.42,.12],stall:[.45,.72,.28],picnic:[.85,.3,.3],cress:[.7,.88,1],trough:[.8,.7,.35],apples:[.8,.2,.15],seedhead:[1,.8,.2],shopspill:[.5,.55,.25],shopbin:[.95,.75,.3],islandlog:[.55,.45,.35],owlstash:[.85,.78,.55],millsack:[.85,.75,.5]}[f.spot.type]||[.6,.5,.35];emit(f.spot.x+R(-.15,.15),groundAt(f.spot.x,f.spot.z)+.08,f.spot.z+R(-.15,.15),5,{col:c,spread:.6,up:1.2,size:.018,life:.8,grav:3})}
   $('forage').querySelector('i').style.width=(f.t/f.need*100)+'%';
   if(f.t>=f.need){forageState=null;$('forage').style.display='none';completeForage(f.spot)}
 }
@@ -1191,7 +1195,7 @@ function updateDrops(dt){for(let i=drops.length-1;i>=0;i--){const d=drops[i];if(
 
 // sniff
 // the little ways in to each zone's big discovery, for the outdoor sniff
-const SNIFF_WAYS_IN=[['oak','a knothole in the giant oak 🌳',0x9fe88a],['agility','a gap under the tent flap 🏅',0xffd060]];
+const SNIFF_WAYS_IN=[['mill','a mouse hole in the windmill door 🌻',0xffd060],['oak','a knothole in the giant oak 🌳',0x9fe88a],['agility','a gap under the tent flap 🏅',0xffd060]];
 function sniff(){if(G.sniffCD>0){toast(`Your nose needs a moment (${Math.ceil(G.sniffCD)}s)`);return}G.sniffCD=10;SFX.sniff();if(G.under){sniffWarren();return}let n=0,t=0;
   for(const s of spots){if(!s.ready)continue;const d=Math.hypot(s.x-pig.pos.x,s.z-pig.pos.z);if(d<22){marker(s.x,heightAt(s.x,s.z)+.2,s.z,0xffd060);n++}}
   for(const tu of tunnels){const d=Math.hypot(tu.x-pig.pos.x,tu.z-pig.pos.z);if(d<32){marker(tu.ex,heightAt(tu.ex,tu.ez)+.35,tu.ez,tu.found?0x7fd0ff:0x9a7bff);if(!tu.found)t++}}
@@ -1587,7 +1591,7 @@ function insideCollide(P,pr,free){const B=G.inside;
 // hidden treats, fresh every day
 function hideTreats(B){B.day=G.day;B.found=0;B.treats=[];for(let i=0;i<4;i++){const a=Math.random()*Math.PI*2,r=Math.sqrt(Math.random())*B.pile.R*.8;B.treats.push({x:B.pile.x+Math.cos(a)*r,z:B.pile.z+Math.sin(a)*r,type:pick(HAYLOOT),got:false})}}
 // in through a hole (or a cat flap): the inside is its own scene; each kind (barn, shop) adds its own actions and update
-function enterInside(b,hole){G.acts=null;iScene.background=new THREE.Color(0x140c06);iScene.fog=null;if(!b.inside)({shop:buildShopInside,island:buildIslandInside,agility:buildAgilityInside,oak:buildOakInside}[b.kind]||buildBarnInside)(b);const B=b.inside;iScene.clear();iScene.add(B.group);G.inside=B;G.insideHole=hole;B.from=b;G.hidden=true;forageState=null;$('forage').style.display='none';
+function enterInside(b,hole){G.acts=null;iScene.background=new THREE.Color(0x140c06);iScene.fog=null;if(!b.inside)({shop:buildShopInside,island:buildIslandInside,agility:buildAgilityInside,oak:buildOakInside,mill:buildMillInside}[b.kind]||buildBarnInside)(b);const B=b.inside;iScene.clear();iScene.add(B.group);G.inside=B;G.insideHole=hole;B.from=b;G.hidden=true;forageState=null;$('forage').style.display='none';
   SFX.rustle();flash('rgba(0,0,0,1)',1);swapScene(pig.obj,iScene);swapScene(pts,iScene);pig.blob.visible=false;pig.light.intensity=0;pig.air=false;pig.vy=0;
   const h=B.holes[Math.max(0,b.holes.indexOf(hole))];pig.pos.set(h.x,0,h.z);pig.vel.set(0,0,0);pig.heading=h.heading;G.camYaw=h.heading+Math.PI;W.trail.length=0;W.trail.push({x:pig.pos.x,z:pig.pos.z});
   if(!B.noHerd)herd.forEach(f=>{swapScene(f.obj,iScene);f.blob.visible=false;f.pos.set(h.x,0,h.z);f.vel.set(0,0,0);f.air=false;f.vy=0});friends.forEach(f=>f.tag.style.display='none');snapCamera();
@@ -1629,7 +1633,7 @@ function foundInHay(tr){const B=G.inside;tr.got=true;B.found++;G.hayFinds=(G.hay
 function sniffBarn(){const B=G.inside,left=B.treats.filter(t=>!t.got);for(const t of left)marker(t.x,insideHeight(t.x,t.z)+.15,t.z,0xffd060,B.group);
   toast(left.length?`👃 Sniff sniff… <b>${left.length} treat${left.length>1?'s':''}</b> hidden in the hay!`:'👃 Just hay. Lovely, sweet hay. (More treats tomorrow.)')}
 function updateInside(dt,t){const B=G.inside;
-  if(B.burrow)updateBurrow(dt,t);else if(B.tube)updateTube(dt,t);else updatePig(dt,t);
+  if(B.burrow)updateBurrow(dt,t);else if(B.tube)updateTube(dt,t);else if(B.catch)updateCatch(B,dt,t);else updatePig(dt,t);
   const last=W.trail[0];if(!B.burrow&&Math.hypot(pig.pos.x-last.x,pig.pos.z-last.z)>.06){W.trail.unshift({x:pig.pos.x,z:pig.pos.z});if(W.trail.length>(HERD_MAX+1)*6+4)W.trail.pop()}
   if(!B.noHerd)herd.forEach((f,i)=>{const tp=W.trail[Math.min(W.trail.length-1,(i+1)*6)],hx=tp.x-f.pos.x,hz=tp.z-f.pos.z,hl=Math.hypot(hx,hz);
     if(hl>.07){f.heading+=angDiff(f.heading,Math.atan2(hx,hz))*Math.min(1,dt*8);const sp=Math.min(Math.min(3.8,hl*4+.4),hl/Math.max(dt,1e-3));f.vel.set(Math.sin(f.heading)*sp,0,Math.cos(f.heading)*sp)}else f.vel.multiplyScalar(Math.max(0,1-dt*10));
@@ -2134,6 +2138,108 @@ function sniffOak(B){const top=OAK_SHELVES[OAK.N];marker(B.window.x,top.h+.3,B.w
   const next=OAK_SHELVES.find(s=>s.h>pig.pos.y+.06);if(next)marker(Math.sin(next.phi)*1.9,next.h+.15,Math.cos(next.phi)*1.9,0x9fe88a,B.group);
   toast(`👃 Sniff sniff… fresh air from the window at the top, something shiny up there too${next?', and the next fungus up is marked':''}.`)}
 
+// ============================================================ the Old Windmill (Sunflower Fields)
+// A tower mill on the highest hill, sails turning. A mouse hole at the foot of its door lets you in. On the ground floor
+// the millstones grind and a sweep arm goes round and round the floor: slip past it, hop up onto the ramp of planks round
+// the wall and climb to the loft. Under the hopper, catch the sunflower seeds that spill from its chute (dodge the
+// pebbles). From the loft window you can see the whole maze, and the way to its middle goes on your map.
+const TAU=Math.PI*2,MILL={R:1.62,loftH:1.4,loftA0:4.3,loftA1:6.9,loftR0:.55,rampA0:2,rampA1:4.3,rampR0:1.2,rampH0:.2,rampT:.07,loftT:.1,sweepR0:.62,sweepR1:1.72,spin:.9,jump:2.15,hopper:5.6,hopperR:1.05,window:0,trunk:1.95,door:2.4,catchT:25};
+const angNorm=a=>((a%TAU)+TAU)%TAU,angIn=(a,a0,a1)=>angNorm(a-a0)<=a1-a0;
+function millRampH(ph){return MILL.rampH0+(MILL.loftH-MILL.rampH0)*(ph-MILL.rampA0)/(MILL.rampA1-MILL.rampA0)}
+// the surfaces you can stand on (the floor, the ramp, the loft) and the slabs you'd bump into from below
+function millSlabs(x,z){const r=Math.hypot(x,z),ph=angNorm(Math.atan2(x,z)),out=[];if(r>=MILL.loftR0&&angIn(ph,MILL.loftA0,MILL.loftA1))out.push([MILL.loftH,MILL.loftT]);
+  if(r>=MILL.rampR0&&ph>=MILL.rampA0&&ph<=MILL.rampA1)out.push([millRampH(ph),MILL.rampT]);return out}
+function millSurf(x,z,y){let best=0;for(const [h] of millSlabs(x,z))if(h<=y+.06&&h>best)best=h;return best}
+function millBlocked(x,z,y){for(const [h,t] of millSlabs(x,z))if(h>y+.06&&h-t<y+.2)return true;return false}
+function setupWindmill(z){const {cx,cz,n,cell}=MAZE,mz=(x,zz)=>Math.max(Math.abs(x-cx),Math.abs(zz-cz))-n*cell/2;
+  const fits=(x,zz)=>{for(let r=0;r<=2.8;r+=.7)for(let k=0;k<(r?12:1);k++){const a=k/12*TAU,px=x+Math.cos(a)*r,pz=zz+Math.sin(a)*r;if(!freeAt(px,pz,.2)||Math.hypot(px,pz)>EDGE-7)return false}
+    return mz(x,zz)>9&&distToPath(x,zz)>4&&!spots.some(s=>Math.hypot(s.x-x,s.z-zz)<3.2)&&!tunnels.some(t=>Math.hypot(t.x-x,t.z-zz)<4)};
+  let best=null,bh=-1e9;for(let x=-56;x<=56;x+=4)for(let zz=-56;zz<=56;zz+=4){const h=heightAt(x,zz);if(h>bh&&fits(x,zz)){bh=h;best=[x,zz]}}   // the highest hill that has room
+  if(!best)return;const [x,zz]=best,rot=Math.atan2(cx-x,cz-zz),o=M.Windmill.clone(true);o.position.set(x,Math.min(heightAt(x,zz),heightAt(x+Math.sin(rot)*1.9,zz+Math.cos(rot)*1.9))-.05,zz);o.rotation.y=rot;z.group.add(o);addCollider(x,zz,MILL.trunk);
+  const nx=Math.sin(rot),nz=Math.cos(rot);z.mill={obj:o,kind:'mill',scale:1,x,z:zz,sails:o.getObjectByName('Sails'),holes:[{ex:x+nx*MILL.door,ez:zz+nz*MILL.door,out:rot,h:{x:0,z:MILL.door}}]}}
+function buildMillInside(b){const g=new THREE.Group(),B={kind:'mill',title:'🌻 The Old Windmill',noHerd:true,onEnter:millEnter,onExit:millExit,actions:millActions,update:millUpdate,sniff:sniffMill,hud:millHud,
+    group:g,s:1,hx:1.8,hz:1.8,ceil:3.4,loftX:Infinity,cols:[{x:0,z:0,r:.57}],boxes:[],radius:MILL.R,height:(x,z)=>millSurf(x,z,pig.pos.y),ledges:true,blocked:millBlocked,jump:MILL.jump,
+    camDist:()=>B.catch?.95:Math.max(.6,Math.hypot(pig.pos.x,pig.pos.z)-.25),camPitch:()=>B.catch?.1:null,spots:[],sweepA:0,hitCD:0,catch:null};   // the camera stays on your side of the drive shaft
+  const room=M.MillInside.clone(true);g.add(room);
+  room.traverse(m=>{if(m.isMesh&&m.material.name==='HoleDark'){m.material=new THREE.MeshBasicMaterial({color:0xfff0d0});B.lightMat=m.material}});
+  const piece=(name,x,y,z,ry=0)=>{const o=M.MillKit.getObjectByName(name).clone(true);o.position.set(x,y,z);o.rotation.y=ry;g.add(o);return o};
+  B.stones=piece('Millstones',0,0,0);B.runner=B.stones.getObjectByName('Runner');B.shaft=piece('Shaft',0,0,0);B.sweep=piece('Sweep',0,0,0);
+  // the ramp of planks round the wall, and the loft floor: slabs matching millSlabs
+  const wood=new THREE.MeshStandardMaterial({color:0x9a6a3e,roughness:.8}),dark=new THREE.MeshStandardMaterial({color:0x6a4426,roughness:.85});
+  {const n=30,pos=[],idx=[];for(let i=0;i<=n;i++){const ph=MILL.rampA0+(MILL.rampA1-MILL.rampA0)*i/n,h=millRampH(ph);for(const [r,y] of [[MILL.rampR0,h],[MILL.R+.15,h],[MILL.R+.15,h-MILL.rampT],[MILL.rampR0,h-MILL.rampT]])pos.push(Math.sin(ph)*r,y,Math.cos(ph)*r)}
+    for(let i=0;i<n;i++){const a=i*4,b2=a+4;for(const [p,q] of [[0,1],[1,2],[2,3],[3,0]])idx.push(a+p,b2+p,b2+q,a+p,b2+q,a+q)}
+    const geo=new THREE.BufferGeometry();geo.setAttribute('position',new THREE.Float32BufferAttribute(pos,3));geo.setIndex(idx);geo.computeVertexNormals();const m=new THREE.Mesh(geo,new THREE.MeshStandardMaterial({color:0x9a6a3e,roughness:.8,side:THREE.DoubleSide}));m.castShadow=m.receiveShadow=true;g.add(m);
+    for(let i=1;i<n;i+=3){const ph=MILL.rampA0+(MILL.rampA1-MILL.rampA0)*i/n,h=millRampH(ph),post=new THREE.Mesh(new THREE.BoxGeometry(.05,h,.05),dark);post.position.set(Math.sin(ph)*(MILL.rampR0+.05),h/2,Math.cos(ph)*(MILL.rampR0+.05));if(h>.25)g.add(post)}
+    for(let i=0;i<n;i++){const ph=MILL.rampA0+(MILL.rampA1-MILL.rampA0)*(i+.5)/n,h=millRampH(ph),slat=new THREE.Mesh(new THREE.BoxGeometry(.5,.012,.03),dark);slat.position.set(Math.sin(ph)*1.45,h+.004,Math.cos(ph)*1.45);slat.rotation.y=ph+Math.PI/2;g.add(slat)}}
+  {const sh=new THREE.Shape(),P=(r,a)=>[r*Math.sin(a),-r*Math.cos(a)],n=40;sh.moveTo(...P(MILL.loftR0,MILL.loftA0));for(let k=0;k<=n;k++)sh.lineTo(...P(MILL.loftR0,MILL.loftA0+(MILL.loftA1-MILL.loftA0)*k/n));for(let k=n;k>=0;k--)sh.lineTo(...P(MILL.R+.15,MILL.loftA0+(MILL.loftA1-MILL.loftA0)*k/n));sh.closePath();
+    const geo=new THREE.ExtrudeGeometry(sh,{depth:MILL.loftT,bevelEnabled:false,curveSegments:4});geo.rotateX(-Math.PI/2);const m=new THREE.Mesh(geo,wood);m.position.y=MILL.loftH-MILL.loftT;m.castShadow=m.receiveShadow=true;g.add(m)}
+  // the hopper hangs over the loft; sacks on the loft and a spilled one on the floor
+  const hx=Math.sin(MILL.hopper)*MILL.hopperR,hz=Math.cos(MILL.hopper)*MILL.hopperR;B.hopper=piece('Hopper',hx,3.05,hz,MILL.hopper+Math.PI);B.hopper.getObjectByName('HopperFrame').visible=false;B.hopperAt={x:hx,z:hz};
+  for(const [ph,r,ry] of [[4.6,1.45,.3],[4.85,1.5,1.2],[6.5,1.45,2]]){piece('Sack',Math.sin(ph)*r,MILL.loftH,Math.cos(ph)*r,ry);B.cols.push({x:Math.sin(ph)*r,z:Math.cos(ph)*r,r:.15})}
+  {const ph=1,r=1.4,o=piece('Sack',Math.sin(ph)*r,0,Math.cos(ph)*r,.6);o.rotation.z=1.3;o.position.y=.13;B.cols.push({x:Math.sin(ph)*r,z:Math.cos(ph)*r,r:.14});
+    B.spots.push({type:'millsack',x:Math.sin(ph-.22)*1.3,z:Math.cos(ph-.22)*1.3,r:.3,ready:true,cd:0,floor:true})}
+  B.window={x:Math.sin(MILL.window)*1.5,z:Math.cos(MILL.window)*1.5};
+  B.hemi=new THREE.HemisphereLight(0xfff4e0,0x6a5038,1.1);g.add(B.hemi);B.amb=new THREE.AmbientLight(0xffeedd,.35);g.add(B.amb);
+  B.sun=new THREE.DirectionalLight(0xfff0d0,1.3);B.sun.position.set(-2,4,1);B.sun.target.position.set(0,.5,0);g.add(B.sun,B.sun.target);
+  B.beams=[];for(const [ph,y] of [[Math.PI/2+2.2-Math.PI/2,1.1],[0,1.75]]){const bm=new THREE.Mesh(new THREE.PlaneGeometry(.35,2.2),new THREE.MeshBasicMaterial({map:glowTex,color:0xffe8b0,transparent:true,opacity:.14,blending:THREE.AdditiveBlending,depthWrite:false,side:THREE.DoubleSide}));
+    bm.position.set(Math.sin(ph)*.9,y-.5,Math.cos(ph)*.9);bm.rotation.y=ph;bm.rotateX(.8);g.add(bm);B.beams.push(bm)}
+  B.holes=[{x:0,z:MILL.R-.3,heading:Math.PI,i:0}];
+  b.inside=B}
+function millEnter(B){B.catch=null;
+  if(!G.mill){G.mill=1;SFX.find('rare');callout('rare','🌻 The Old Windmill',120);addScore(120,'new place!','#7fd0ff');
+    toast(`🌻 <b>Inside the old windmill!</b> The millstones are grinding and the sweep arm goes round the floor: don't get swept! Hop (${kb('Space')}) up onto the ramp of planks round the wall and climb to the loft, where seeds spill from the hopper. Your herd waits outside.`,'gold',10)}
+  else toast('🌻 Into the old windmill')}
+function millExit(B){if(B.catch)millCatchEnd(B,true)}
+function millActions(B){if(B.catch)return [];const acts=[],loft=pig.pos.y>MILL.loftH-.02;
+  if(pig.pos.y<.05)acts.push(...exitActs(B,'Squeeze out through the mouse hole'));
+  if(loft&&Math.hypot(pig.pos.x-B.hopperAt.x,pig.pos.z-B.hopperAt.z)<.35)acts.push({k:'E',label:G.seedBest?`Catch the falling seeds (best ${G.seedBest})`:'Catch the falling seeds!',do:()=>millCatchStart(B)});
+  if(loft&&Math.hypot(pig.pos.x-B.window.x,pig.pos.z-B.window.z)<.42)acts.push({k:'E',label:'Look out over the maze',do:()=>millLookout(B)});
+  for(const sp of B.spots){if(Math.hypot(sp.x-pig.pos.x,sp.z-pig.pos.z)<sp.r+.28&&pig.pos.y<.05){acts.push(sp.ready?{k:'F',hold:true,label:'Forage the spilled sack',spot:sp,do:()=>{if(!forageState)startForage(sp)}}:{k:'F',label:`Spilled sack · picked over (${Math.ceil(sp.cd)}s)`,disabled:true});break}}
+  return acts}
+// the way through the maze: breadth-first from the entrance cell to the middle one
+function mazeRoute(){const w=ZONE.sunflowers.maze;if(!w)return null;const {n}=MAZE,start=[n-1,n-1],goal=[Math.floor(n/2),Math.floor(n/2)],prev=new Map(),key=(c,r)=>r*n+c,q=[start];prev.set(key(...start),null);
+  while(q.length){const [c,r]=q.shift();if(c===goal[0]&&r===goal[1])break;for(const [dc,dr] of [[0,-1],[1,0],[0,1],[-1,0]]){const a=c+dc,b2=r+dr;if(a<0||b2<0||a>=n||b2>=n||prev.has(key(a,b2)))continue;
+    const open=dr===-1?!w.h[r][c]:dr===1?!w.h[r+1][c]:dc===-1?!w.v[c][r]:!w.v[c+1][r];if(open){prev.set(key(a,b2),[c,r]);q.push([a,b2])}}}
+  const out=[];let k=goal;while(k){out.unshift(k);k=prev.get(key(...k))}return out[0]&&out[0][0]===start[0]&&out[0][1]===start[1]?out:null}
+function millLookout(B){SFX.find('epic');flash('rgba(255,250,220,.6)',.6);const first=!G.mazeView;G.mazeView=1;if(first){callout('epic','🌻 A view of the maze',200);addScore(200,'view!','#c98bff')}
+  toast(`🌻 <b>You can see the whole sunflower maze from up here!</b> The way through to the middle is on your map now.${G.mazePrize?'':' Something golden is waiting there.'}`,'gold',7)}
+function millCatchStart(B){const ph=angNorm(Math.atan2(B.hopperAt.x,B.hopperAt.z));B.catch={t:0,score:0,gold:0,pebbles:0,items:[],spawn:.8,lat:0,cx:B.hopperAt.x,cz:B.hopperAt.z,rx:-Math.cos(ph),rz:Math.sin(ph),ph};G.acts=null;
+  pig.vel.set(0,0,0);pig.heading=ph+Math.PI;G.camYaw=ph+Math.PI;tone('triangle',600,900,.15,.12);
+  toast(`🌻 <b>Seeds!</b> Scurry left and right${G.input==='touch'?'':` (${kb('A')} ${kb('D')})`} to catch them as they spill from the hopper. Golden ones are worth more. Spit out the pebbles: don't catch those! ${MILL.catchT} seconds.`,'gold',6)}
+function updateCatch(B,dt,t){const C=B.catch;C.t+=dt;
+  let ix=0;if(keys.KeyA||keys.ArrowLeft)ix-=1;if(keys.KeyD||keys.ArrowRight)ix+=1;if(joy.active)ix=joy.x;else if(pad.on)ix=pad.x;
+  const v=ix*1.7;C.lat=clamp(C.lat+v*dt,-.5,.5);pig.pos.set(C.cx+C.rx*C.lat,MILL.loftH,C.cz+C.rz*C.lat);pig.vel.set(C.rx*v,0,C.rz*v);pig.heading=C.ph+Math.PI;pig.air=false;
+  pig.obj.position.copy(pig.pos);pig.obj.rotation.set(0,pig.heading+(Math.abs(v)>.1?Math.sin(t*20)*.08:0),0,'YXZ');animatePigLegs(dt,Math.abs(v),Math.abs(v)>.1);U.player.value.copy(pig.pos);
+  // the hopper's shoe jiggles side to side and seeds spill from it, faster and faster
+  const shoe=Math.sin(C.t*1.4)*.42+Math.sin(C.t*3.1)*.06;B.hopper.position.set(B.hopperAt.x+C.rx*shoe,3.05,B.hopperAt.z+C.rz*shoe);
+  C.spawn-=dt;if(C.spawn<=0&&C.t<MILL.catchT-.8){C.spawn=lerp(.55,.22,C.t/MILL.catchT);const kind=Math.random()<.07?'gold':Math.random()<.16?'pebble':'seed',lat=clamp(shoe+R(-.1,.1),-.52,.52);
+    const geo=kind==='pebble'?new THREE.SphereGeometry(.022,8,6):new THREE.SphereGeometry(.018,8,6),mat=new THREE.MeshStandardMaterial({color:kind==='gold'?0xffd23f:kind==='pebble'?0x8a8a86:0x2a2622,roughness:kind==='gold'?.3:.7,metalness:kind==='gold'?.5:0,emissive:kind==='gold'?0x5a3a00:0});
+    const o=new THREE.Mesh(geo,mat);if(kind==='seed')o.scale.set(.8,.8,1.7);o.position.set(B.hopperAt.x+C.rx*lat,2.28,B.hopperAt.z+C.rz*lat);B.group.add(o);C.items.push({o,lat,y:2.28,vy:0,kind})}
+  for(const it of C.items){if(it.done)continue;it.vy-=2.6*dt;it.y+=it.vy*dt;it.o.position.y=it.y;it.o.rotation.x+=dt*6;
+    if(it.y<MILL.loftH+.16&&it.y>MILL.loftH+.04&&Math.abs(it.lat-C.lat)<.09){it.done=true;it.o.removeFromParent();
+      if(it.kind==='pebble'){C.pebbles++;C.score=Math.max(0,C.score-2);SFX.hurt();floaty('ptooey!','#ff9a7a');emit(pig.pos.x,pig.pos.y+.12,pig.pos.z,8,{col:[.6,.6,.58],spread:.5,up:1,size:.012,life:.5})}
+      else{const n=it.kind==='gold'?5:1;C.score+=n;if(it.kind==='gold'){C.gold++;SFX.find('rare');floaty('+5 golden!','#ffd23f')}else{SFX.chomp()}}}
+    else if(it.y<MILL.loftH){it.done=true;it.o.removeFromParent();if(it.kind!=='pebble')emit(B.hopperAt.x+C.rx*it.lat,MILL.loftH+.02,B.hopperAt.z+C.rz*it.lat,3,{col:[.3,.26,.2],spread:.3,up:.5,size:.01,life:.4,grav:3})}}
+  C.items=C.items.filter(it=>!it.done);if(C.t>=MILL.catchT&&!C.items.length)millCatchEnd(B)}
+function millCatchEnd(B,quiet){const C=B.catch;B.catch=null;for(const it of C.items)it.o.removeFromParent();B.hopper.position.set(B.hopperAt.x,3.05,B.hopperAt.z);G.acts=null;if(quiet)return;
+  const best=C.score>(G.seedBest||0);G.millCatch=(G.millCatch||0)+1;if(best)G.seedBest=C.score;const handfuls=Math.floor(C.score/10);
+  addScore(C.score*3+C.gold*15+(best&&G.millCatch>1?40:0),'seeds!','#ffd23f');for(let i=0;i<handfuls;i++){discover('seeds');applyFood('seeds')}if(handfuls)SFX.chomp();
+  G.happy=Math.min(100,G.happy+8+handfuls*2);SFX.levelup();
+  toast(`🌻 <b>${C.score} seeds caught!</b>${C.gold?` ${C.gold} golden.`:''}${C.pebbles?` ${C.pebbles} pebble${C.pebbles>1?'s':''} spat out.`:''}${handfuls?` That's ${handfuls} cheekful${handfuls>1?'s':''} of sunflower seeds. Crunch!`:''}${best?' Your best yet!':''}`,'gold',7)}
+function millHud(B){const C=B.catch;if(!C)return null;return {html:`🌻 Seeds ${C.score}${C.gold?` · ✨ ${C.gold}`:''} · ${Math.max(0,Math.ceil(MILL.catchT-C.t))} s`,pct:Math.min(100,C.t/MILL.catchT*100)}}
+function millUpdate(B,dt,t){const day=clamp(sun.intensity/2.9,0,1);B.lightMat&&B.lightMat.color.copy(skyMat.uniforms.hor.value).multiplyScalar(.6+day*.8);B.sun.intensity=.2+day*1.3;B.hemi.intensity=.6+day*.6;B.amb.intensity=.3+day*.2;for(const bm of B.beams)bm.material.opacity=.03+day*.14;
+  for(const sp of B.spots)if(!sp.ready){sp.cd-=dt;if(sp.cd<=0)sp.ready=true}
+  // the machinery turns with the sails
+  B.sweepA+=dt*MILL.spin;B.sweep.rotation.y=-B.sweepA;B.runner.rotation.y=-B.sweepA*1.8;B.shaft.rotation.y=-B.sweepA*1.8;if(Math.random()<dt*3)emit(R(-.4,.4),.58,R(-.4,.4),1,{col:[.95,.92,.85],spread:.2,up:.3,size:.008,life:1.2,grav:-.05});
+  if(B.catch){G.camYaw=B.catch.ph+Math.PI;return}
+  const r=Math.hypot(pig.pos.x,pig.pos.z);if(r>.7&&!G.drag)G.camYaw+=angDiff(G.camYaw,Math.atan2(-pig.pos.x,-pig.pos.z))*Math.min(1,dt*4);
+  // the sweep arm: it points along phi = sweepA (rotation.y = -sweepA puts its local +X there), and pushes you round ahead of it
+  B.hitCD=Math.max(0,B.hitCD-dt);const armPh=B.sweepA+Math.PI/2;
+  if(pig.pos.y<.14&&r>MILL.sweepR0-.08&&r<MILL.sweepR1+.1){const d=angDiff(armPh,Math.atan2(pig.pos.x,pig.pos.z));if(d<0&&d>-(.13/r)){const a=armPh+.14/r;pig.pos.x=Math.sin(a)*r;pig.pos.z=Math.cos(a)*r;
+    if(B.hitCD<=0){B.hitCD=1;SFX.rustle();tone('triangle',220,160,.1,.15);floaty('swept!','#ffe9a0');G.energy=Math.max(0,G.energy-2);emit(pig.pos.x,.05,pig.pos.z,8,{col:[.95,.92,.85],spread:.4,up:.6,size:.012,life:.6})}}}}
+function sniffMill(B){marker(Math.sin(MILL.rampA0+.1)*1.45,millRampH(MILL.rampA0+.1)+.2,Math.cos(MILL.rampA0+.1)*1.45,0x9fe88a,B.group);marker(B.hopperAt.x,MILL.loftH+.3,B.hopperAt.z,0xffd060,B.group);marker(B.window.x,MILL.loftH+.45,B.window.z,0x7fd0ff,B.group);
+  toast('👃 Sniff sniff… flour dust, the foot of the ramp, seeds up in the loft and fresh air from the window.')}
+
 // ---- requests: some humans have lost a little thing, and it turned up down in the warren. Bring it back for a thank-you
 const REQUESTS={
   marble:{who:'Maya',zone:'park',ask:'I lost my favourite blue marble down a hole in the woods. If you ever find it…',thanks:'My marble! You clever little thing!',gift:['strawberry','strawberry'],pts:200},
@@ -2479,7 +2585,7 @@ function updateCamera(dt){
     const reach=p=>{aim(p,d);for(let s=1;s<=12;s++){const q=s/12;if(wSdf(lerp(camTgt.x,want.x,q),lerp(camTgt.y,want.y,q),lerp(camTgt.z,want.z,q),false)>-.1)return (s-1)/12}return 1};
     let best=p,bk=reach(p);for(const q of [.7,.95,1.2]){if(bk>=.6||q<=p)continue;const k=reach(q);if(k>bk+.1){bk=k;best=q}}
     aim(best,d*Math.max(.15,bk))}
-  else if(G.inside){const B=G.inside;if(B.tube)aim(.6,.75);else aim(B.camPitch||p,B.camDist?B.camDist():Math.min(d,B.camMax||(B.radius?4:2.6)));if(B.waterY!==undefined)want.y=Math.max(want.y,B.waterY+.12);want.x=clamp(want.x,-B.hx-.05,B.hx+.05);want.z=clamp(want.z,-B.hz-.05,B.hz+.05);want.y=clamp(want.y,insideHeight(want.x,want.z)+.08,B.ceilAt?B.ceilAt(want.x,want.z):want.x>B.loftX-.15?B.loftY-.15:B.ceil-.25)}
+  else if(G.inside){const B=G.inside;if(B.tube)aim(.6,.75);else{const cp=B.camPitch&&B.camPitch();aim(cp??p,B.camDist?B.camDist():Math.min(d,B.camMax||(B.radius?4:2.6)))}if(B.waterY!==undefined)want.y=Math.max(want.y,B.waterY+.12);want.x=clamp(want.x,-B.hx-.05,B.hx+.05);want.z=clamp(want.z,-B.hz-.05,B.hz+.05);want.y=clamp(want.y,insideHeight(want.x,want.z)+.08,B.ceilAt?B.ceilAt(want.x,want.z):want.x>B.loftX-.15?B.loftY-.15:B.ceil-.25)}
   else if(G.raft){const c=creekAt(G.raft.s-2.1);want.set(c.x+c.nx*G.raft.lat*.6,-.12+.78,c.z+c.nz*G.raft.lat*.6)}   // behind you along the creek's curve, over the water
   else{aim(p,d);const gy=heightAt(want.x,want.z)+.07;if(want.y<gy)want.y=gy}
   camPos.lerp(want,Math.min(1,dt*8));if(G.under&&wSdf(camPos.x,camPos.y,camPos.z,false)>-.05)camPos.copy(want);camera.position.copy(camPos);camera.lookAt(camTgt);
@@ -2563,6 +2669,8 @@ const GOALS=[
   {id:'agilitygold',icon:'🥇',name:'Best in Show',desc:`Win a gold rosette on the agility course (under ${AGI.GOLD} s)`,test:()=>G.rosette>=3,pts:300},
   {id:'lookout',icon:'🔭',name:'Top of the Tree',desc:'Climb the Hollow Oak in the Deep Wood all the way to the lookout',test:()=>G.lookout>=1,pts:250},
   {id:'quietclimb',icon:'🦉',name:'Light Paws',desc:'Climb the Hollow Oak to the lookout without waking the owl',test:()=>G.quietClimb>=1,pts:250},
+  {id:'seeds',icon:'🌻',name:'Seed Catcher',desc:'Catch 30 seeds in one go under the old windmill\'s hopper',test:()=>G.seedBest>=30,pts:250},
+  {id:'mazeview',icon:'🗺',name:'Bird\'s Eye',desc:'Look out over the sunflower maze from the old windmill\'s loft',test:()=>G.mazeView>=1,pts:150},
   {id:'shop',icon:'🐾',name:'After Hours',desc:'Sneak into the pet shop at night and make friends with Butterscotch',test:()=>G.pals.includes(friends.findIndex(f=>f.shopPig)),pts:300},
   {id:'gnaw',icon:'🦷',name:'Tidy Teeth',desc:'Gnaw a twig down without a single miss',test:()=>G.cleanGnaws>=1,pts:150},
   {id:'hay',icon:'🌾',name:'Hay Diver',desc:"Squeeze into a barn, burrow into its hay and find 3 hidden treats",test:()=>G.hayFinds>=3,pts:200},
@@ -2637,6 +2745,7 @@ function drawMap(){if(!mapBg)drawMapBg();fitMap();const g=mctx;const s=v=>(v/72*
   // passages you have explored, faint under the woods
   g.setLineDash([5,6]);g.strokeStyle='rgba(50,30,12,.5)';g.lineWidth=3;g.beginPath();
   if(Z===PARK)for(const e of W.edges)for(let k=0;k<e.pts.length-1;k++){const a=e.pts[k],b=e.pts[k+1];if(a.seen&&b.seen){g.moveTo(s(a.x/WS),s(a.z/WS));g.lineTo(s(b.x/WS),s(b.z/WS))}}g.stroke();g.setLineDash([]);
+  if(Z.id==='sunflowers'&&G.mazeView){const rt=mazeRoute();if(rt){const {cx,cz,n,cell}=MAZE,x0=cx-n*cell/2,z0=cz-n*cell/2;g.setLineDash([4,4]);g.strokeStyle='#ffd23f';g.lineWidth=2.5;g.beginPath();g.moveTo(s(x0+n*cell+1),s(z0+(n-.5)*cell));rt.forEach(([c,r])=>g.lineTo(s(x0+(c+.5)*cell),s(z0+(r+.5)*cell)));g.stroke();g.setLineDash([])}}
   if(Z.id==='deepwood'&&G.lookout){g.setLineDash([3,3]);g.strokeStyle='#ffd9a0';g.lineWidth=2;tunnels.forEach(t=>{if(t.found)return;g.beginPath();g.arc(s(t.x),s(t.z),6,0,7);g.stroke()});g.setLineDash([])}
   tunnels.forEach(t=>{if(!t.found)return;g.fillStyle='#2a1a0a';g.strokeStyle='#ffd9a0';g.lineWidth=2;g.beginPath();g.arc(s(t.x),s(t.z),6,0,7);g.fill();g.stroke()});
   if(!isNight())humans.forEach(h=>{g.fillStyle='#ffb0d0';g.beginPath();g.arc(s(h.obj.position.x),s(h.obj.position.z),5,0,7);g.fill()});
@@ -2677,6 +2786,7 @@ function placeStatus(z){const items=[],nf=(G.zfound[z.id]||[]).length,nb=z===PAR
   if(z.id==='farm'||z.id==='zoo')items.push({icon:'🛖',label:'Squeezed into the barn',done:!!G.barns[z.id]});
   if(z.id==='town')items.push({icon:'🐾',label:'Snuck into the pet shop',done:!!G.shop});
   if(z.id==='creek')items.push({icon:'🍃',label:'Rode the leaf raft to Willow Island',done:!!G.island});
+  if(z.id==='sunflowers')items.push({icon:'🌻',label:'Caught seeds in the old windmill',done:G.millCatch>=1});
   if(z.id==='deepwood')items.push({icon:'🔭',label:'Climbed the Hollow Oak to the lookout',done:!!G.lookout});
   if(z.id==='zoo')items.push({icon:'🏅',label:'Won a rosette in the agility tent',done:G.rosette>=1});
   return {items,done:items.every(i=>i.done)}}
@@ -2695,7 +2805,7 @@ function gameOver(){G.over=true;const best=Math.max(G.best,G.score);lsSet('wheek
 // Three slots in localStorage. The world is seeded (the same every game), so a save only keeps what changed:
 // the stats, what's been found, the herd (by friend index) and the warren's explored passages.
 const SLOTS=3,slotKey=i=>'wheek-slot-'+i;
-const SAVE_G=['hp','full','vitc','energy','happy','score','day','time','forages','pets','found','curios','nightsSurvived','eaten','luckT','warrenTip','zfound','visited','met','pals','placesDone','goals','bestStreak','hawkDodged','foxEscapes','mazePrize','heard','given','barns','hayFinds','teethT','gnaws','cleanGnaws','shop','fullHerd','island','rafts','cleanRaft','agility','rosette','agilityBest','agilityRuns','oak','lookout','quietClimb','owlSwoops'];
+const SAVE_G=['hp','full','vitc','energy','happy','score','day','time','forages','pets','found','curios','nightsSurvived','eaten','luckT','warrenTip','zfound','visited','met','pals','placesDone','goals','bestStreak','hawkDodged','foxEscapes','mazePrize','heard','given','barns','hayFinds','teethT','gnaws','cleanGnaws','shop','fullHerd','island','rafts','cleanRaft','agility','rosette','agilityBest','agilityRuns','oak','lookout','quietClimb','owlSwoops','mill','mazeView','seedBest','millCatch'];
 function snapshot(){const g={};for(const k of SAVE_G)g[k]=G[k];const ix=(a,f)=>a.flatMap((x,i)=>f(x)?[i]:[]);
   return {v:1,saved:Date.now(),name:G.name,breed:G.breed,coat:G.coat,G:g,
     zone:Z.id,pig:G.raft?{x:+Z.raft.ex.toFixed(2),z:+Z.raft.ez.toFixed(2),h:+Z.raft.out.toFixed(2)}:G.inside?{x:+G.insideHole.ex.toFixed(2),z:+G.insideHole.ez.toFixed(2),h:+G.insideHole.out.toFixed(2)}:{x:+pig.pos.x.toFixed(2),z:+pig.pos.z.toFixed(2),h:+pig.heading.toFixed(2)},under:G.under?PARK.tunnels.indexOf(W.from):-1,herd:herd.map(f=>friends.indexOf(f)),names:friends.map(f=>f.name),known:ix(friends,f=>f.known),
@@ -2853,7 +2963,7 @@ function loop(){
     if(G.raft)updateRaft(dt,t);else updatePig(dt,t);
     const hold=(keys.KeyE)&&!G.inTunnel?(G.acts||[]).find(a=>a.k==='E'&&a.hold):null;if(hold)holdEat(dt,hold);
     updateForage(dt);updateGnaw(dt);updateSurvival(dt);updateHumans(dt);updateFriends(dt,t);updateHawk(dt,t);updateFoxes(dt,t);updateDay(dt);updateReveals(dt);updateDrops(dt);
-    if(Z.critters.length)updateCritters(dt,t);if(Z.cars.length)updateCars(dt)}
+    if(Z.critters.length)updateCritters(dt,t);if(Z.cars.length)updateCars(dt);if(Z.mill&&Z.mill.sails)Z.mill.sails.rotation.z+=dt*.55}
   }else if(!G.started){ // title orbit / breed preview
     if(G.selecting)G.camYaw+=angDiff(G.camYaw,pig.heading+.5+Math.sin(t*.3)*.9)*Math.min(1,dt*2);else G.camYaw+=dt*.08;updateDay(0);updatePig(dt,t);updateFriends(dt,t);
   }
@@ -2889,5 +2999,5 @@ function loop(){
   $('setBtn').onclick=openSettings;$('setBtn2').onclick=openSettings;$('setClose').onclick=closeSettings;applyQuality();
   $('resumeBtn').onclick=()=>togglePause(false);$('saveBtn').onclick=()=>saveGame();$('quitBtn').onclick=()=>{saveGame(true);location.reload()};$('jclose').onclick=closeJournal;$('againBtn').onclick=()=>location.reload();
   $('retryBtn').onclick=()=>{try{sessionStorage.setItem('wheek-continue',G.slot)}catch(e){}location.reload()};
-  window.__game={G,W,WS,ZONE,PARK,EDGE,ITEMS,AGI,AGI_COURSE,WEAVE_X,WEAVE_Z,OAK,OAK_SHELVES,oakSurf,oakBlocked,owlNoise,startRaft,creekAt,offerSwap,insideCollide,TUBE_NODES,startGnaw,gnawHit,enterBarn:enterInside,exitBarn:exitInside,enterInside,exitInside,enterTube:n=>enterTube(n),catNoise:n=>catNoise(n),startBurrow,popOut,insideHeight,revealItem,setInput,SET,sun,music:()=>({now:musicNow&&musicNow.k,gain:musicGain&&musicGain.gain.value,tracks:Object.fromEntries(Object.entries(MUSIC).map(([k,m])=>[k,m.buf?{dur:+m.buf.duration.toFixed(4),start:m.start,len:m.len}:null]))}),wSdf,neighbour,freeAt,Z:()=>Z,visit:(id,x=0,z=0,h=0)=>arriveZone(ZONE[id],0,{x,z,h}),enterWarren,exitWarren,pig,friends,herd,joinHerd,keys,applyLook,humans,tunnels,spots,hawk,foxes,heightAt,renderer,scene,camera};
+  window.__game={G,W,WS,ZONE,PARK,EDGE,ITEMS,MILL,MAZE,angNorm,millSurf,millBlocked,mazeRoute,AGI,AGI_COURSE,WEAVE_X,WEAVE_Z,OAK,OAK_SHELVES,oakSurf,oakBlocked,owlNoise,startRaft,creekAt,offerSwap,insideCollide,TUBE_NODES,startGnaw,gnawHit,enterBarn:enterInside,exitBarn:exitInside,enterInside,exitInside,enterTube:n=>enterTube(n),catNoise:n=>catNoise(n),startBurrow,popOut,insideHeight,revealItem,setInput,SET,sun,music:()=>({now:musicNow&&musicNow.k,gain:musicGain&&musicGain.gain.value,tracks:Object.fromEntries(Object.entries(MUSIC).map(([k,m])=>[k,m.buf?{dur:+m.buf.duration.toFixed(4),start:m.start,len:m.len}:null]))}),wSdf,neighbour,freeAt,Z:()=>Z,visit:(id,x=0,z=0,h=0)=>arriveZone(ZONE[id],0,{x,z,h}),enterWarren,exitWarren,pig,friends,herd,joinHerd,keys,applyLook,humans,tunnels,spots,hawk,foxes,heightAt,renderer,scene,camera};
 })().catch(e=>{console.error(e);$('loading').textContent='Failed to load: '+e.message});
